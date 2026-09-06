@@ -11,6 +11,7 @@ export type Route =
   | { name: 'label' }
   | { name: 'board' }
   | { name: 'racks' }
+  | { name: 'pindai' }
   | { name: 'scan'; target: 'item' | 'asset' | 'location'; id: string }
   | { name: 'scan-empty' };
 
@@ -34,6 +35,7 @@ export function parseRoute(hash: string): Route {
   if (path === '/label') return { name: 'label' };
   if (path === '/board') return { name: 'board' };
   if (path === '/racks') return { name: 'racks' };
+  if (path === '/pindai') return { name: 'pindai' };
   return { name: 'opname' };
 }
 
@@ -42,6 +44,7 @@ export function routeToHash(route: Route): string {
     case 'label': return '#/label';
     case 'board': return '#/board';
     case 'racks': return '#/racks';
+    case 'pindai': return '#/pindai';
     case 'scan': {
       const key = route.target === 'asset' ? 'a' : route.target === 'location' ? 'l' : 'i';
       return `#/scan?${key}=${encodeURIComponent(route.id)}`;
@@ -49,4 +52,35 @@ export function routeToHash(route: Route): string {
     case 'scan-empty': return '#/scan';
     default: return '#/';
   }
+}
+
+/**
+ * Turn whatever a camera decoded into a destination, or `null` if it means nothing to us.
+ *
+ * Accepts three shapes, because a gudang accumulates labels from more than one source:
+ *  1. Our own deep links — the full URL a printed label encodes.
+ *  2. A bare id, for a label printed before deep links, or hand-written, or read off a
+ *     different system. An id we recognise is still useful even without a URL around it.
+ *  3. Anything else → null, so the UI can say "label ini bukan milik sistem ini" rather
+ *     than silently doing nothing, which reads as a broken camera.
+ */
+export function routeFromScan(text: string): Route | null {
+  const raw = text.trim();
+  if (raw === '') return null;
+
+  // 1. A URL of ours. Only the hash matters; the host may be a phone's saved shortcut,
+  //    a different deployment, or plain http on the LAN.
+  const hashAt = raw.indexOf('#/');
+  if (hashAt !== -1) {
+    const route = parseRoute(raw.slice(hashAt));
+    return route.name === 'scan' ? route : null;
+  }
+
+  // 2. A bare id. Order matters: an assetId contains its item's barcode as a prefix, so
+  //    the most specific pattern has to be tested first.
+  if (/^ALQ-ITM-\d+-\d+$/i.test(raw)) return { name: 'scan', target: 'asset', id: raw.toUpperCase() };
+  if (/^LOC-[A-Z0-9_-]+$/i.test(raw)) return { name: 'scan', target: 'location', id: raw.toUpperCase() };
+  if (/^(ALQ-)?ITM-\d+$/i.test(raw)) return { name: 'scan', target: 'item', id: raw.toUpperCase() };
+
+  return null;
 }

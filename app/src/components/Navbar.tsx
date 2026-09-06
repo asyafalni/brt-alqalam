@@ -5,7 +5,7 @@
 // and wired to nothing (`Navbar.tsx:47-53`) — carrying that over would ship a permanent red
 // dot that means nothing.
 
-import { Bell, Menu, Search } from '@octanejs/lucide';
+import { Bell, Menu, ScanLine, Search } from '@octanejs/lucide';
 
 interface Props {
   search: string;
@@ -13,6 +13,7 @@ interface Props {
   onSearch: (value: string) => void;
   onToggleSidebar: () => void;
   onShowAlerts: () => void;
+  onScan: () => void;
 }
 
 export function Navbar(p: Props) {
@@ -38,9 +39,19 @@ export function Navbar(p: Props) {
         />
       </div>
 
+      {/* Hidden on mobile, where the raised centre button in the bottom bar owns this. */}
       <button
         type="button"
-        class="relative ml-auto rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform hover:-translate-y-0.5"
+        class="ml-auto hidden items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-slate-50 shadow-sm md:flex"
+        onClick={p.onScan}
+      >
+        <ScanLine class="h-5 w-5" />
+        Pindai
+      </button>
+
+      <button
+        type="button"
+        class="relative rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform hover:-translate-y-0.5"
         onClick={p.onShowAlerts}
         aria-label={
           p.alertCount > 0 ? `${p.alertCount} barang menipis` : 'Tidak ada notifikasi stok'

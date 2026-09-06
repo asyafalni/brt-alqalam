@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
-import { ClipboardList, MapPin, Package, QrCode } from '@octanejs/lucide';
+import { ClipboardList, MapPin, Package, QrCode, ScanLine } from '@octanejs/lucide';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -12,6 +12,7 @@ import { StockTake } from './features/stocktake/StockTake';
 import { LabelSheet } from './features/labels/LabelSheet';
 import { Board } from './features/board/Board';
 import { ScanResult } from './features/scan/ScanResult';
+import { ScannerView } from './features/scan/ScannerView';
 
 export function App() {
   // One draft, shared. Two screens each loading from storage would be two sources of truth,
@@ -47,6 +48,17 @@ export function App() {
     if (isMobile) setCollapsed(true);
   };
 
+  // The camera takes the whole screen: it is a viewfinder, and chrome around a viewfinder
+  // is just something to mis-tap while aiming.
+  if (route.name === 'pindai') {
+    return (
+      <ScannerView
+        onFound={(next) => go(next)}
+        onClose={() => go({ name: 'opname' })}
+      />
+    );
+  }
+
   return (
     // SmartInv App.tsx:67 — the app frame.
     <div class="flex h-screen bg-slate-50 font-sans">
@@ -74,6 +86,7 @@ export function App() {
           onSearch={setSearch}
           onToggleSidebar={() => setCollapsed(!collapsed)}
           onShowAlerts={() => navigate({ name: 'board' })}
+          onScan={() => go({ name: 'pindai' })}
         />
 
         {/* pb-24 on mobile keeps the last row clear of the bottom bar. */}
@@ -131,6 +144,7 @@ export function App() {
           { name: 'Cetak Label', short: 'Label', icon: QrCode, route: { name: 'label' } },
         ]}
         onNavigate={navigate}
+        onScan={() => go({ name: 'pindai' })}
       />
     </div>
   );

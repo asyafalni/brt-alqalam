@@ -18,7 +18,28 @@ cd app && npm install && npm run dev     # http://localhost:5173
 ```
 
 Walk the gudang, add what you find, **Ekspor CSV**. That already answers *"nobody knows what we
-own"*. Everything below is about turning that into a shared, live system.
+own"*. Tap **Muat contoh data** on an empty stock-take to see the whole thing populated first.
+Everything below is about turning that into a shared, live system.
+
+### ⚠️ Stage 0b — the camera needs HTTPS. Read this before testing on a phone.
+
+`npm run dev -- --host` prints a LAN address like `http://192.168.18.32:5173`. Every screen works
+there **except the scanner**: browsers refuse `getUserMedia` outside a *secure context*, so on
+plain `http://` over the LAN the camera will not open. The app detects this and says
+*"Kamera butuh HTTPS"* rather than looking broken — but it still cannot scan.
+
+Three ways round it, cheapest first:
+
+1. **Test the scanner on the deployed HTTPS URL** (Stage 5). Simplest, and it is the environment
+   the marbot will actually use.
+2. **Run the dev server over HTTPS**: `npm i -D @vitejs/plugin-basic-ssl`, add it to
+   `vite.config.ts`, then `npm run dev -- --host`. The phone will warn about the self-signed
+   certificate; accept it once.
+3. **Chrome flag on an Android test device**: `chrome://flags` →
+   *"Insecure origins treated as secure"* → add `http://192.168.18.32:5173`. Test-only; never
+   ask a marbot to do this.
+
+Everything else — opname, racks, labels, stock, cycle counts — works fine over plain LAN http.
 
 ---
 
@@ -179,6 +200,25 @@ append rows as anyone — which contradicts the requirement that the system be l
 is exactly the right semantic because a local queue already holds the truth. Not before.
 
 ---
+
+## What I need from you (in priority order)
+
+Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
+
+| # | What | Why it blocks me | Effort |
+| --- | --- | --- | --- |
+| 1 | **Clerk → Configure → JWT Templates**: available on your plan, or upgrade-gated? | Apps Script has no RSA verify and Clerk no longer has a session-verify endpoint, so an HS256 template is the only way the gateway can check a login (§65.3). If it is paid, I redesign admin auth. | 2 min |
+| 2 | **Create the spreadsheet** and send me its ID | Nothing can read or write until it exists. Import the five tabs from `sheets/`. | 10 min |
+| 3 | **Deploy to Vercel/Cloudflare** and send me the URL | The scanner needs HTTPS, and printed labels need a stable address baked into every QR. | 20 min |
+| 4 | **Your gudang's real layout** — one room or several zones, roughly how many shelves | The rack board groups by whatever zone you type. I would rather build against the real shape than a guess. | a photo |
+| 5 | **Watch the marbot for an hour** (`docs/OBSERVE-MARBOT.md`) | Every UI assumption rests on this. It is the one thing that can invalidate work already done. | 1 hour |
+| 6 | **Two real "it went missing" stories** from the boss | Settles whether loan tracking is the fix for his top pain, or whether things are simply lost in the mess. | a conversation |
+
+## Decisions still waiting on you
+
+- **Q33 — dark board?** Arche is dark; the kiosk probably should not be, since dark screens are
+  worse in sunlight. Proposed: light kiosk, and a dark option for the desktop board only.
+- **Q34 — zones.** Covered by #4 above.
 
 ## Checklist
 

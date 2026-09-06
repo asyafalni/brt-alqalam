@@ -13,6 +13,7 @@
   "dependencies": {
     "@octanejs/lucide": "^0.1.47",
     "@octanejs/tanstack-store": "^0.0.47",
+    "@zxing/browser": "^0.2.1",
     "octane": "^0.2.3",
     "qrcode-generator": "^2.0.4"
   },

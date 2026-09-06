@@ -6,6 +6,7 @@
 // destination inside the thumb arc, which is the whole point on a device someone is holding
 // while also holding a mop.
 
+import { ScanLine } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 
 interface Tab {
@@ -17,9 +18,13 @@ interface Tab {
 }
 
 export function BottomNav(
-  { route, tabs, onNavigate }:
-  { route: Route; tabs: Tab[]; onNavigate: (route: Route) => void },
+  { route, tabs, onNavigate, onScan }:
+  { route: Route; tabs: Tab[]; onNavigate: (route: Route) => void; onScan: () => void },
 ) {
+  // The scanner sits in the middle, raised — it is the one action taken while standing at a
+  // shelf holding something, and the centre is the easiest point in the thumb arc to hit
+  // without looking.
+  const half = Math.ceil(tabs.length / 2);
   return (
     <nav
       class="no-print fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md md:hidden"
@@ -28,7 +33,7 @@ export function BottomNav(
       aria-label="Navigasi utama"
     >
       <div class="mx-auto flex max-w-lg items-stretch">
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const active = tab.route.name === route.name;
           return (
             <button
@@ -56,7 +61,19 @@ export function BottomNav(
               <span class="text-[10px] font-semibold">{tab.short}</span>
             </button>
           );
-        })}
+        }).flatMap((node, index) => (index === half - 1
+          ? [node, (
+            <button
+              key="scan"
+              type="button"
+              class="relative -mt-6 mx-1 flex h-14 w-14 shrink-0 items-center justify-center self-center rounded-full bg-slate-900 text-slate-50 shadow-lg"
+              onClick={onScan}
+              aria-label="Pindai QR"
+            >
+              <ScanLine class="h-6 w-6" />
+            </button>
+          )]
+          : [node]))}
       </div>
     </nav>
   );
