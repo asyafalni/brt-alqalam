@@ -1,0 +1,16 @@
+{
+  "name": "brt-inventaris-domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure domain layer for BRT Inventaris \u2014 types + deriveState reducer. No I/O, no framework.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.0",
+    "vite": "^8.2.2"
+  }
+}
