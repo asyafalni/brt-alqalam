@@ -8,7 +8,7 @@
 //    @octanejs/motion is not a dependency yet, and its `layoutId` is single-element FLIP rather
 //    than a full projection tree (OCTANE-FINDINGS.md). Static appearance is identical.
 
-import { ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, Warehouse } from '@octanejs/lucide';
+import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, Warehouse, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 
 interface NavItem { name: string; icon: typeof Package; route: Route; badge?: number }
@@ -20,6 +20,7 @@ interface Props {
   itemCount: number;
   alertCount: number;
   rackCount: number;
+  assetIssues: number;
   onNavigate: (route: Route) => void;
   onClose: () => void;
 }
@@ -30,7 +31,9 @@ export function Sidebar(p: Props) {
     { name: 'Opname Gudang', icon: ClipboardList, route: { name: 'opname' } },
     { name: 'Peta Rak', icon: MapPin, route: { name: 'racks' }, badge: p.rackCount },
     { name: 'Stok', icon: Package, route: { name: 'board' }, badge: p.alertCount },
+    { name: 'Aset', icon: Wrench, route: { name: 'aset' }, badge: p.assetIssues },
     { name: 'Cetak Label', icon: QrCode, route: { name: 'label' }, badge: p.itemCount },
+    { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
   ];
 
   const width = p.isMobile ? '280px' : p.collapsed ? '90px' : '260px';

@@ -100,6 +100,11 @@ export function RackBoard(
             />
           </div>
 
+          {/* Two columns on a wide screen: the map stays put while the detail changes beside
+              it, so choosing a rack never scrolls the grid out from under you. Stacked on a
+              phone, where there is no room for two and the detail follows the tap. */}
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px] lg:items-start">
+          <div class="space-y-4">
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -141,6 +146,9 @@ export function RackBoard(
             </section>
           ))}
 
+          </div>
+
+          <div class="space-y-4 lg:sticky lg:top-24">
           {due.length > 0 && (
             <section class={CARD}>
               <div class="mb-3 flex items-center gap-3">
@@ -183,6 +191,14 @@ export function RackBoard(
                 setCounting(null);
               }}
             />
+          )}
+
+          {!selectedRack && !counting && (
+            <section class={`${CARD} hidden lg:block`}>
+              <MapPin class="mb-2 h-6 w-6 text-slate-300" />
+              <p class="font-semibold text-slate-700">Pilih satu rak</p>
+              <p class="text-sm text-slate-500">Isinya akan tampil di sini.</p>
+            </section>
           )}
 
           {selectedRack && !counting && (
@@ -260,6 +276,8 @@ export function RackBoard(
               )}
             </section>
           )}
+          </div>
+          </div>
         </>
       )}
     </div>

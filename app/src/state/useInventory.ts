@@ -28,7 +28,9 @@ export function useInventory(draft: Draft, now: number): Inventory {
     [draft.items, now],
   );
 
-  const txns: Txn[] = useMemo(() => [], []);
+  // Real use has none until the gateway lands; the demo fills it so every derived state
+  // — dipinjam, rusak, hilang — is actually reachable and visible.
+  const txns: Txn[] = draft.txns;
 
   const derived = useMemo(
     () => deriveState(draft.items, instances, txns, now),

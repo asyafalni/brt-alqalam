@@ -7,6 +7,8 @@ import { Card } from './components/ui';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
+import { Report } from './features/report/Report';
+import { AssetBoard } from './features/assets/AssetBoard';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
 // on the path anyone opens first. The label sheet pulls a QR *encoder* (~43kB) and the scanner
@@ -45,6 +47,13 @@ export function App() {
   const now = useMemo(() => Date.now(), []);
   const inventory = useInventory(draft, now);
 
+  // Broken and lost both need a person to do something; borrowed does not.
+  const assetIssues = useMemo(
+    () => Object.values(inventory.derived.instances)
+      .filter((d) => d.status === 'broken' || d.status === 'lost').length,
+    [inventory.derived],
+  );
+
   // SmartInv App.tsx:51-64 owns this the same way. Their version force-expands on every
   // resize, overriding a manual collapse; ours only reacts when the breakpoint is crossed.
   const [isMobile, setIsMobile] = useState(() => innerWidth < 768);
@@ -79,7 +88,7 @@ export function App() {
 
   return (
     // SmartInv App.tsx:67 — the app frame.
-    <div class="flex h-screen bg-slate-50 font-sans">
+    <div class="app-frame flex h-screen bg-slate-50 font-sans">
       {/* SmartInv's two decorative blur blobs (App.tsx:69-70) are deliberately NOT ported.
           They are pure ornament — the opposite of DOSS's restraint — and two full-viewport
           120px blur layers are the most expensive thing that can sit behind a scrolling list
@@ -92,12 +101,13 @@ export function App() {
         itemCount={draft.items.length}
         alertCount={inventory.notifications.length}
         rackCount={draft.locations.length}
+        assetIssues={assetIssues}
         onNavigate={navigate}
         onClose={() => setCollapsed(true)}
       />
 
       {/* App.tsx:74-77 — content column. */}
-      <div class="relative flex min-w-0 flex-1 flex-col">
+      <div class="app-column relative flex min-w-0 flex-1 flex-col">
         <Navbar
           search={search}
           alertCount={inventory.notifications.length}
@@ -146,6 +156,17 @@ export function App() {
               now={now}
               onNavigate={navigate}
             />
+          )}
+          {route.name === 'aset' && (
+            <AssetBoard
+              draft={draft}
+              inventory={inventory}
+              search={search}
+              onOpenItem={(id) => navigate({ name: 'item', id })}
+            />
+          )}
+          {route.name === 'laporan' && (
+            <Report draft={draft} inventory={inventory} now={now} />
           )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>

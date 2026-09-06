@@ -14,8 +14,8 @@ function seed(...inputs: DraftInput[]) {
   const items = inputs.reduce<ReturnType<typeof createItem>[]>(
     (acc, i) => [...acc, createItem(i, acc)], [],
   );
-  localStorage.setItem('brt.stocktake.draft.v3',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [] }));
+  localStorage.setItem('brt.stocktake.draft.v4',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [], txns: [] }));
   return items;
 }
 

@@ -14,8 +14,8 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
 const B3: Location = createLocation('B3', 'Gudang Utama', 'Rak sabun', []);
 
 function seed(items: Item[], locations: Location[] = [B3]) {
-  localStorage.setItem('brt.stocktake.draft.v3',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations }));
+  localStorage.setItem('brt.stocktake.draft.v4',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, txns: [] }));
 }
 const catalog = (...inputs: DraftInput[]): Item[] =>
   inputs.reduce<Item[]>((acc, i) => [...acc, createItem(i, acc)], []);

@@ -131,6 +131,9 @@ input, select, textarea { font-size: max(16px, 1em); }
 
 @media print {
   .no-print { display: none !important; }
+  /* The report is printed as a document, so the app frame must not come with it. */
+  .app-frame { display: block !important; height: auto !important; }
+  .app-column { display: block !important; }
   body { background: #fff; color: #000; }
   main { max-width: none; padding: 0; }
   .label { border: none; break-inside: avoid; page-break-inside: avoid; }

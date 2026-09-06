@@ -42,11 +42,11 @@ const B3 = createLocation('B3', 'Gudang Utama', 'Rak sabun', []);
 const B4 = createLocation('B4', 'Gudang Utama', '', [B3]);
 
 function seed(items: Item[], locations: Location[]) {
-  localStorage.setItem('brt.stocktake.draft.v3',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations }));
+  localStorage.setItem('brt.stocktake.draft.v4',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, txns: [] }));
 }
 
-const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v3')!);
+const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v4')!);
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
