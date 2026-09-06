@@ -50,9 +50,10 @@ export function App() {
   return (
     // SmartInv App.tsx:67 — the app frame.
     <div class="flex h-screen bg-slate-50 font-sans">
-      {/* App.tsx:69-70 — decorative background glow. */}
-      <div class="pointer-events-none fixed right-[-5%] top-[-10%] h-[40%] w-[40%] rounded-full bg-sky-200/20 blur-[120px]" />
-      <div class="pointer-events-none fixed bottom-[-10%] left-[-5%] h-[40%] w-[40%] rounded-full bg-blue-200/10 blur-[120px]" />
+      {/* SmartInv's two decorative blur blobs (App.tsx:69-70) are deliberately NOT ported.
+          They are pure ornament — the opposite of DOSS's restraint — and two full-viewport
+          120px blur layers are the most expensive thing that can sit behind a scrolling list
+          on a tablet. "Minimalist and fast" is one decision here, not two. */}
 
       <Sidebar
         route={route}
@@ -116,7 +117,7 @@ export function App() {
                 </p>
                 <button
                   type="button"
-                  class="min-h-touch rounded-lg bg-[#38BDF8] px-6 font-semibold text-white hover:bg-[#0EA5E9]"
+                  class="min-h-touch rounded-lg bg-slate-900 px-6 font-semibold text-slate-50 hover:bg-slate-800"
                   onClick={() => navigate({ name: 'opname' })}
                 >
                   Buka Opname Gudang

@@ -57,15 +57,13 @@ export function Sidebar(p: Props) {
           class="relative flex h-full flex-col overflow-hidden border-r border-white/10 bg-slate-900/95
                  backdrop-blur-xl md:rounded-[32px] md:border md:shadow-2xl"
         >
-          <div class="pointer-events-none absolute left-0 top-0 h-32 w-full bg-sky-500/10 blur-3xl" />
-
           <div class="relative z-10 mb-4 flex shrink-0 items-center justify-between p-6">
             <div class="flex items-center gap-3">
               <div
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br
-                       from-sky-400 to-blue-600 shadow-lg shadow-sky-500/20 transition-transform hover:rotate-12 hover:scale-110"
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-50
+                       transition-transform hover:rotate-12 hover:scale-110"
               >
-                <Warehouse class="h-6 w-6 text-white" />
+                <Warehouse class="h-6 w-6 text-slate-900" />
               </div>
               {showText && (
                 <span class="whitespace-nowrap text-xl font-bold tracking-tight text-white">
@@ -96,12 +94,12 @@ export function Sidebar(p: Props) {
                   onClick={() => p.onNavigate(item.route)}
                 >
                   {active && (
-                    <span class="absolute inset-0 z-0 rounded-2xl border-l-4 border-sky-400 bg-gradient-to-r from-sky-500/20 to-sky-500/5" />
+                    <span class="absolute inset-0 z-0 rounded-2xl border-l-4 border-slate-50 bg-white/10" />
                   )}
                   <item.icon
                     class={
                       'relative z-10 h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ' +
-                      (active ? 'text-sky-400' : '')
+                      (active ? 'text-slate-50' : '')
                     }
                   />
                   {showText && (

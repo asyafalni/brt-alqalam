@@ -31,7 +31,7 @@ export function Board(
       />
 
       {offline && (
-        <div class={`${CARD} border-sky-100 bg-gradient-to-br from-white to-sky-50/30`}>
+        <div class={`${CARD} border-slate-200`}>
           <p class="text-sm text-slate-600">
             <span class="font-bold text-slate-900">Belum terhubung ke gateway.</span>{' '}
             Riwayat transaksi masih kosong, jadi yang tampil adalah stok awal hasil opname.
@@ -57,7 +57,7 @@ export function Board(
           </div>
 
           {/* Dashboard.tsx:207-261 — the amber alert rail, our Notifikasi Stok. */}
-          <div class={`${CARD} border-amber-100 bg-gradient-to-br from-white to-amber-50/20`}>
+          <div class={`${CARD} border-amber-200`}>
             <div class="mb-4 flex items-center gap-3">
               <TriangleAlert class="h-5 w-5 text-amber-500" />
               <h2 class="font-bold text-slate-900">Notifikasi Stok</h2>

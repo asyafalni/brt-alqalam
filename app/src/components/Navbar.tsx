@@ -27,7 +27,7 @@ export function Navbar(p: Props) {
         <Menu class="h-5 w-5" />
       </button>
 
-      <div class="hidden w-72 items-center gap-3 rounded-[20px] border border-white bg-white/60 px-5 py-3 shadow-sm backdrop-blur-md focus-within:border-sky-400/50 focus-within:ring-4 focus-within:ring-sky-500/10 sm:flex md:w-96">
+      <div class="hidden w-72 items-center gap-3 rounded-[20px] border border-white bg-white/60 px-5 py-3 shadow-sm backdrop-blur-md focus-within:border-slate-900/40 focus-within:ring-4 focus-within:ring-slate-900/5 sm:flex md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
           class="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"

@@ -39,6 +39,13 @@ export interface Location {
   zone: string;
   order: number;
   active: boolean;
+  /**
+   * When this rack was last physically counted. A one-off opname gives a true register for
+   * exactly one day; "messy inventory" is what drift looks like a year later. Counting a slice
+   * on a rotation is what keeps it true — and a rack is a two-minute job where the whole
+   * gudang never happens.
+   */
+  lastCountedTs?: number;
 }
 
 export interface Item {

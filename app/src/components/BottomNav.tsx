@@ -38,12 +38,12 @@ export function BottomNav(
               aria-label={tab.name}
               class={
                 'relative flex min-h-touch flex-1 flex-col items-center justify-center gap-0.5 py-2 ' +
-                'transition-colors ' + (active ? 'text-sky-500' : 'text-slate-400')
+                'transition-colors ' + (active ? 'text-slate-900' : 'text-slate-400')
               }
               onClick={() => onNavigate(tab.route)}
             >
               {active && (
-                <span class="absolute inset-x-3 top-0 h-0.5 rounded-full bg-sky-500" aria-hidden="true" />
+                <span class="absolute inset-x-3 top-0 h-0.5 rounded-full bg-slate-900" aria-hidden="true" />
               )}
               <span class="relative">
                 <tab.icon class="h-5 w-5" />

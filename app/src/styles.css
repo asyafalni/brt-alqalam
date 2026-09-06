@@ -14,12 +14,51 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* ---------------------------------------------------------------------
+     PALETTE — DOSS neutrals on SmartInv's structure.
+     doss.com is #000000 + #e0ddd8 and deliberately carries no accent. We take
+     the part that transfers and is measurably better here: a WARM ground
+     glares less than a cool white under gudang skylights, and black on beige
+     is about the highest contrast available — which is what the design doc
+     asks for (Part XVI, sunlight legibility).
+
+     Applied by RETINTING the slate ramp rather than rewriting components:
+     SmartInv's classes are stock Tailwind, so every `bg-slate-50` and
+     `text-slate-900` already in the ported markup re-skins with no component
+     change. Conventions intact, values swapped.
+
+     What we do NOT take is the two-colour restraint. A marketing site has
+     nothing to signal; this UI carries seven statuses, and colour is how
+     they read at a glance.
+  --------------------------------------------------------------------- */
+  --color-slate-50: #e0ddd8;   /* DOSS beige — the app ground */
+  --color-slate-100: #d7d3cd;
+  --color-slate-200: #c5c0b8;
+  --color-slate-300: #a9a49b;
+  --color-slate-400: #8b867d;
+  --color-slate-500: #6c6760;
+  --color-slate-600: #524e48;
+  --color-slate-700: #3a3733;
+  --color-slate-800: #232120;
+  --color-slate-900: #000000;  /* DOSS black — ink, and the sidebar panel */
+  --color-slate-950: #000000;
+
+  /* The single interactive accent, kept restrained per DOSS. Warm stone rather
+     than a vibrant hue, so it never competes with a status colour for meaning. */
+  --color-sky-50: #efece7;
+  --color-sky-100: #ded9d1;
+  --color-sky-200: #c9c2b7;
+  --color-sky-400: #6c6760;
+  --color-sky-500: #3a3733;
+  --color-sky-600: #232120;
+  --color-sky-700: #171614;
+
   /* FIELD-OPS EXTENSION — 56px, where SmartInv's controls are 32–44px. Justified by a
      written need: a shared tablet handled with wet or gloved hands (design doc Part XVI). */
   --spacing-touch: 3.5rem;
 }
 
-/* SmartInv `frontend/index.css:5-9` — the app ground and default ink. */
+/* SmartInv `frontend/index.css:5-9` — the app ground and default ink, DOSS-tinted. */
 body {
   margin: 0;
   @apply bg-slate-50 text-slate-900 font-sans antialiased;
@@ -43,7 +82,7 @@ input, select, textarea { font-size: max(16px, 1em); }
 
 :where(button, [role="button"], a):focus-visible,
 :where(input, select, textarea):focus-visible {
-  @apply outline-2 outline-offset-2 outline-sky-500;
+  @apply outline-2 outline-offset-2 outline-slate-900;
 }
 
 /* ---------------------------------------------------------------------------

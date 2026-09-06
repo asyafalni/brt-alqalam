@@ -186,7 +186,7 @@ export function ItemForm(p: Props) {
             />
             <button
               type="button"
-              class="min-h-touch shrink-0 rounded-lg bg-[#38BDF8] px-4 font-semibold text-white hover:bg-[#0EA5E9]"
+              class="min-h-touch shrink-0 rounded-lg bg-slate-900 px-4 font-semibold text-slate-50 hover:bg-slate-800"
               onClick={commitRack}
             >
               Simpan

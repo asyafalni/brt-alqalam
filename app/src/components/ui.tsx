@@ -36,9 +36,11 @@ const BUTTON_BASE =
   'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ' +
   'rounded-lg focus:outline-none active:scale-95 disabled:opacity-50 disabled:pointer-events-none';
 
+// DOSS's restraint applied where it costs nothing: the primary action is black on beige,
+// the highest-contrast pairing available, leaving colour free to mean *status*.
 const VARIANT = {
-  primary: 'bg-[#38BDF8] text-white hover:bg-[#0EA5E9] shadow-sm',
-  secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
+  primary: 'bg-slate-900 text-slate-50 hover:bg-slate-800 shadow-sm',
+  secondary: 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-100',
   danger: 'bg-red-500 text-white hover:bg-red-600',
   ghost: 'bg-transparent hover:bg-slate-100 text-slate-600',
   success: 'bg-[#22C55E] text-white',
@@ -75,14 +77,14 @@ export function Button(props: {
 export const LABEL = 'block text-sm font-medium text-slate-700 mb-1.5';
 export const FIELD =
   'w-full px-4 rounded-lg border border-slate-200 bg-white text-slate-900 transition-all ' +
-  'duration-200 outline-none focus:ring-2 focus:ring-[#38BDF8]/20 focus:border-[#38BDF8] ' +
+  'duration-200 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 ' +
   'placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
 export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
 export const ERROR_TEXT = 'mt-1.5 text-xs text-red-500 font-medium';
 
 // --- Stat tile — Dashboard.tsx:140-152 --------------------------------------------------
 export function Stat(
-  { value, label, tint = 'bg-sky-50 text-sky-600' }: { value: unknown; label: string; tint?: string },
+  { value, label, tint = 'bg-slate-900 text-slate-50' }: { value: unknown; label: string; tint?: string },
 ) {
   return (
     <div class={`${CARD} flex items-center gap-4`}>

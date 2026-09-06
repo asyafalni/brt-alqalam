@@ -114,7 +114,7 @@ export function ScanResult(p: Props) {
         <p class={`mt-4 ${CODE}`}>{instance?.assetId ?? item.barcode}</p>
       </div>
 
-      <div class={`${CARD} border-sky-100 bg-gradient-to-br from-white to-sky-50/30`}>
+      <div class={`${CARD} border-slate-200`}>
         <p class="text-sm text-slate-600">
           <span class="font-bold text-slate-900">Belum bisa mencatat keluar/masuk.</span>{' '}
           Transaksi ditulis lewat gateway, dan gateway belum terpasang. Sementara ini layar
