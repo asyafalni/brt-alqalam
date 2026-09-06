@@ -1,18 +1,36 @@
-import { useEffect, useMemo, useState } from 'octane';
-import { ClipboardList, MapPin, Package, QrCode, ScanLine } from '@octanejs/lucide';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
+import { ClipboardList, LayoutDashboard, MapPin, Package } from '@octanejs/lucide';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card } from './components/ui';
 import { RackBoard } from './features/racks/RackBoard';
+import { Dashboard } from './features/dashboard/Dashboard';
+
+// Split at the route, because these two carry the app's only heavy dependencies and neither is
+// on the path anyone opens first. The label sheet pulls a QR *encoder* (~43kB) and the scanner
+// pulls a QR *decoder* on browsers without a native one — both would otherwise sit in the
+// bundle a marbot downloads just to write down how much sabun is on a shelf.
+const LabelSheet = lazy(() => import('./features/labels/LabelSheet').then((m) => ({ default: m.LabelSheet })));
+const ScannerView = lazy(() => import('./features/scan/ScannerView').then((m) => ({ default: m.ScannerView })));
+
+/** Deliberately plain. A spinner that appears for 80ms reads as a flicker, not as progress. */
+function Loading({ label }: { label: string }) {
+  return (
+    <div class="flex min-h-48 items-center justify-center p-8 text-sm text-slate-400" role="status">
+      {label}
+    </div>
+  );
+}
 import { useDraft } from './state/useDraft';
 import { useInventory } from './state/useInventory';
 import { useRoute } from './state/useRoute';
+import type { Route } from './state/route';
 import { StockTake } from './features/stocktake/StockTake';
-import { LabelSheet } from './features/labels/LabelSheet';
+
 import { Board } from './features/board/Board';
 import { ScanResult } from './features/scan/ScanResult';
-import { ScannerView } from './features/scan/ScannerView';
+
 
 export function App() {
   // One draft, shared. Two screens each loading from storage would be two sources of truth,
@@ -52,10 +70,9 @@ export function App() {
   // is just something to mis-tap while aiming.
   if (route.name === 'pindai') {
     return (
-      <ScannerView
-        onFound={(next) => go(next)}
-        onClose={() => go({ name: 'opname' })}
-      />
+      <Suspense fallback={<Loading label="Menyiapkan kamera…" />}>
+        <ScannerView onFound={(next: Route) => go(next)} onClose={() => go({ name: 'beranda' })} />
+      </Suspense>
     );
   }
 
@@ -91,6 +108,14 @@ export function App() {
 
         {/* pb-24 on mobile keeps the last row clear of the bottom bar. */}
         <main class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pb-8">
+          {route.name === 'beranda' && (
+            <Dashboard
+              draft={draft}
+              inventory={inventory}
+              now={now}
+              onNavigate={navigate}
+            />
+          )}
           {route.name === 'opname' && (
             <StockTake draft={draft} search={search} onSearch={setSearch} />
           )}
@@ -101,7 +126,9 @@ export function App() {
             <RackBoard draft={draft} inventory={inventory} search={search} now={now} />
           )}
           {route.name === 'label' && (
-            <LabelSheet items={draft.items} categories={draft.categories} locations={draft.locations} />
+            <Suspense fallback={<Loading label="Menyiapkan label…" />}>
+              <LabelSheet items={draft.items} categories={draft.categories} locations={draft.locations} />
+            </Suspense>
           )}
           {route.name === 'scan' && (
             <ScanResult
@@ -112,7 +139,7 @@ export function App() {
               locations={draft.locations}
               inventory={inventory}
               now={now}
-              onBack={() => navigate({ name: 'opname' })}
+              onBack={() => navigate({ name: 'beranda' })}
             />
           )}
           {route.name === 'scan-empty' && (
@@ -138,10 +165,13 @@ export function App() {
       <BottomNav
         route={route}
         tabs={[
+          // Four tabs plus the scan button. Printing labels is a desk job and lives in the
+          // sidebar; putting it here would cost a thumb-sized slot for something nobody does
+          // while standing at a shelf.
+          { name: 'Beranda', short: 'Beranda', icon: LayoutDashboard, route: { name: 'beranda' }, badge: inventory.notifications.length },
           { name: 'Opname Gudang', short: 'Opname', icon: ClipboardList, route: { name: 'opname' } },
           { name: 'Peta Rak', short: 'Rak', icon: MapPin, route: { name: 'racks' } },
-          { name: 'Stok Sekarang', short: 'Stok', icon: Package, route: { name: 'board' }, badge: inventory.notifications.length },
-          { name: 'Cetak Label', short: 'Label', icon: QrCode, route: { name: 'label' } },
+          { name: 'Stok Sekarang', short: 'Stok', icon: Package, route: { name: 'board' } },
         ]}
         onNavigate={navigate}
         onScan={() => go({ name: 'pindai' })}

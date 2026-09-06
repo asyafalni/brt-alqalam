@@ -14,6 +14,7 @@ import {
 } from './draft';
 import type { DraftInput } from './draft';
 import { ItemForm } from './ItemForm';
+import { itemIcon } from '../items/itemIcon';
 
 const emptyInput = (categories: Category[]): DraftInput => ({
   name: '', categoryId: categories[0]?.categoryId ?? '', unit: 'buah',
@@ -196,8 +197,16 @@ export function StockTake(
                     class={`transition-colors hover:bg-slate-50/50 ${editingId === i.itemId ? 'bg-sky-50/50' : ''}`}
                   >
                     <td class={TD}>
-                      <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
-                      <p class={CODE}>{i.barcode}</p>
+                      <div class="flex items-center gap-3">
+                        {(() => {
+                          const Icon = itemIcon(i, categoryName(i.categoryId));
+                          return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
+                        })()}
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
+                          <p class={CODE}>{i.barcode}</p>
+                        </div>
+                      </div>
                     </td>
                     <td class={`${TD} text-sm text-slate-500`}>
                       {categoryName(i.categoryId)}

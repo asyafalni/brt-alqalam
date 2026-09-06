@@ -7,6 +7,7 @@ import type { Category, Item } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Stat, TD, TH } from '../../components/ui';
 import { itemStatusBadge, PILL } from '../scan/resolve';
+import { itemIcon } from '../items/itemIcon';
 
 export function Board(
   { items, categories, inventory, search }:
@@ -130,6 +131,10 @@ export function Board(
                           <td class={TD}>
                             <div class="flex items-center gap-3">
                               <span class={`h-8 w-1 shrink-0 rounded-full ${badge.rail}`} aria-hidden="true" />
+                              {(() => {
+                                const Icon = itemIcon(d.item, categoryName(d.item.categoryId));
+                                return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
+                              })()}
                               <div class="min-w-0">
                                 <p class="truncate text-sm font-bold text-slate-900">{d.item.name}</p>
                                 <p class={CODE}>{d.item.barcode}</p>

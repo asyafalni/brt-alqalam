@@ -21,8 +21,8 @@ function seed(...inputs: DraftInput[]) {
 
 const at = (hash: string) => { location.hash = hash; };
 
-beforeEach(() => { localStorage.clear(); at('#/'); });
-afterEach(() => { cleanup(); at('#/'); });
+beforeEach(() => { localStorage.clear(); at('#/opname'); });
+afterEach(() => { cleanup(); at('#/opname'); });
 
 describe('deep links — the whole point of a printed label', () => {
   it('a rack QR opens the item with its derived stock', () => {
@@ -66,20 +66,19 @@ describe('deep links — the whole point of a printed label', () => {
     expect(render(App).getByText('Label tidak terbaca')).toBeTruthy();
   });
 
-  it('returns to the stock-take from a scan', () => {
+  it('returns home from a scan', () => {
     seed(input());
     at('#/scan?i=ITM-0001');
     const r = render(App);
 
     fireEvent.click(r.getByText('Kembali'));
-    expect(location.hash).toBe('#/');
-    // The label appears twice — sidebar nav and page heading. The heading is the assertion.
-    expect(r.getByRole('heading', { name: 'Opname Gudang' })).toBeTruthy();
+    expect(location.hash).toBe('#/');   // the dashboard is the root
+    expect(r.getByRole('heading', { name: 'Beranda' })).toBeTruthy();
   });
 });
 
 describe('navigation', () => {
-  it('switches screens and reflects it in the URL, so back works', () => {
+  it('switches screens and reflects it in the URL, so back works', async () => {
     seed(input());
     const r = render(App);
 
@@ -89,9 +88,14 @@ describe('navigation', () => {
     expect(location.hash).toBe('#/board');
     expect(r.getByRole('heading', { name: 'Stok Sekarang' })).toBeTruthy();
 
-    fireEvent.click(r.getByLabelText('Cetak Label'));
+    // Cetak Label is a desk job: it lives in the sidebar, not the mobile bottom bar, so it
+    // has no aria-label to target — the sidebar's own text is unambiguous here.
+    fireEvent.click(r.getByText('Cetak Label'));
     expect(location.hash).toBe('#/label');
-    expect(r.getByText('Cetak Label QR')).toBeTruthy();
+    // The label screen is code-split — it carries the QR encoder, which nobody should
+    // download to write down how much sabun is on a shelf. So it announces itself first.
+    expect(r.getByRole('status').textContent).toContain('Menyiapkan label');
+    expect(await r.findByText('Cetak Label QR')).toBeTruthy();
   });
 
   it('reaches the rack map, which is a screen only the new location model makes possible', () => {
@@ -103,9 +107,9 @@ describe('navigation', () => {
     expect(r.getByText(/Belum ada rak/)).toBeTruthy();
   });
 
-  it('an unknown path lands on the stock-take rather than a dead end', () => {
+  it('an unknown path lands on the dashboard rather than a dead end', () => {
     at('#/sesuatu');
-    expect(render(App).getByRole('heading', { name: 'Opname Gudang' })).toBeTruthy();
+    expect(render(App).getByRole('heading', { name: 'Beranda' })).toBeTruthy();
   });
 });
 
@@ -156,6 +160,7 @@ describe('the navbar search filters the screen you are on', () => {
 
   it('filters the opname list, and says so when nothing matches', () => {
     seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/opname');
     const r = render(App);
 
     type(r.getByLabelText('Cari barang'), 'sabun');

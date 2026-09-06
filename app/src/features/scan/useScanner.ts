@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'octane';
 
 // Native BarcodeDetector where it exists (Chrome/Android): no bundle cost, hardware-accelerated,
-// and noticeably faster on a cheap tablet. iOS Safari has never shipped it, so @zxing/browser is
-// loaded LAZILY as the fallback — meaning the ~200kB decoder never reaches a device that has the
-// native one, and never loads at all until someone actually opens the camera.
+// and noticeably faster on a cheap tablet. iOS Safari has never shipped it, so a JS decoder is
+// loaded LAZILY as the fallback — it never reaches a device that has the native one, and never
+// loads at all until someone opens the camera.
+//
+// The fallback is jsQR (~40kB) rather than @zxing/browser (~870kB). Measured, not assumed:
+// zxing pulls its PDF417, DataMatrix and RSS-Expanded decoders into the chunk, and this app
+// reads exactly one format. On an iPhone over gudang wifi that difference is the whole wait.
 declare const BarcodeDetector: {
   new (options?: { formats?: string[] }): {
     detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
@@ -22,7 +26,7 @@ export type ScannerStatus =
 export interface Scanner {
   status: ScannerStatus;
   /** Which decoder actually ran — worth surfacing when diagnosing a slow phone. */
-  engine: 'native' | 'zxing' | null;
+  engine: 'native' | 'jsqr' | null;
   message?: string;
 }
 
@@ -41,7 +45,7 @@ export function useScanner(
   useEffect(() => {
     let stream: MediaStream | null = null;
     let raf = 0;
-    let stopZxing: (() => void) | null = null;
+    let stopFallback: (() => void) | null = null;
     let cancelled = false;
 
     const finish = (text: string) => {
@@ -96,13 +100,35 @@ export function useScanner(
         return;
       }
 
-      const { BrowserQRCodeReader } = await import('@zxing/browser');
+      const jsQR = (await import('jsqr')).default;
       if (cancelled) return;
-      setState({ status: 'scanning', engine: 'zxing' });
-      const controls = await new BrowserQRCodeReader().decodeFromVideoElement(video, (result) => {
-        if (result) finish(result.getText());
-      });
-      stopZxing = () => controls.stop();
+      setState({ status: 'scanning', engine: 'jsqr' });
+
+      // jsQR reads pixels, so frames go through a canvas. Downscaling to ~640px wide is a
+      // deliberate trade: decoding cost falls roughly with area, and a QR held at arm's length
+      // is still many pixels per module. Full 1280px frames make a cheap tablet stutter.
+      const canvas = document.createElement('canvas');
+      const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+      let timer = 0;
+
+      const scanFrame = () => {
+        if (cancelled || done.current || !ctx2d) return;
+        const w = video.videoWidth;
+        if (w) {
+          const scale = Math.min(1, 640 / w);
+          canvas.width = Math.round(w * scale);
+          canvas.height = Math.round(video.videoHeight * scale);
+          ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frame = ctx2d.getImageData(0, 0, canvas.width, canvas.height);
+          const hit = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+          if (hit?.data) return finish(hit.data);
+        }
+        // ~8 fps, not every frame. A phone camera does not move fast enough to justify 60,
+        // and the battery on a shelf tablet is a real constraint.
+        timer = setTimeout(scanFrame, 120) as unknown as number;
+      };
+      scanFrame();
+      stopFallback = () => clearTimeout(timer);
     }
 
     void start();
@@ -110,7 +136,7 @@ export function useScanner(
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      stopZxing?.();
+      stopFallback?.();
       // Releasing the track is what turns the camera light off. Leaving it on is alarming
       // on a shared device, and drains a tablet that lives on a shelf.
       stream?.getTracks().forEach((t) => t.stop());

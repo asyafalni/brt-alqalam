@@ -25,15 +25,20 @@ describe('parseRoute — printed labels must land somewhere real', () => {
     expect(parseRoute('#/label/')).toEqual({ name: 'label' });
   });
 
-  it('falls back to the stock-take rather than a dead end', () => {
-    expect(parseRoute('#/')).toEqual({ name: 'opname' });
-    expect(parseRoute('#/sesuatu')).toEqual({ name: 'opname' });
+  it('falls back to the dashboard rather than a dead end', () => {
+    expect(parseRoute('#/')).toEqual({ name: 'beranda' });
+    expect(parseRoute('#/sesuatu')).toEqual({ name: 'beranda' });
+  });
+
+  it('the stock-take has its own address now that home is the dashboard', () => {
+    expect(parseRoute('#/opname')).toEqual({ name: 'opname' });
   });
 });
 
 describe('routeToHash round-trips', () => {
   it('re-parses to the same route', () => {
     for (const route of [
+      { name: 'beranda' as const },
       { name: 'opname' as const },
       { name: 'label' as const },
       { name: 'board' as const },

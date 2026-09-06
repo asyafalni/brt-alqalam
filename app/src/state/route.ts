@@ -7,6 +7,7 @@
 // shows up only after printing.
 
 export type Route =
+  | { name: 'beranda' }
   | { name: 'opname' }
   | { name: 'label' }
   | { name: 'board' }
@@ -32,11 +33,12 @@ export function parseRoute(hash: string): Route {
     if (item) return { name: 'scan', target: 'item', id: item };
     return { name: 'scan-empty' };
   }
+  if (path === '/opname') return { name: 'opname' };
   if (path === '/label') return { name: 'label' };
   if (path === '/board') return { name: 'board' };
   if (path === '/racks') return { name: 'racks' };
   if (path === '/pindai') return { name: 'pindai' };
-  return { name: 'opname' };
+  return { name: 'beranda' };
 }
 
 export function routeToHash(route: Route): string {
@@ -45,6 +47,7 @@ export function routeToHash(route: Route): string {
     case 'board': return '#/board';
     case 'racks': return '#/racks';
     case 'pindai': return '#/pindai';
+    case 'opname': return '#/opname';
     case 'scan': {
       const key = route.target === 'asset' ? 'a' : route.target === 'location' ? 'l' : 'i';
       return `#/scan?${key}=${encodeURIComponent(route.id)}`;

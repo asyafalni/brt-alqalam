@@ -15,7 +15,43 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      The app frame, painted before any JavaScript runs.
+
+      This is a client-rendered SPA, so without it the first thing anyone sees is a blank
+      screen until the bundle has downloaded, parsed and executed — measured at ~1.0s on a
+      throttled tablet, against ~0.4s for the stylesheet. The skeleton closes that gap: the
+      shell appears with the CSS, and the real app replaces it in place.
+
+      Deliberately not a spinner. A spinner says "waiting"; a layout says "arriving", and it
+      is the same shape the app resolves into, so nothing jumps.
+    -->
+    <div id="root">
+      <div class="flex h-screen bg-slate-50">
+        <div class="hidden md:m-4 md:mr-0 md:block md:w-[260px] md:shrink-0">
+          <div class="h-full rounded-[32px] bg-slate-900 p-6">
+            <!-- Real text, deliberately. First Contentful Paint counts text, images and SVG —
+                 never a coloured box — so a purely geometric skeleton improves what someone
+                 sees while measuring as no improvement at all. This is also just true: the
+                 app is called this whether or not the bundle has arrived. -->
+            <span class="text-xl font-bold tracking-tight text-slate-50">BRT Inventaris</span>
+          </div>
+        </div>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <div class="h-20 shrink-0 border-b border-slate-200/50 bg-white/80"></div>
+          <div class="flex-1 space-y-4 p-4 md:p-8">
+            <div class="text-xl font-bold text-slate-900 md:hidden">BRT Inventaris</div>
+            <div class="hidden h-8 w-48 rounded-lg bg-slate-200/70 md:block"></div>
+            <div class="grid grid-cols-3 gap-2 sm:gap-4">
+              <div class="h-20 rounded-lg border border-slate-100 bg-white"></div>
+              <div class="h-20 rounded-lg border border-slate-100 bg-white"></div>
+              <div class="h-20 rounded-lg border border-slate-100 bg-white"></div>
+            </div>
+            <div class="h-64 rounded-lg border border-slate-100 bg-white"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -19,6 +19,7 @@ import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader, Stat } from '../../components/ui';
 import { applyCount, markCounted } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
+import { itemIcon } from '../items/itemIcon';
 import { CountSheet } from './CountSheet';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
@@ -232,6 +233,10 @@ export function RackBoard(
                     const badge = itemStatusBadge(d?.status ?? 'available');
                     return (
                       <li key={i.itemId} class="flex items-center gap-3 py-3">
+                        {(() => {
+                          const Icon = itemIcon(i, categoryName(i.categoryId));
+                          return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
+                        })()}
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
                           <p class={CODE}>{categoryName(i.categoryId)}</p>
