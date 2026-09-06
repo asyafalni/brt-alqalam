@@ -35,7 +35,9 @@ export function deriveState(
 
   const qty: Record<string, number> = {};
   const outstanding: Record<string, { ts: number; qty: number }[]> = {};
-  items.forEach((i) => { qty[i.itemId] = i.initialStock; outstanding[i.itemId] = []; });
+  // The spec's per-item PENGAMBILAN counter: everything ever taken out, positive.
+  const taken: Record<string, number> = {};
+  items.forEach((i) => { qty[i.itemId] = i.initialStock; outstanding[i.itemId] = []; taken[i.itemId] = 0; });
 
   const inst: Record<string, DerivedInstance> = {};
   instances.forEach((a) => { inst[a.assetId] = { instance: a, status: 'available' }; });
@@ -44,7 +46,10 @@ export function deriveState(
     // --- equipment instance lifecycle ---
     if (t.assetId && inst[t.assetId]) {
       const di = inst[t.assetId];
-      if (t.type === 'peminjaman') {
+      // `digunakan` and `peminjaman` are one path on purpose (Part XVII). They are different
+      // words for the same physical fact — the thing is not on the shelf and someone has it —
+      // and giving "in use" its own borrower-less state is exactly what let things go missing.
+      if (t.type === 'peminjaman' || t.type === 'digunakan') {
         di.status = 'out'; di.holder = t.recipient; di.since = t.ts;
       } else if (t.type === 'pengembalian') {
         if (t.condition === 'rusak') { di.status = 'broken'; di.holder = undefined; di.since = undefined; }
@@ -61,8 +66,11 @@ export function deriveState(
     // --- quantity items (consumables + quantity-tracked) ---
     if (t.itemId && qty[t.itemId] !== undefined) {
       switch (t.type) {
-        case 'pemakaian':   qty[t.itemId] += t.qtyDelta; break;                 // delta < 0, permanent
-        case 'pengambilan': qty[t.itemId] += t.qtyDelta;                        // delta < 0, may return
+        case 'pemakaian':   qty[t.itemId] += t.qtyDelta;                        // delta < 0, permanent
+                            taken[t.itemId] += -t.qtyDelta; break;
+        case 'pengambilan':
+        case 'digunakan':   qty[t.itemId] += t.qtyDelta;                        // delta < 0, may return
+                            taken[t.itemId] += -t.qtyDelta;
                             outstanding[t.itemId].push({ ts: t.ts, qty: -t.qtyDelta }); break;
         case 'pengembalian': qty[t.itemId] += t.qtyDelta; break;               // delta > 0, restock
         case 'adjust':       qty[t.itemId] += t.qtyDelta; break;               // admin correction
@@ -81,7 +89,7 @@ export function deriveState(
       .filter((o) => now - o.ts <= DAY_MS)
       .reduce((s, o) => s + o.qty, 0);
     const status = q <= 0 ? 'out' : (i.minStock != null && q <= i.minStock ? 'low' : 'available');
-    derivedItems[i.itemId] = { item: i, qty: q, status, outstanding: pend };
+    derivedItems[i.itemId] = { item: i, qty: q, status, outstanding: pend, takenTotal: taken[i.itemId] };
   });
 
   const lowStock = Object.values(derivedItems).filter((d) => d.status !== 'available');

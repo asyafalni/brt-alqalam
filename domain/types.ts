@@ -7,11 +7,16 @@
 //   equipment  = "Barang tetap"           — stays, but can aus/rusak/hilang (e.g. pisau)
 export type Kind = 'consumable' | 'equipment';
 export type TrackBy = 'quantity' | 'instance';
-// Keterangan (HISTORI DATA). The operator NEVER picks one of these — it is inferred from the
-// item's `kind` plus the direction of travel (see keterangan.ts). `pengambilan` is the one
-// exception path an admin may choose explicitly: "taken, but coming back".
+// Keterangan (HISTORI DATA). The spec offers five radios; the operator does not normally pick
+// one, because it is inferred from the item's `kind` plus the direction of travel (see
+// keterangan.ts). `pengambilan` and `digunakan` remain available as explicit choices.
+//
+// `digunakan` was deleted in Part XVI and is RESTORED here (Part XVII): the word is the boss's
+// and belongs in HISTORI DATA, but its old meaning — a state that recorded no borrower — was
+// the thing that undermined "things go missing". It now behaves exactly like `peminjaman`:
+// the item is out, and something is out *with someone*.
 export type MovementType =
-  | 'pemakaian' | 'pengambilan' | 'peminjaman' | 'pengembalian'
+  | 'pemakaian' | 'pengambilan' | 'peminjaman' | 'pengembalian' | 'digunakan'
   | 'adjust' | 'status_change' | 'reversal';
 
 /** Direction of travel, decided by the screen the operator is on, not by a choice they make. */
@@ -52,6 +57,12 @@ export interface Item {
   itemId: string; barcode: string; name: string;
   categoryId: string; kind: Kind; unit: string; trackBy: TrackBy; // trackBy defaults from kind (consumable->quantity, equipment->instance), overridable
   minStock: number | null; initialStock: number; active: boolean; // minStock null = Setting Minimum "(-)" → no low-stock notification
+  /**
+   * The keterangan this item normally moves under — the spec's per-row KETERANGAN column on
+   * MENU STOK. NOTIFIKASI STOK sources its own KETERANGAN column from here, not from the
+   * transaction that breached the minimum (which corrects the reading in §37.2).
+   */
+  keterangan?: MovementType;
   /** Optional: a catalog built before locations existed has none, and that is a real state
    *  worth seeing — "belum ditempatkan" is exactly the mess we are trying to surface. */
   locationId?: string;
@@ -71,6 +82,12 @@ export interface Txn {
 
 export interface DerivedItem {
   item: Item; qty: number; status: 'available' | 'low' | 'out'; outstanding: number;
+  /**
+   * Everything ever taken out of this item, as a positive running total — the spec's
+   * PENGAMBILAN counter on MENU STOK, which HISTORI DATA's AMBIL column is sourced from.
+   * Derived like everything else; nothing counts it up in storage.
+   */
+  takenTotal: number;
 }
 export interface DerivedInstance {
   instance: AssetInstance; status: InstanceStatus; holder?: string; since?: number;

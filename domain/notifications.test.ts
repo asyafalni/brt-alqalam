@@ -74,3 +74,18 @@ describe('deriveNotifications (Notifikasi Stok)', () => {
     expect(deriveNotifications([a, b], txns, 1000).map((x) => x.itemId)).toEqual(['A', 'B']);
   });
 });
+
+describe('KETERANGAN comes from the item, per the spec', () => {
+  it('uses the item\'s own keterangan, not the transaction that breached the minimum', () => {
+    // MENU STOK carries a KETERANGAN per catalog row, and NOTIFIKASI STOK sources its column
+    // from there — what this thing normally moves under, not what happened to trip the alarm.
+    const it0 = item({ keterangan: 'peminjaman' });
+    const n = deriveNotifications([it0], [tx({ type: 'pemakaian', qtyDelta: -6, ts: 100 })], 1000);
+    expect(n[0].keterangan).toBe('peminjaman');
+  });
+
+  it('falls back to the breaching transaction when the item declares nothing', () => {
+    const n = deriveNotifications([item()], [tx({ type: 'pemakaian', qtyDelta: -6, ts: 100 })], 1000);
+    expect(n[0].keterangan).toBe('pemakaian');
+  });
+});

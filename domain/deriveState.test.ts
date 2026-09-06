@@ -159,3 +159,46 @@ describe('append-only integrity', () => {
     expect(activeTxns([later, earlier]).map((t) => t.ts)).toEqual([100, 200]);
   });
 });
+
+describe('digunakan, restored (Part XVII)', () => {
+  // The spec offers it as one of five keterangan and it belongs in HISTORI DATA. What was
+  // wrong was never the word — it was giving it a state that recorded no holder.
+  it('takes a durable out, with whoever has it, exactly like peminjaman', () => {
+    const s = deriveState([pisauItem], [pisau],
+      [tx({ type: 'digunakan', assetId: 'A-P7', recipient: 'Panitia Jumat', ts: 50 })], 100);
+    expect(s.instances['A-P7'].status).toBe('out');
+    expect(s.instances['A-P7'].holder).toBe('Panitia Jumat');
+  });
+
+  it('is returned by pengembalian like any other loan', () => {
+    const txns = [
+      tx({ type: 'digunakan', assetId: 'A-P7', recipient: 'Panitia' }),
+      tx({ type: 'pengembalian', assetId: 'A-P7', condition: 'normal' }),
+    ];
+    expect(deriveState([pisauItem], [pisau], txns, 0).instances['A-P7'].status).toBe('available');
+  });
+
+  it('reduces a counted item and expects it back', () => {
+    const s = deriveState([sabun], [], [tx({ type: 'digunakan', itemId: 'ITM-S', qtyDelta: -3 })], 0);
+    expect(s.items['ITM-S'].qty).toBe(7);
+    expect(s.items['ITM-S'].outstanding).toBe(3);
+  });
+});
+
+describe('takenTotal — the spec PENGAMBILAN counter', () => {
+  it('counts everything ever taken out, and never counts returns back off it', () => {
+    const txns = [
+      tx({ type: 'pemakaian', itemId: 'ITM-S', qtyDelta: -2 }),
+      tx({ type: 'pengambilan', itemId: 'ITM-S', qtyDelta: -3 }),
+      tx({ type: 'pengembalian', itemId: 'ITM-S', qtyDelta: 3 }),
+    ];
+    const s = deriveState([sabun], [], txns, 0);
+    expect(s.items['ITM-S'].takenTotal).toBe(5);   // a cumulative counter, not a balance
+    expect(s.items['ITM-S'].qty).toBe(8);          // the balance is separate
+  });
+
+  it('an admin adjustment is not "taken" — it corrects the books, nobody carried anything', () => {
+    const s = deriveState([sabun], [], [tx({ type: 'adjust', itemId: 'ITM-S', qtyDelta: -4 })], 0);
+    expect(s.items['ITM-S'].takenTotal).toBe(0);
+  });
+});

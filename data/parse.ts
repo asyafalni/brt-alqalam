@@ -135,7 +135,7 @@ function oneOf<T extends string>(r: Record<string, string>, f: string, allowed: 
   return v as T;
 }
 
-const MOVEMENTS = ['pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'adjust', 'status_change', 'reversal'] as const;
+const MOVEMENTS = ['pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'digunakan', 'adjust', 'status_change', 'reversal'] as const;
 const CONDITIONS = ['normal', 'rusak', 'hilang'] as const;
 const STATUSES = ['available', 'out', 'broken', 'lost', 'retired'] as const;
 
@@ -224,6 +224,8 @@ export const buildItem = (r: Record<string, string>): Item => {
       // Blank is a real state, not an error: a catalog built before locations existed has
       // none, and "belum ditempatkan" is exactly the mess we want visible.
       ...(r['locationid'] ? { locationId: r['locationid'] } : {}),
+      // The spec's per-row KETERANGAN on MENU STOK. Optional, and validated when present.
+      ...(r['keterangan'] ? { keterangan: oneOf<MovementType>(r, 'keterangan', MOVEMENTS) } : {}),
     };
 };
 

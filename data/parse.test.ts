@@ -17,21 +17,29 @@ describe('parseCsv', () => {
   });
 });
 
-const ITEM_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId\n';
+const ITEM_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,keterangan\n';
 
 describe('parseItems', () => {
   it('reads a well-formed row', () => {
-    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,LOC-A1');
+    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,LOC-A1,pemakaian');
     expect(r.quarantined).toEqual([]);
     expect(r.ok[0]).toMatchObject({
-      itemId: 'ITM-S', kind: 'consumable', minStock: 5, initialStock: 10, active: true, locationId: 'LOC-A1',
+      itemId: 'ITM-S', kind: 'consumable', minStock: 5, initialStock: 10, active: true,
+      locationId: 'LOC-A1', keterangan: 'pemakaian',
     });
   });
 
   it('treats a blank location as unplaced rather than an error', () => {
-    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,');
+    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,,');
     expect(r.quarantined).toEqual([]);
     expect(r.ok[0].locationId).toBeUndefined();
+    expect(r.ok[0].keterangan).toBeUndefined();
+  });
+
+  it('validates the item KETERANGAN when present, rather than storing any word', () => {
+    const bad = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,,sesuatu');
+    expect(bad.ok).toHaveLength(0);
+    expect(bad.quarantined[0].field).toBe('keterangan');
   });
 
   it('accepts the plain-language kind labels admins actually type', () => {
@@ -104,8 +112,16 @@ describe('parseTxns', () => {
     expect(r.ok[0].ts).toBe(Date.parse('2026-09-06T13:45:00Z'));
   });
 
-  it('rejects a movement type that is no longer in the model', () => {
-    const r = parseTxns(TXN_HEADER + 'T1,c1,2026-09-06T13:45:00Z,digunakan,ITM-S,,-2,,u1,,,,');
+  it('accepts all five keterangan the spec offers, digunakan included', () => {
+    for (const type of ['pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'digunakan']) {
+      const r = parseTxns(TXN_HEADER + `T1,c1,2026-09-06T13:45:00Z,${type},ITM-S,,-2,,u1,,,,`);
+      expect(r.quarantined).toEqual([]);
+      expect(r.ok[0].type).toBe(type);
+    }
+  });
+
+  it('rejects a movement type that is not in the model', () => {
+    const r = parseTxns(TXN_HEADER + 'T1,c1,2026-09-06T13:45:00Z,dipakai,ITM-S,,-2,,u1,,,,');
     expect(r.quarantined[0]).toMatchObject({ field: 'type' });
   });
 

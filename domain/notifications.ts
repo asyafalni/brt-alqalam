@@ -12,10 +12,17 @@ export interface StockNotification {
   ts: number;         // HARI/TGL/JAM — when it breached the minimum (or now if it started below)
   stokAkhir: number;  // current stock
   setMin: number;     // Setting Minimum (minStock)
-  keterangan: string; // movement type of the breaching transaction
+  /**
+   * The spec sources this column from the item's own KETERANGAN on MENU STOK — what this thing
+   * normally moves under — NOT from the transaction that happened to breach the minimum.
+   * (This corrects design doc §37.2, which reasoned the opposite from an incomplete reading.)
+   * Falls back to the breaching transaction when the item declares nothing, since an empty
+   * column answers nobody's question.
+   */
+  keterangan: string;
 }
 
-const QTY_TYPES = new Set(['pemakaian', 'pengambilan', 'pengembalian', 'adjust']);
+const QTY_TYPES = new Set(['pemakaian', 'pengambilan', 'pengembalian', 'digunakan', 'adjust']);
 
 export function deriveNotifications(items: Item[], txns: Txn[], now: number): StockNotification[] {
   const T = activeTxns(txns);
@@ -41,7 +48,8 @@ export function deriveNotifications(items: Item[], txns: Txn[], now: number): St
     if (qty <= min) {
       out.push({
         itemId: item.itemId, name: item.name,
-        ts: breachTs ?? now, stokAkhir: qty, setMin: min, keterangan: breachKet,
+        ts: breachTs ?? now, stokAkhir: qty, setMin: min,
+        keterangan: item.keterangan ?? breachKet,
       });
     }
   }

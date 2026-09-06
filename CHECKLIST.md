@@ -1,6 +1,6 @@
 # Checklist — feature progress
 
-**Updated:** 2026-09-06 · **Tests:** 219 green (61 domain · 28 data · 130 app) · **Build:** clean
+**Updated:** 2026-09-06 · **Tests:** 252 green (68 domain · 46 data · 138 app) · **Build:** clean
 
 Legend: ✅ done & tested · 🔨 partly done · ⛔ blocked on you · ⬜ not started · ➖ deliberately not doing
 
@@ -18,7 +18,11 @@ Legend: ✅ done & tested · 🔨 partly done · ⛔ blocked on you · ⬜ not s
 | 16 kategori (Menu Stok 1–16) | ✅ | Categories are **free-form and editable**, seeded with his 8 domains. Part XI dropped the fixed 16 because the perlengkapan/peralatan split was a proxy for "consumable vs durable" — that behaviour now lives on the **item** as a plain-language flag, so a new category still works. |
 | Daftar barang per kategori | ✅ | `Stok` board, filterable; plus `Peta Rak` by physical location. |
 | Nama barang · Satuan · Stok | ✅ | Item catalog, built by the Opname screen. |
-| Ambil / pengambilan barang | ⛔ | Flow designed, blocked on the gateway. Today the scan screen shows status but cannot record. |
+| Ambil / pengambilan barang | ⛔ | Flow designed, gateway written; blocked on deployment. |
+| **KETERANGAN per catalog row** | ✅ | `Item.keterangan`. Added after reading the spec properly — §37.2 had reasoned this field did not exist. |
+| **PENGAMBILAN running counter** | ✅ | `DerivedItem.takenTotal` — cumulative, never reduced by returns. Feeds HISTORI DATA's `AMBIL`. |
+| 5 keterangan incl. **Digunakan** | ✅ | All five accepted. `digunakan` behaves as `peminjaman` — out, *with someone* — so the word survives without the borrower-less hole that let things go missing. |
+| Free-text keterangan box | ✅ | `Txn.note`, alongside the inferred word. |
 | Kembali / pengembalian | ⛔ | Same. Condition (normal/rusak/hilang) already in the domain and tested. |
 
 ## 2. The boss's spec — MENU ADMIN
@@ -87,4 +91,15 @@ Legend: ✅ done & tested · 🔨 partly done · ⛔ blocked on you · ⬜ not s
 4. 📋 **Watch the marbot for an hour** — can invalidate UI work already done.
 5. 📋 **Two "it went missing" stories** — decides how much loan tracking is worth building.
 
-Full detail and click-paths: `docs/SETUP.md`.
+## Ambiguities in the spec — need the boss, not a decision from us
+
+1. **TAMBAH KATEGORI is drawn as a Jenis Barang / Satuan form** and never captures a category
+   name. Copy-paste artefact, or "create a category with its first item"?
+2. **"kurang/bermasalah"** — NOTIFIKASI STOK covers low *or problematic* stock. "Bermasalah" is
+   never defined. It may be his word for rusak/hilang — if so, our extension is closer to his
+   intent than we assumed.
+3. **Audit scope vs schema**: password/category/item changes are said to be logged in HISTORI
+   DATA, but its eight columns are stock-shaped. We keep a separate catalog log.
+4. **`17. ADMIN` has an edit/delete control** — deleting the admin menu should not be possible.
+
+Full detail: `docs/SPEC-INVENTORY.md` and Design doc Part XVII. Click-paths: `docs/SETUP.md`.

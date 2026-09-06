@@ -1149,3 +1149,77 @@ signed in on a kiosk), and framer-motion's spring widths and `layoutId` shared-l
 CSS transitions — `@octanejs/motion` is not yet a dependency, and its `layoutId` is single-element
 FLIP rather than a projection tree (§62). Static appearance is identical; only the animation
 between nav items is lost. Revisit when motion is added.
+
+# Part XVII — Read the spec properly (v1.7)
+
+The requirements PDF was finally read **page by page, image by image** rather than from its text
+layer, which contains only headings (`docs/SPEC-INVENTORY.md`). Three things in it change the
+model, and one of them shows an earlier "resolved" call was reasoned from an incomplete reading.
+
+## 67. §37.2 was wrong — NOTIFIKASI STOK's KETERANGAN comes from the ITEM
+
+§37.2 argued that an item "has no single default keterangan (the same row moves under pemakaian
+*and* pengambilan over time), so there is no such field to read", and concluded the column must
+mean the breaching transaction's keterangan.
+
+**The spec has that field.** MENU STOK carries a `KETERANGAN` column *per catalog row*, and
+NOTIFIKASI STOK's Kolom F explicitly sources from `MENU STOK - KETERANGAN`. The premise was
+false, so the conclusion was too.
+
+`Item.keterangan` is now optional on the item, and `deriveNotifications` reports it, falling back
+to the breaching transaction only when the item declares nothing — an empty column answers
+nobody's question. **Lesson worth keeping: "there is no such field" is a claim about the
+document, and it should have been checked against the document.**
+
+## 68. `digunakan` restored, with the hole closed
+
+Part XVI deleted it. The spec offers **five** keterangan radios — Pemakaian · Pengambilan ·
+Pengembalian · Peminjaman · **Digunakan** — and it belongs in HISTORI DATA.
+
+What was wrong was never the word. It was giving it a *state that recorded no holder*, while the
+boss's top pain is that things go missing. So the word comes back and the hole stays shut:
+**`digunakan` behaves exactly like `peminjaman`** — the item is out, and something out is out
+*with someone*. Two words for one physical fact, one code path, no borrower-less state.
+
+This is the shape of every deviation we should make: keep the boss's vocabulary, fix the
+mechanism underneath it.
+
+## 69. PENGAMBILAN is a running counter, not just a form field
+
+On MENU STOK each row shows a cumulative **PENGAMBILAN**, and HISTORI DATA's `AMBIL` column is
+sourced from it. `DerivedItem.takenTotal` now carries it — everything ever taken out, positive,
+never reduced by returns, because it is a counter and not a balance. Derived like everything
+else; nothing counts it up in storage.
+
+## 70. Confirmed: most of what we built is ours, not his
+
+The spec contains **no** barcode or QR, no camera, no search or filter, no kits, no sessions, no
+offline, no borrower/recipient field, and no rusak/hilang condition. Row selection is literally
+*"mengklik pada baris"*. Everything in that list is our extension, and §0.0's test applies to
+each of them.
+
+## 71. Open — needs the boss, not a decision from us
+
+1. **`TAMBAH KATEGORI` is drawn as a `Jenis Barang` / `Satuan` form**, identical to TAMBAH JENIS
+   BARANG, note and all. As drawn it never captures a category *name*. Copy-paste artefact, or
+   deliberately "create a category together with its first item"? We implement the former.
+2. **"kurang/bermasalah"** — NOTIFIKASI STOK is said to cover stock that is low *or problematic*.
+   "Bermasalah" is never defined, and it is the only hint of a non-quantity problem state
+   anywhere in the spec. It may be his word for what we call rusak/hilang — worth asking, since
+   if so, our extension is closer to his intent than we assumed.
+3. **The audit scope contradicts the HISTORI DATA schema.** Password changes, category edits and
+   item edits are all said to be logged there, but its eight columns are stock-shaped with
+   nowhere to put them. We keep a separate catalog/admin log; the alternative is columns that are
+   empty on most rows.
+4. **`17. ADMIN` carries an edit/delete control** in EDIT MENU UTAMA. Deleting the admin menu
+   should not be possible; we guard it.
+
+## 72. Small confirmations
+- Breach is **≤** ("sama atau lebih rendah dari") — matches.
+- `NO` **auto-renumbers**, so it is a display index and never a key — matches.
+- **Admin Utama cannot be created in the UI** (only Admin/Anggota radios) and is marked *Tetap*
+  with no Hapus — matches the seeded, undeletable account.
+- **GANTI PASSWORD ends in a BUAT NAMA step**, with no user picker — confirms Model C: the PIN
+  identifies, so changing it re-states who you are.
+- On TAMBAH/KURANG STOK the **STOK AKHIR column shows stock while its stepper edits the
+  minimum** (default `-`). Easy to implement backwards; we keep them separate fields.
