@@ -4,6 +4,33 @@
 
 ---
 
+## 0.0 The north star (owner, 2026-09-06)
+
+> **"So that we can focus on ibadah at masjid."**
+
+That is what the system is *for*. Not "track inventory" — **give people their attention back**.
+It is the sharpest test in this document, and it outranks every feature list:
+
+> **Does this remove work from people, or add it?**
+> A feature that adds admin burden fails, *even when it is a good feature.*
+
+Applying it honestly to what exists and what is planned:
+
+| | Verdict |
+| --- | --- |
+| Sticky context in the stock-take (category/unit/kind carry over) | ✅ Removes work — 2 taps per item instead of 6. |
+| Keterangan inferred rather than chosen (Part XVI) | ✅ Removes a decision from every single transaction. |
+| Rack labels — one QR per shelf | ✅ Removes searching, which is the invisible daily tax in a messy gudang. |
+| Cycle counts, one rack at a time | ✅ *If* it stays a two-minute job. A monthly full opname would fail this test. |
+| Gateway / Clerk / JWT setup | ✅ One-time cost that removes recurring work. Front-loaded, not ongoing. |
+| **Per-unit QR on every knife** | ⚠️ **Fails as specced.** Labelling 200 blades is an operational project, and re-labelling after they are washed and sharpened is recurring work. This is why "Label satu-satu vs Hitung jumlahnya" is asked out loud rather than defaulted. |
+| **PIN on every visit** | ⚠️ Borderline. Four taps buys access control that ~5–10 users barely need. Kept because the owner chose it; revisit if the marbot hour shows it being skipped. |
+| Supplier/PO management, sales analytics, costing (DOSS, image 1) | ❌ Pure added burden with no return here. Correctly rejected. |
+
+**Use this table's test on anything proposed from here on**, including anything I propose.
+
+---
+
 ## 0. The actual problem (established 2026-09-06 — read this before §1)
 
 **There is no paper process.** Nothing in this repo replaces an existing workflow. The

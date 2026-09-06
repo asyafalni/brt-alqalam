@@ -34,6 +34,16 @@ If in doubt: read the repo file. If the file isn't there: say UNKNOWN.
 
 Current guardrails:
 
+- **The north star: "so that we can focus on ibadah at masjid"** (Design doc §0.0). Every feature
+  faces one test — *does this remove work from people, or add it?* A feature that adds admin
+  burden fails, even when it is a good feature. Apply it to your own proposals first.
+- **The visual direction is settled; further references are FEATURE input, not look input.**
+  The palette was rewritten twice in one day (SmartInv → shadcn tokens → SmartInv → DOSS), and
+  each rewrite is real work that produces no new capability. The look is now: SmartInv's
+  structure and class conventions, DOSS's warm-beige-and-black neutrals, seven status colours
+  that carry meaning, no ornament. Change it only on an explicit owner decision recorded as a
+  Part — not because a new reference is interesting.
+
 - **The operator never picks a keterangan.** It is inferred from the item's `kind` and the
   direction of travel (`domain/keterangan.ts`). Do not add a keterangan chooser to the default
   flow — that tap-tax is exactly what was removed, and a KETERANGAN column people guess at is a
