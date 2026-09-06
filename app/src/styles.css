@@ -114,3 +114,74 @@ input, select, textarea { font-size: max(16px, 1em); }
   outline: 3px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* ---------------------------------------------------------------------------
+   PRINTED LABELS
+   Sized in millimetres, because these end up on a physical sticker sheet and a
+   millimetre is the only unit that survives the trip from screen to printer.
+--------------------------------------------------------------------------- */
+
+.label-sheet {
+  display: grid;
+  grid-template-columns: repeat(var(--label-cols), var(--label-w));
+  justify-content: center;
+  gap: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  width: var(--label-w);
+  height: var(--label-h);
+  padding: 2mm;
+  overflow: hidden;
+  /* On screen only — a printed sticker sheet must not carry ink borders. */
+  border: 1px dashed var(--border);
+  background: #fff;
+  color: #000;
+}
+
+.label-qr {
+  width: calc(var(--label-h) - 4mm);
+  height: calc(var(--label-h) - 4mm);
+  flex-shrink: 0;
+}
+
+.label-text { min-width: 0; line-height: 1.25; }
+
+.label-title {
+  display: block;
+  overflow: hidden;
+  font-size: 3mm;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label-subtitle {
+  display: block;
+  overflow: hidden;
+  color: #444;
+  font-size: 2.2mm;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label-code {
+  display: block;
+  margin-top: 0.5mm;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 2.2mm;
+  letter-spacing: 0.02em;
+}
+
+@page { size: A4; margin: 8mm; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  main { max-width: none; padding: 0; }
+  .label { border: none; }
+  .label-sheet { gap: 0; }
+  /* Never split a sticker across two sheets. */
+  .label { break-inside: avoid; page-break-inside: avoid; }
+}

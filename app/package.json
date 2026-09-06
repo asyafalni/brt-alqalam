@@ -11,9 +11,10 @@
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "octane": "^0.2.3",
+    "@octanejs/lucide": "^0.1.47",
     "@octanejs/tanstack-store": "^0.0.47",
-    "@octanejs/lucide": "^0.1.47"
+    "octane": "^0.2.3",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "@octanejs/testing-library": "^0.1.50",

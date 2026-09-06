@@ -51,17 +51,42 @@ collection to keep in sync. Lower the count from 20 to 18 and the last two simpl
 That means **it is useful before any Google setup exists**: walk the gudang today, export a CSV,
 import it into the Items tab. The gateway replaces the export later; nothing here changes.
 
+## Cetak Label — the second screen
+Completes the loop: **walk → count → label**.
+
+- **QR encodes a deep link**, not a bare id (design doc §15.4): `…/scan?i=<itemId>` for a rack or
+  bin, `…/scan?a=<assetId>` for one physical unit. A URL opens the right screen from the phone's
+  own camera app with nothing installed; a bare id would only work inside a scanner we wrote,
+  which is the one situation where the label is least needed.
+- **Vector SVG, not canvas.** These get printed. An SVG path prints at the printer's resolution,
+  where a canvas bitmap would be resampled and lose module edges — which is what makes a scan
+  fail at an angle in bad light. Horizontal runs are merged into single path commands so a sheet
+  of a few hundred labels stays responsive.
+- **Error correction H (~30%).** Higher than the usual M because these live in a gudang: they get
+  scratched, greasy and part-peeled. Redundancy is cheaper than reprinting a sheet.
+- **The quiet zone is painted white**, not left transparent — a transparent QR on a coloured
+  sticker is the classic reason a code will not scan.
+- **It refuses to print against a dev-server address.** A sticker outlives the laptop that
+  printed it; catching `localhost` here costs a sentence, catching it later costs reprinting
+  every label in the gudang.
+- Sized in **millimetres** for A4 sticker sheets (24 or 40 per page), because a millimetre is the
+  only unit that survives the trip from screen to printer.
+
 ## Layout
 ```
 src/
 ├── features/stocktake/
-│   ├── draft.ts        PURE logic — ids, validation, CSV. No framework, no DOM.
-│   ├── draft.test.ts   12 tests, including the round-trip through data/parse.ts
-│   ├── StockTake.tsx   the screen — thin, all rules live in draft.ts
-│   └── StockTake.test.tsx  10 component tests
+│   ├── draft.ts        PURE logic — ids, validation, instances, categories, CSV
+│   ├── StockTake.tsx   the screen — thin; all rules live in draft.ts
+│   └── ItemForm.tsx    the form, extracted
+├── features/labels/
+│   ├── qr.ts           PURE — QR matrix to SVG path
+│   ├── labels.ts       PURE — what gets printed, deep links, sheet geometry
+│   └── LabelSheet.tsx  the printable sheet
+├── state/useDraft.ts   the draft, owned once and shared by both screens
 ├── state/persist.ts    localStorage, defensive on every read
 ├── data/seedCategories.ts
-└── styles.css          the authored token layer (see below)
+└── styles.css          the authored token layer + print rules
 ```
 
 ## Two things that will bite you

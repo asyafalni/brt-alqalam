@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { useMemo, useState } from 'octane';
 import type { Category, Item } from '../../../../domain/types';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { clearDraft, loadDraft, saveDraft } from '../../state/persist';
+import type { Draft } from '../../state/useDraft';
 import {
   createCategory, createItem, filterItems, instancesFor, isBlocking, summarise,
   toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, updateItem, validate,
@@ -14,11 +14,9 @@ const emptyInput = (categories: Category[]): DraftInput => ({
   kind: 'consumable', initialStock: 0, minStock: null,
 });
 
-export function StockTake() {
-  const initial = useMemo(() => loadDraft(SEED_CATEGORIES), []);
-  const [items, setItems] = useState<Item[]>(initial.items);
-  const [categories, setCategories] = useState<Category[]>(initial.categories);
-  const [input, setInput] = useState<DraftInput>(() => emptyInput(initial.categories));
+export function StockTake({ draft }: { draft: Draft }) {
+  const { items, categories, setItems, setCategories } = draft;
+  const [input, setInput] = useState<DraftInput>(() => emptyInput(categories));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showProblems, setShowProblems] = useState(false);
   const [query, setQuery] = useState('');
@@ -26,8 +24,6 @@ export function StockTake() {
   // tablet held with wet hands, and suppressible by the browser.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-
-  useEffect(() => { saveDraft({ items, categories }); }, [items, categories]);
 
   const problems = useMemo(
     () => validate(input, items, editingId ?? undefined),
@@ -86,10 +82,8 @@ export function StockTake() {
   }
 
   function reset() {
-    setItems([]);
-    setCategories(SEED_CATEGORIES);
+    draft.reset();
     cancelEdit();
-    clearDraft();
     setConfirmReset(false);
   }
 

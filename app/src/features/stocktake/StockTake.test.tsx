@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { StockTake } from './StockTake';
+import { useDraft } from '../../state/useDraft';
 import { toItemsCsv, toInstancesCsv } from './draft';
 import { parseItems, parseInstances } from '../../../../data/parse';
+
+// The draft is owned above the screen (App), so tests supply it the same way.
+function Harness() {
+  return <StockTake draft={useDraft()} />;
+}
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.
 const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
@@ -22,12 +28,12 @@ afterEach(() => cleanup());
 
 describe('StockTake — walking the gudang', () => {
   it('starts empty, and says where to begin', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     expect(r.getByText(/Belum ada barang/)).toBeTruthy();
   });
 
   it('adds an item and shows it in the list', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sabun cuci tangan', '12');
     expect(r.getByText('Sabun cuci tangan')).toBeTruthy();
     expect(r.getByText(/Kebersihan · Bisa habis/)).toBeTruthy();
@@ -35,7 +41,7 @@ describe('StockTake — walking the gudang', () => {
   });
 
   it('keeps category, unit and kind but clears the name — the sticky-context win', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     type(r.getByLabelText('Satuan'), 'galon');
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '4');
@@ -46,14 +52,14 @@ describe('StockTake — walking the gudang', () => {
   });
 
   it('refuses to add a nameless item, and says why', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     fireEvent.click(r.getByText('Tambah barang'));
     expect(r.getByText('Nama barang belum diisi')).toBeTruthy();
     expect(r.getByText(/Belum ada barang/)).toBeTruthy();
   });
 
   it('steppers adjust the count and never go below zero', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     const qty = r.getByLabelText('Jumlah dihitung') as HTMLInputElement;
     fireEvent.click(r.getByLabelText('Tambah'));
     fireEvent.click(r.getByLabelText('Tambah'));
@@ -63,23 +69,23 @@ describe('StockTake — walking the gudang', () => {
   });
 
   it('minimum starts as "(-)" — no alarm — until the operator sets one', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     expect(r.getByText(/Tidak ada minimum/)).toBeTruthy();
     fireEvent.click(r.getByText('Atur'));
     expect(r.getByLabelText('Minimum (alarm stok)')).toBeTruthy();
   });
 
   it('survives closing the app — the draft is restored from storage', () => {
-    const first = render(StockTake);
+    const first = render(Harness);
     addItem(first, 'Terpal', '3');
     cleanup();
-    expect(render(StockTake).getByText('Terpal')).toBeTruthy();
+    expect(render(Harness).getByText('Terpal')).toBeTruthy();
   });
 });
 
 describe('durables must be asked how they are tracked', () => {
   it('the question only appears for Barang tetap', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     expect(r.queryByText('Label satu-satu')).toBeNull();
     fireEvent.click(r.getByText('Barang tetap'));
     expect(r.getByText('Label satu-satu')).toBeTruthy();
@@ -88,7 +94,7 @@ describe('durables must be asked how they are tracked', () => {
   });
 
   it('choosing "Hitung jumlahnya" produces no per-unit labels', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     fireEvent.click(r.getByText('Barang tetap'));
     fireEvent.click(r.getByText('Hitung jumlahnya'));
     addItem(r, 'Terpal', '10');
@@ -96,7 +102,7 @@ describe('durables must be asked how they are tracked', () => {
   });
 
   it('labelling one-by-one yields one QR-able unit per count', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '3');
     const parsed = parseInstances(toInstancesCsv(stored().items, Date.parse('2026-09-06T00:00:00Z')));
@@ -107,7 +113,7 @@ describe('durables must be asked how they are tracked', () => {
 
 describe('editing a row mid-walk', () => {
   it('loads the row back into the form and saves in place', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sabun', '5');
     fireEvent.click(r.getByLabelText('Ubah Sabun'));
 
@@ -121,7 +127,7 @@ describe('editing a row mid-walk', () => {
   });
 
   it('does not warn that the row being edited duplicates itself', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sapu', '2');
     fireEvent.click(r.getByLabelText('Ubah Sapu'));
     fireEvent.click(r.getByText('Simpan perubahan'));
@@ -129,7 +135,7 @@ describe('editing a row mid-walk', () => {
   });
 
   it('can be cancelled without changing anything', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sapu', '2');
     fireEvent.click(r.getByLabelText('Ubah Sapu'));
     type(r.getByLabelText('Nama barang'), 'Bukan sapu');
@@ -139,7 +145,7 @@ describe('editing a row mid-walk', () => {
   });
 
   it('deleting takes two taps — a mis-tap must not lose a counted row', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Kanebo', '5');
 
     fireEvent.click(r.getByLabelText('Hapus Kanebo'));
@@ -153,7 +159,7 @@ describe('editing a row mid-walk', () => {
   });
 
   it('emptying the whole list also takes two taps', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sapu', '1');
     fireEvent.click(r.getByText('Kosongkan'));
     expect(r.getByText(/Hapus semua 1 barang\?/)).toBeTruthy();
@@ -164,7 +170,7 @@ describe('editing a row mid-walk', () => {
 
 describe('categories are free-form', () => {
   it('a new category can be added mid-walk and is selected immediately', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     fireEvent.click(r.getByLabelText('Tambah kategori baru'));
     type(r.getByLabelText('Nama kategori baru'), 'Alat Masak');
     fireEvent.click(r.getByText('Simpan'));
@@ -175,7 +181,7 @@ describe('categories are free-form', () => {
   });
 
   it('backing out of the new-category field adds nothing', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     fireEvent.click(r.getByLabelText('Tambah kategori baru'));
     type(r.getByLabelText('Nama kategori baru'), 'Tidak jadi');
     fireEvent.click(r.getByText('Batal'));
@@ -187,7 +193,7 @@ describe('categories are free-form', () => {
 
   it('uses a native dialog for nothing — the kiosk never calls prompt or confirm', () => {
     // happy-dom provides neither, so any surviving call would throw rather than pass silently.
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sabun', '1');
     fireEvent.click(r.getByLabelText('Tambah kategori baru'));
     fireEvent.click(r.getByLabelText('Hapus Sabun'));
@@ -198,7 +204,7 @@ describe('categories are free-form', () => {
 
 describe('export', () => {
   it('offers one file per sheet tab, and only lists instances when there are any', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sabun', '5');
     expect(r.getByText('Items')).toBeTruthy();
     expect(r.getByText('Categories')).toBeTruthy();
@@ -211,7 +217,7 @@ describe('export', () => {
   });
 
   it('what it exports is what the Items sheet accepts', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     addItem(r, 'Sabun', '12');
     const parsed = parseItems(toItemsCsv(stored().items));
     expect(parsed.quarantined).toEqual([]);
@@ -221,7 +227,7 @@ describe('export', () => {
 
 describe('finding a row in a long list', () => {
   it('the search box appears only once the list is long enough to need it', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     for (let n = 1; n <= 5; n += 1) addItem(r, `Barang ${n}`, '1');
     expect(r.queryByLabelText('Cari barang')).toBeNull();
     addItem(r, 'Sabun cuci', '1');
@@ -229,7 +235,7 @@ describe('finding a row in a long list', () => {
   });
 
   it('filters the list, and says so when nothing matches', () => {
-    const r = render(StockTake);
+    const r = render(Harness);
     for (let n = 1; n <= 5; n += 1) addItem(r, `Barang ${n}`, '1');
     addItem(r, 'Sabun cuci', '1');
 
