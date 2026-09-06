@@ -23,11 +23,30 @@ Barang tetap*, count, and an optional minimum. **Tambah barang**, repeat.
 - **Saved automatically** to `localStorage` on every change, so closing the app mid-walk loses
   nothing. (IndexedDB is reserved for the Phase-3 offline transaction queue, where durability
   under replay actually matters. A stock-take draft is a few hundred small rows.)
-- **Ekspor CSV** produces exactly the `Items` tab format in `sheets/`. A test asserts the export
-  round-trips through the real `data/parse.ts` with zero quarantine — so what this button
-  produces is, by construction, what the sheet accepts.
 - **The minimum defaults to "(-)"** — no alarm — because most items don't need one, and a
   default that nags is a default people turn off.
+- **Durables are asked how they're tracked**, in plain language: *Label satu-satu* (each unit
+  gets its own QR) or *Hitung jumlahnya* (just the count). Defaulting silently to per-unit would
+  generate 200 labels for 200 knives without anyone choosing that — labelling every blade is a
+  real operational project, so it is a decision, not a default.
+- **Categories are free-form.** Hitting something that fits nowhere must not stop the walk;
+  that is exactly when a stock-take gets abandoned. Add one inline and it's selected immediately.
+- **Rows are editable in place.** Re-adding would burn an id that may already be on a printed
+  label, so `itemId` and `barcode` survive an edit.
+- **Search appears once the list is long enough to need it** (>5 rows).
+- **Export is one file per sheet tab** — `Items`, `Categories`, and `AssetInstances` when any
+  item is labelled one-by-one. Separate downloads, because firing three from one tap gets
+  blocked by browsers, silently. Tests assert every file round-trips through the real
+  `data/parse.ts` with zero quarantine, so what these buttons produce is by construction what
+  the sheet accepts.
+- **No `prompt()` or `confirm()` anywhere.** Native dialogs are small, unstyled and suppressible
+  — the opposite of the 56px targets the rest of the UI uses. Adding a category and deleting a
+  row are both inline, and destructive actions take two taps.
+
+**Asset instances are derived, not stored.** An instance-tracked durable with `initialStock` N
+*is* N physical units; `instancesFor()` generates them at export time, so there is no second
+collection to keep in sync. Lower the count from 20 to 18 and the last two simply stop existing
+— correct during a stock-take, where nothing has a history yet.
 
 That means **it is useful before any Google setup exists**: walk the gudang today, export a CSV,
 import it into the Items tab. The gateway replaces the export later; nothing here changes.

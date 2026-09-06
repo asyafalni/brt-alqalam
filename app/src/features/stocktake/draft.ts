@@ -7,7 +7,7 @@
 // The draft IS `domain/Item[]`. Nothing new is invented: what the marbot types is exactly
 // what the Items sheet holds, so the export round-trips through the real parser.
 
-import type { Item, Kind, TrackBy } from '../../../../domain/types';
+import type { AssetInstance, Category, Item, Kind, TrackBy } from '../../../../domain/types';
 
 /** What the operator actually fills in. Everything else is derived. */
 export interface DraftInput {
@@ -56,7 +56,7 @@ export function createItem(input: DraftInput, existing: readonly Item[]): Item {
 export interface DraftProblem { field: keyof DraftInput; message: string }
 
 /** Validation the operator sees, in their language. Blocking only on what truly cannot be fixed later. */
-export function validate(input: DraftInput, existing: readonly Item[]): DraftProblem[] {
+export function validate(input: DraftInput, existing: readonly Item[], editingId?: string): DraftProblem[] {
   const problems: DraftProblem[] = [];
   const name = input.name.trim();
 
@@ -73,7 +73,8 @@ export function validate(input: DraftInput, existing: readonly Item[]): DraftPro
 
   // A warning, not a block: duplicates are real ("Pisau" on two racks) and the marbot
   // decides. Surfacing it beats silently creating a second row nobody reconciles.
-  if (name !== '' && existing.some((i) => i.name.toLowerCase() === name.toLowerCase())) {
+  const others = editingId ? existing.filter((i) => i.itemId !== editingId) : existing;
+  if (name !== '' && others.some((i) => i.name.toLowerCase() === name.toLowerCase())) {
     problems.push({ field: 'name', message: `"${name}" sudah ada di daftar — tetap tambah?` });
   }
   return problems;
@@ -104,6 +105,98 @@ export function toItemsCsv(items: readonly Item[]): string {
     i.active ? 'TRUE' : 'FALSE',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';
+}
+
+// ---------------------------------------------------------------------------
+// Asset instances — DERIVED, not stored.
+//
+// An instance-tracked durable with initialStock N is exactly N physical units, each
+// needing its own QR label. Deriving them from the item means there is no second
+// collection to keep in sync: edit the count from 20 to 18 and the last two simply
+// stop existing. That is correct during a stock-take, where nothing has a history yet.
+// ---------------------------------------------------------------------------
+
+export function instancesFor(item: Item, acquiredTs: number): AssetInstance[] {
+  if (item.trackBy !== 'instance') return [];
+  return Array.from({ length: Math.max(0, Math.trunc(item.initialStock)) }, (_, n) => ({
+    assetId: `${item.barcode}-${String(n + 1).padStart(3, '0')}`,
+    itemId: item.itemId,
+    label: `${item.name} #${n + 1}`,
+    acquiredTs,
+    active: true,
+  }));
+}
+
+const INSTANCES_HEADER = 'assetId,itemId,label,acquiredTs,active';
+
+export function toInstancesCsv(items: readonly Item[], acquiredTs: number): string {
+  const rows = items
+    .flatMap((i) => instancesFor(i, acquiredTs))
+    .map((a) => [a.assetId, a.itemId, a.label, new Date(a.acquiredTs).toISOString(), a.active ? 'TRUE' : 'FALSE']
+      .map(cell).join(','));
+  return [INSTANCES_HEADER, ...rows].join('\n') + '\n';
+}
+
+// ---------------------------------------------------------------------------
+// Categories — free-form and editable (design doc Part XI). Nothing behavioural
+// hangs off them; `kind` on the item carries all the meaning.
+// ---------------------------------------------------------------------------
+
+const slug = (name: string): string =>
+  name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24);
+
+export function createCategory(name: string, existing: readonly Category[]): Category {
+  const base = `CAT-${slug(name) || 'LAIN'}`;
+  let categoryId = base;
+  for (let n = 2; existing.some((c) => c.categoryId === categoryId); n += 1) categoryId = `${base}-${n}`;
+  return {
+    categoryId,
+    name: name.trim(),
+    order: existing.reduce((m, c) => Math.max(m, c.order), 0) + 1,
+    active: true,
+  };
+}
+
+const CATEGORIES_HEADER = 'categoryId,name,order,active';
+
+export function toCategoriesCsv(categories: readonly Category[]): string {
+  const rows = categories.map((c) =>
+    [c.categoryId, c.name, String(c.order), c.active ? 'TRUE' : 'FALSE'].map(cell).join(','));
+  return [CATEGORIES_HEADER, ...rows].join('\n') + '\n';
+}
+
+// ---------------------------------------------------------------------------
+// Editing — a mistyped row mid-walk must be fixable in place. Re-adding would
+// burn an id that may already be printed on a label.
+// ---------------------------------------------------------------------------
+
+export function updateItem(items: readonly Item[], itemId: string, input: DraftInput): Item[] {
+  return items.map((i) =>
+    i.itemId !== itemId ? i : {
+      ...i,
+      name: input.name.trim(),
+      categoryId: input.categoryId,
+      kind: input.kind,
+      unit: input.unit.trim(),
+      trackBy: input.trackBy ?? (input.kind === 'consumable' ? 'quantity' : 'instance'),
+      minStock: input.minStock,
+      initialStock: input.initialStock,
+    });
+}
+
+/** Reverse of `createItem` — load an existing row back into the form for editing. */
+export function toInput(item: Item): DraftInput {
+  return {
+    name: item.name, categoryId: item.categoryId, unit: item.unit, kind: item.kind,
+    initialStock: item.initialStock, minStock: item.minStock, trackBy: item.trackBy,
+  };
+}
+
+/** Substring match over name and unit — for finding a row in a long list mid-walk. */
+export function filterItems(items: readonly Item[], query: string): Item[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return [...items];
+  return items.filter((i) => `${i.name} ${i.unit}`.toLowerCase().includes(q));
 }
 
 /** Progress line for the header — the only number that matters while walking. */

@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createItem, nextItemId, toItemsCsv, validate, isBlocking, summarise } from './draft';
+import {
+  createItem, nextItemId, toItemsCsv, validate, isBlocking, summarise,
+  instancesFor, toInstancesCsv, createCategory, toCategoriesCsv, updateItem, toInput, filterItems,
+} from './draft';
 import type { DraftInput } from './draft';
-import { parseItems } from '../../../../data/parse';
+import { parseItems, parseInstances, parseCategories } from '../../../../data/parse';
 import type { Item } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
@@ -88,5 +91,100 @@ describe('summarise', () => {
     const a = createItem(input({ initialStock: 10 }), []);
     const b = createItem(input({ categoryId: 'CAT-PHBI', initialStock: 4 }), [a]);
     expect(summarise([a, b])).toEqual({ count: 2, categories: 2, units: 14 });
+  });
+});
+
+describe('asset instances are derived from the item, not stored', () => {
+  const TS0 = Date.parse('2026-09-06T00:00:00Z');
+
+  it('an instance-tracked durable yields one labelled unit per count', () => {
+    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), []);
+    const inst = instancesFor(pisau, TS0);
+    expect(inst.map((a) => a.assetId)).toEqual(['ALQ-ITM-0001-001', 'ALQ-ITM-0001-002', 'ALQ-ITM-0001-003']);
+    expect(inst.map((a) => a.label)).toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
+  });
+
+  it('quantity-tracked things get no instances — consumables and counted durables alike', () => {
+    const sabun = createItem(input({ kind: 'consumable', initialStock: 10 }), []);
+    const terpal = createItem(input({ kind: 'equipment', trackBy: 'quantity', initialStock: 10 }), []);
+    expect(instancesFor(sabun, TS0)).toEqual([]);
+    expect(instancesFor(terpal, TS0)).toEqual([]);
+  });
+
+  it('lowering the count simply drops the last units', () => {
+    const before = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 5 }), []);
+    const after = updateItem([before], before.itemId, { ...toInput(before), initialStock: 3 })[0];
+    expect(instancesFor(after, TS0).map((a) => a.assetId))
+      .toEqual(instancesFor(before, TS0).slice(0, 3).map((a) => a.assetId));
+  });
+
+  it('exports instances in the shape the AssetInstances tab parses', () => {
+    const items = [createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 2 }), [])];
+    const parsed = parseInstances(toInstancesCsv(items, TS0));
+    expect(parsed.quarantined).toEqual([]);
+    expect(parsed.ok).toHaveLength(2);
+    expect(parsed.ok[0].acquiredTs).toBe(TS0);
+  });
+});
+
+describe('categories are free-form and editable', () => {
+  it('derives a readable id from the name', () => {
+    expect(createCategory('  Alat Masak ', []).categoryId).toBe('CAT-ALAT-MASAK');
+  });
+
+  it('never collides with an existing id', () => {
+    const first = createCategory('Dapur', []);
+    const second = createCategory('Dapur', [first]);
+    expect(second.categoryId).toBe('CAT-DAPUR-2');
+    expect(createCategory('Dapur', [first, second]).categoryId).toBe('CAT-DAPUR-3');
+  });
+
+  it('falls back rather than producing an empty id', () => {
+    expect(createCategory('!!!', []).categoryId).toBe('CAT-LAIN');
+  });
+
+  it('exports in the shape the Categories tab parses', () => {
+    const cats = [createCategory('Kebersihan', []), createCategory('Alat, berat', [])];
+    const parsed = parseCategories(toCategoriesCsv(cats));
+    expect(parsed.quarantined).toEqual([]);
+    expect(parsed.ok[1].name).toBe('Alat, berat');
+  });
+});
+
+describe('editing a row in place', () => {
+  it('keeps the id and barcode — they may already be on a printed label', () => {
+    const before = createItem(input({ name: 'Sabun' }), []);
+    const after = updateItem([before], before.itemId, { ...toInput(before), name: 'Sabun cair', initialStock: 7 })[0];
+    expect(after.itemId).toBe(before.itemId);
+    expect(after.barcode).toBe(before.barcode);
+    expect(after).toMatchObject({ name: 'Sabun cair', initialStock: 7 });
+  });
+
+  it('re-derives trackBy when the kind changes', () => {
+    const before = createItem(input({ kind: 'consumable' }), []);
+    const after = updateItem([before], before.itemId, { ...toInput(before), kind: 'equipment', trackBy: undefined })[0];
+    expect(after.trackBy).toBe('instance');
+  });
+
+  it('does not flag the row being edited as a duplicate of itself', () => {
+    const existing = [createItem(input({ name: 'Sapu' }), [])];
+    expect(validate(toInput(existing[0]), existing)).toHaveLength(1);            // as a new row: warned
+    expect(validate(toInput(existing[0]), existing, existing[0].itemId)).toEqual([]); // as an edit: fine
+  });
+});
+
+describe('filterItems', () => {
+  const items = [
+    createItem(input({ name: 'Sabun cuci', unit: 'galon' }), []),
+    createItem(input({ name: 'Pisau', unit: 'buah' }), [createItem(input(), [])]),
+  ];
+
+  it('matches on name or unit, case-insensitively', () => {
+    expect(filterItems(items, 'sabun').map((i) => i.name)).toEqual(['Sabun cuci']);
+    expect(filterItems(items, 'BUAH').map((i) => i.name)).toEqual(['Pisau']);
+  });
+
+  it('an empty query returns everything', () => {
+    expect(filterItems(items, '  ')).toHaveLength(2);
   });
 });

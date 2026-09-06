@@ -7,27 +7,61 @@
 // Every read is defensive. A half-written or hand-edited value must not white-screen a tablet
 // in a gudang — we would rather start empty and say so than crash.
 
-const KEY = 'brt.stocktake.draft.v1';
+import type { Category, Item } from '../../../domain/types';
 
-export function loadDraft<T>(isValid: (v: unknown) => v is T[]): T[] {
+export interface StoredDraft {
+  items: Item[];
+  categories: Category[];
+}
+
+const KEY = 'brt.stocktake.draft.v2';
+const KEY_V1 = 'brt.stocktake.draft.v1'; // a bare Item[], before categories were editable
+
+const isItem = (v: unknown): v is Item =>
+  !!v && typeof v === 'object' && typeof (v as Item).itemId === 'string';
+
+const isCategory = (v: unknown): v is Category =>
+  !!v && typeof v === 'object' && typeof (v as Category).categoryId === 'string';
+
+function readJson(key: string): unknown {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return isValid(parsed) ? parsed : [];
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : undefined;
   } catch {
-    return [];
+    return undefined;
   }
 }
 
-export function saveDraft<T>(items: readonly T[]): void {
+export function loadDraft(fallbackCategories: Category[]): StoredDraft {
+  const v2 = readJson(KEY);
+  if (v2 && typeof v2 === 'object') {
+    const { items, categories } = v2 as Partial<StoredDraft>;
+    return {
+      items: Array.isArray(items) ? items.filter(isItem) : [],
+      categories: Array.isArray(categories) && categories.some(isCategory)
+        ? categories.filter(isCategory)
+        : fallbackCategories,
+    };
+  }
+
+  // A draft written before categories became editable. Keep the walk, not the schema.
+  const v1 = readJson(KEY_V1);
+  if (Array.isArray(v1)) return { items: v1.filter(isItem), categories: fallbackCategories };
+
+  return { items: [], categories: fallbackCategories };
+}
+
+export function saveDraft(draft: StoredDraft): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(items));
+    localStorage.setItem(KEY, JSON.stringify(draft));
   } catch {
     // Quota or private mode. The draft stays in memory and the export still works.
   }
 }
 
 export function clearDraft(): void {
-  try { localStorage.removeItem(KEY); } catch { /* nothing to do */ }
+  try {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(KEY_V1);
+  } catch { /* nothing to do */ }
 }
