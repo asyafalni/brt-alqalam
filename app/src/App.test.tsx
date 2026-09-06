@@ -14,8 +14,8 @@ function seed(...inputs: DraftInput[]) {
   const items = inputs.reduce<ReturnType<typeof createItem>[]>(
     (acc, i) => [...acc, createItem(i, acc)], [],
   );
-  localStorage.setItem('brt.stocktake.draft.v2',
-    JSON.stringify({ items, categories: SEED_CATEGORIES }));
+  localStorage.setItem('brt.stocktake.draft.v3',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [] }));
   return items;
 }
 
@@ -83,13 +83,24 @@ describe('navigation', () => {
     seed(input());
     const r = render(App);
 
-    fireEvent.click(r.getByText('Stok'));
+    // Every destination exists twice — sidebar on desktop, bottom bar on mobile. The bottom
+    // bar carries an aria-label, so querying by it targets exactly one of them.
+    fireEvent.click(r.getByLabelText('Stok Sekarang'));
     expect(location.hash).toBe('#/board');
-    expect(r.getByText('Stok Sekarang')).toBeTruthy();
+    expect(r.getByRole('heading', { name: 'Stok Sekarang' })).toBeTruthy();
 
-    fireEvent.click(r.getByText('Cetak Label'));
+    fireEvent.click(r.getByLabelText('Cetak Label'));
     expect(location.hash).toBe('#/label');
     expect(r.getByText('Cetak Label QR')).toBeTruthy();
+  });
+
+  it('reaches the rack map, which is a screen only the new location model makes possible', () => {
+    seed(input());
+    const r = render(App);
+    fireEvent.click(r.getByLabelText('Peta Rak'));
+    expect(location.hash).toBe('#/racks');
+    expect(r.getByRole('heading', { name: 'Peta Rak' })).toBeTruthy();
+    expect(r.getByText(/Belum ada rak/)).toBeTruthy();
   });
 
   it('an unknown path lands on the stock-take rather than a dead end', () => {

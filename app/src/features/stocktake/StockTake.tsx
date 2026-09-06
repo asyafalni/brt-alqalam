@@ -4,13 +4,13 @@
 
 import { useMemo, useState } from 'octane';
 import { Package, Pencil, Trash2 } from '@octanejs/lucide';
-import type { Category, Item } from '../../../../domain/types';
+import type { Category, Item, Location } from '../../../../domain/types';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import type { Draft } from '../../state/useDraft';
 import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat, TD, TH } from '../../components/ui';
 import {
-  createCategory, createItem, filterItems, instancesFor, isBlocking, summarise,
-  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, updateItem, validate,
+  createCategory, createItem, createLocation, filterItems, instancesFor, isBlocking, summarise,
+  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, updateItem, validate,
 } from './draft';
 import type { DraftInput } from './draft';
 import { ItemForm } from './ItemForm';
@@ -23,7 +23,7 @@ const emptyInput = (categories: Category[]): DraftInput => ({
 export function StockTake(
   { draft, search, onSearch }: { draft: Draft; search: string; onSearch: (v: string) => void },
 ) {
-  const { items, categories, setItems, setCategories } = draft;
+  const { items, categories, locations, setItems, setCategories, setLocations } = draft;
   const [input, setInput] = useState<DraftInput>(() => emptyInput(categories));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showProblems, setShowProblems] = useState(false);
@@ -77,6 +77,12 @@ export function StockTake(
     change('categoryId', category.categoryId);
   }
 
+  function addLocation(code: string, zone: string) {
+    const location = createLocation(code, zone, '', locations);
+    setLocations((prev) => [...prev, location]);
+    change('locationId', location.locationId);
+  }
+
   function remove(item: Item) {
     if (editingId === item.itemId) cancelEdit();
     setItems((prev) => prev.filter((i) => i.itemId !== item.itemId));
@@ -125,16 +131,18 @@ export function StockTake(
       <ItemForm
         input={input}
         categories={categories}
+        locations={locations}
         problems={problems}
         showProblems={showProblems}
         editing={editingId != null}
         onChange={change}
         onAddCategory={addCategory}
+        onAddLocation={addLocation}
         onSubmit={submit}
         onCancelEdit={cancelEdit}
       />
 
-      <ExportPanel items={items} categories={categories} labelCount={labelCount} />
+      <ExportPanel items={items} categories={categories} locations={locations} labelCount={labelCount} />
 
       <div class={CARD_FLUSH}>
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 p-4">
@@ -186,6 +194,11 @@ export function StockTake(
                       <span class="ml-2 text-[10px] uppercase tracking-wider text-slate-400">
                         {i.kind === 'consumable' ? 'bisa habis' : 'barang tetap'}
                       </span>
+                      <p class="mt-0.5 text-[11px] text-slate-400">
+                        {i.locationId
+                          ? locations.find((l) => l.locationId === i.locationId)?.code ?? i.locationId
+                          : 'belum ditempatkan'}
+                      </p>
                     </td>
                     <td class={`${TD} text-right`}>
                       <span class="text-sm font-bold tabular-nums text-slate-900">{i.initialStock}</span>{' '}
@@ -245,7 +258,8 @@ export function StockTake(
  * files are listed with their row counts and taken one at a time.
  */
 function ExportPanel(
-  { items, categories, labelCount }: { items: Item[]; categories: Category[]; labelCount: number },
+  { items, categories, locations, labelCount }:
+  { items: Item[]; categories: Category[]; locations: Location[]; labelCount: number },
 ) {
   if (items.length === 0) return null;
   const acquiredTs = Date.now();
@@ -254,6 +268,9 @@ function ExportPanel(
   const files = [
     { tab: 'Items', rows: items.length, note: 'katalog barang', csv: () => toItemsCsv(items) },
     { tab: 'Categories', rows: categories.length, note: 'daftar kategori', csv: () => toCategoriesCsv(categories) },
+    ...(locations.length > 0
+      ? [{ tab: 'Locations', rows: locations.length, note: 'rak & tempat', csv: () => toLocationsCsv(locations) }]
+      : []),
     ...(labelCount > 0
       ? [{ tab: 'AssetInstances', rows: labelCount, note: 'unit yang dilabeli satu-satu', csv: () => toInstancesCsv(items, acquiredTs) }]
       : []),

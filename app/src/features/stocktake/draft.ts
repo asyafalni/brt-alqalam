@@ -7,7 +7,7 @@
 // The draft IS `domain/Item[]`. Nothing new is invented: what the marbot types is exactly
 // what the Items sheet holds, so the export round-trips through the real parser.
 
-import type { AssetInstance, Category, Item, Kind, TrackBy } from '../../../../domain/types';
+import type { AssetInstance, Category, Item, Kind, Location, TrackBy } from '../../../../domain/types';
 
 /** What the operator actually fills in. Everything else is derived. */
 export interface DraftInput {
@@ -20,6 +20,8 @@ export interface DraftInput {
   minStock: number | null;
   /** Optional override; defaults from `kind` (design doc §50). */
   trackBy?: TrackBy;
+  /** Which rack it sits on. Blank is allowed — "belum ditempatkan" is a real, visible state. */
+  locationId?: string;
 }
 
 const PREFIX = 'ITM-';
@@ -50,6 +52,7 @@ export function createItem(input: DraftInput, existing: readonly Item[]): Item {
     minStock: input.minStock,
     initialStock: input.initialStock,
     active: true,
+    ...(input.locationId ? { locationId: input.locationId } : {}),
   };
 }
 
@@ -87,7 +90,7 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 // Export — must match sheets/Items.csv exactly, because it is imported into that tab.
 // ---------------------------------------------------------------------------
 
-const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active';
+const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId';
 
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
@@ -103,6 +106,7 @@ export function toItemsCsv(items: readonly Item[]): string {
     i.minStock == null ? '(-)' : String(i.minStock),
     String(i.initialStock),
     i.active ? 'TRUE' : 'FALSE',
+    i.locationId ?? '',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';
 }
@@ -157,6 +161,29 @@ export function createCategory(name: string, existing: readonly Category[]): Cat
   };
 }
 
+// Racks — one durable QR per rack or bin (design doc §14.2), never one per bar of soap.
+export function createLocation(code: string, zone: string, name: string, existing: readonly Location[]): Location {
+  const base = `LOC-${slug(code) || 'RAK'}`;
+  let locationId = base;
+  for (let n = 2; existing.some((l) => l.locationId === locationId); n += 1) locationId = `${base}-${n}`;
+  return {
+    locationId,
+    code: code.trim(),
+    name: name.trim(),
+    zone: zone.trim() || 'Gudang',
+    order: existing.filter((l) => l.zone === (zone.trim() || 'Gudang')).length + 1,
+    active: true,
+  };
+}
+
+const LOCATIONS_HEADER = 'locationId,code,name,zone,order,active';
+
+export function toLocationsCsv(locations: readonly Location[]): string {
+  const rows = locations.map((l) =>
+    [l.locationId, l.code, l.name, l.zone, String(l.order), l.active ? 'TRUE' : 'FALSE'].map(cell).join(','));
+  return [LOCATIONS_HEADER, ...rows].join('\n') + '\n';
+}
+
 const CATEGORIES_HEADER = 'categoryId,name,order,active';
 
 export function toCategoriesCsv(categories: readonly Category[]): string {
@@ -181,6 +208,7 @@ export function updateItem(items: readonly Item[], itemId: string, input: DraftI
       trackBy: input.trackBy ?? (input.kind === 'consumable' ? 'quantity' : 'instance'),
       minStock: input.minStock,
       initialStock: input.initialStock,
+      locationId: input.locationId || undefined,
     });
 }
 
@@ -189,6 +217,7 @@ export function toInput(item: Item): DraftInput {
   return {
     name: item.name, categoryId: item.categoryId, unit: item.unit, kind: item.kind,
     initialStock: item.initialStock, minStock: item.minStock, trackBy: item.trackBy,
+    locationId: item.locationId,
   };
 }
 

@@ -6,6 +6,11 @@ import {
 import { createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
+import type { Location } from '../../../../domain/types';
+
+const rak: Location = {
+  locationId: 'LOC-B3', code: 'B3', name: 'Rak sabun', zone: 'Gudang Utama', order: 1, active: true,
+};
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
@@ -83,7 +88,7 @@ describe('labelsFor', () => {
 
   it('gives a quantity-tracked item ONE label — the rack, not each bar of soap', () => {
     const sabun = createItem(input({ initialStock: 40 }), []);
-    const labels = labelsFor([sabun], SEED_CATEGORIES, base, TS0);
+    const labels = labelsFor([sabun], SEED_CATEGORIES, [], base, TS0);
     expect(labels).toHaveLength(1);
     expect(labels[0]).toMatchObject({
       code: 'ALQ-ITM-0001',
@@ -95,19 +100,49 @@ describe('labelsFor', () => {
 
   it('gives an instance-tracked durable one label per physical unit', () => {
     const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), []);
-    const labels = labelsFor([pisau], SEED_CATEGORIES, base, TS0);
+    const labels = labelsFor([pisau], SEED_CATEGORIES, [], base, TS0);
     expect(labels.map((l) => l.title)).toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
     expect(labels[2].url).toBe('https://x.test/#/scan?a=ALQ-ITM-0001-003');
   });
 
   it('a counted durable gets a rack label, not one per unit', () => {
     const terpal = createItem(input({ name: 'Terpal', kind: 'equipment', trackBy: 'quantity', initialStock: 12 }), []);
-    expect(labelsFor([terpal], SEED_CATEGORIES, base, TS0)).toHaveLength(1);
+    expect(labelsFor([terpal], SEED_CATEGORIES, [], base, TS0)).toHaveLength(1);
   });
 
   it('falls back to the raw id when a category was deleted', () => {
     const orphan = createItem(input({ categoryId: 'CAT-GONE' }), []);
-    expect(labelsFor([orphan], SEED_CATEGORIES, base, TS0)[0].subtitle).toBe('CAT-GONE · galon');
+    expect(labelsFor([orphan], SEED_CATEGORIES, [], base, TS0)[0].subtitle).toBe('CAT-GONE · galon');
+  });
+});
+
+describe('racks get their own label — what §14.2 actually asked for', () => {
+  const base = 'https://x.test';
+
+  it('one label per rack, pointing at the rack', () => {
+    const labels = labelsFor([], SEED_CATEGORIES, [rak], base, TS0);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toMatchObject({
+      code: 'LOC-B3',
+      title: 'Rak B3',
+      subtitle: 'Rak sabun',
+      url: 'https://x.test/#/scan?l=LOC-B3',
+    });
+  });
+
+  it('racks print first — they go on the shelves', () => {
+    const sabun = createItem(input(), []);
+    const labels = labelsFor([sabun], SEED_CATEGORIES, [rak], base, TS0);
+    expect(labels.map((l) => l.title)).toEqual(['Rak B3', 'Sabun']);
+  });
+
+  it('skips retired racks', () => {
+    expect(labelsFor([], SEED_CATEGORIES, [{ ...rak, active: false }], base, TS0)).toHaveLength(0);
+  });
+
+  it('falls back to the zone when a rack has no descriptive name', () => {
+    const labels = labelsFor([], SEED_CATEGORIES, [{ ...rak, name: '' }], base, TS0);
+    expect(labels[0].subtitle).toBe('Gudang Utama');
   });
 });
 

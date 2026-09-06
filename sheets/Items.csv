@@ -1,6 +1,6 @@
-itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active
-ITM-0001,ALQ-ITM-0001,Sabun cuci tangan,CAT-KEBERSIHAN,Bisa habis,galon,,5,12,TRUE
-ITM-0002,ALQ-ITM-0002,Kantong sampah besar,CAT-KEBERSIHAN,Bisa habis,pak,,3,8,TRUE
-ITM-0003,ALQ-ITM-0003,Kanebo,CAT-KEBERSIHAN,Bisa habis,buah,,(-),20,TRUE
-ITM-0004,ALQ-ITM-0004,Pisau potong,CAT-PHBI,Barang tetap,buah,,,0,TRUE
-ITM-0005,ALQ-ITM-0005,Terpal 4x6,CAT-PHBI,Barang tetap,lembar,quantity,,10,TRUE
+itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId
+ITM-0001,ALQ-ITM-0001,Sabun cuci tangan,CAT-KEBERSIHAN,Bisa habis,galon,,5,12,TRUE,LOC-A1
+ITM-0002,ALQ-ITM-0002,Kantong sampah besar,CAT-KEBERSIHAN,Bisa habis,pak,,3,8,TRUE,LOC-A1
+ITM-0003,ALQ-ITM-0003,Kanebo,CAT-KEBERSIHAN,Bisa habis,buah,,(-),20,TRUE,LOC-A2
+ITM-0004,ALQ-ITM-0004,Pisau potong,CAT-PHBI,Barang tetap,buah,,,0,TRUE,LOC-P1
+ITM-0005,ALQ-ITM-0005,Terpal 4x6,CAT-PHBI,Barang tetap,lembar,quantity,,10,TRUE,LOC-P1

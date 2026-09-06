@@ -2,7 +2,7 @@
 // sheets/*.csv, or a parser rule changes, this fails here rather than in a gudang.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseCategories, parseItems, parseInstances, parseTxns, describeIssues } from './parse';
+import { parseCategories, parseItems, parseInstances, parseLocations, parseTxns, describeIssues } from './parse';
 
 const read = (f: string) => readFileSync(new URL(`../sheets/${f}`, import.meta.url), 'utf8');
 
@@ -20,6 +20,13 @@ describe('sheets/ templates match the parser', () => {
     expect(r.ok.find((i) => i.itemId === 'ITM-0003')?.minStock).toBeNull();      // "(-)"
     expect(r.ok.find((i) => i.itemId === 'ITM-0004')?.trackBy).toBe('instance'); // defaulted from kind
     expect(r.ok.find((i) => i.itemId === 'ITM-0005')?.trackBy).toBe('quantity'); // explicit override
+  });
+
+  it('Locations.csv', () => {
+    const r = parseLocations(read('Locations.csv'));
+    expect(describeIssues(r.quarantined)).toBe('');
+    expect(r.ok).toHaveLength(4);
+    expect(new Set(r.ok.map((l) => l.zone)).size).toBe(2);
   });
 
   it('AssetInstances.csv', () => {

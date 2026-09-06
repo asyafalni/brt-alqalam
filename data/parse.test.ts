@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseCsv, toRecords } from './csv';
-import { parseItems, parseTxns, parseInstances, describeIssues } from './parse';
+import { parseItems, parseTxns, parseInstances, parseLocations, describeIssues } from './parse';
 
 describe('parseCsv', () => {
   it('handles quotes, embedded commas and newlines', () => {
@@ -17,13 +17,21 @@ describe('parseCsv', () => {
   });
 });
 
-const ITEM_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active\n';
+const ITEM_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId\n';
 
 describe('parseItems', () => {
   it('reads a well-formed row', () => {
-    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE');
+    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,LOC-A1');
     expect(r.quarantined).toEqual([]);
-    expect(r.ok[0]).toMatchObject({ itemId: 'ITM-S', kind: 'consumable', minStock: 5, initialStock: 10, active: true });
+    expect(r.ok[0]).toMatchObject({
+      itemId: 'ITM-S', kind: 'consumable', minStock: 5, initialStock: 10, active: true, locationId: 'LOC-A1',
+    });
+  });
+
+  it('treats a blank location as unplaced rather than an error', () => {
+    const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].locationId).toBeUndefined();
   });
 
   it('accepts the plain-language kind labels admins actually type', () => {
@@ -125,5 +133,29 @@ describe('describeIssues', () => {
   it('renders issues for the admin banner with sheet row numbers', () => {
     const r = parseItems(ITEM_HEADER + 'A,,Sabun,C,consumable,galon,quantity,5,sepuluh,');
     expect(describeIssues(r.quarantined)).toBe('Baris 2 (initialstock): "sepuluh" bukan angka');
+  });
+});
+
+describe('parseLocations', () => {
+  const HEADER = 'locationId,code,name,zone,order,active\n';
+
+  it('reads a rack', () => {
+    const r = parseLocations(HEADER + 'LOC-A1,A1,Rak sabun,Gudang Utama,1,TRUE');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0]).toEqual({
+      locationId: 'LOC-A1', code: 'A1', name: 'Rak sabun', zone: 'Gudang Utama', order: 1, active: true,
+    });
+  });
+
+  it('accepts a rack known only by what is painted on it', () => {
+    const r = parseLocations(HEADER + 'LOC-A1,A1,,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0]).toMatchObject({ code: 'A1', name: '', zone: 'Gudang', order: 0, active: true });
+  });
+
+  it('quarantines a rack with no code — an unlabelled shelf helps nobody find anything', () => {
+    const r = parseLocations(HEADER + 'LOC-A1,,Rak sabun,Gudang Utama,1,TRUE');
+    expect(r.ok).toHaveLength(0);
+    expect(r.quarantined[0]).toMatchObject({ field: 'code' });
   });
 });

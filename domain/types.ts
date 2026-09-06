@@ -24,10 +24,30 @@ export interface Category {
   categoryId: string; name: string; order: number; active: boolean;
 }
 
+/**
+ * Where a thing physically is. A rack, shelf or bin — the unit that gets ONE durable QR
+ * (design doc §14.2: a QR per rack, never per bar of soap).
+ *
+ * This is what makes a messy gudang legible: "we own 12 galon sabun" does not help a marbot
+ * who cannot find them; "Rak B3" does. `zone` groups racks into rooms or areas.
+ */
+export interface Location {
+  locationId: string;
+  /** What is painted on the shelf — short, and the thing a person actually says. */
+  code: string;
+  name: string;
+  zone: string;
+  order: number;
+  active: boolean;
+}
+
 export interface Item {
   itemId: string; barcode: string; name: string;
   categoryId: string; kind: Kind; unit: string; trackBy: TrackBy; // trackBy defaults from kind (consumable->quantity, equipment->instance), overridable
   minStock: number | null; initialStock: number; active: boolean; // minStock null = Setting Minimum "(-)" → no low-stock notification
+  /** Optional: a catalog built before locations existed has none, and that is a real state
+   *  worth seeing — "belum ditempatkan" is exactly the mess we are trying to surface. */
+  locationId?: string;
 }
 
 export interface AssetInstance {

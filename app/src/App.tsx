@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'octane';
+import { ClipboardList, MapPin, Package, QrCode } from '@octanejs/lucide';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
+import { BottomNav } from './components/BottomNav';
 import { Card } from './components/ui';
+import { RackBoard } from './features/racks/RackBoard';
 import { useDraft } from './state/useDraft';
 import { useInventory } from './state/useInventory';
 import { useRoute } from './state/useRoute';
@@ -57,6 +60,7 @@ export function App() {
         isMobile={isMobile}
         itemCount={draft.items.length}
         alertCount={inventory.notifications.length}
+        rackCount={draft.locations.length}
         onNavigate={navigate}
         onClose={() => setCollapsed(true)}
       />
@@ -71,15 +75,25 @@ export function App() {
           onShowAlerts={() => navigate({ name: 'board' })}
         />
 
-        <main class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-4 pb-8 md:px-8">
+        {/* pb-24 on mobile keeps the last row clear of the bottom bar. */}
+        <main class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pb-8">
           {route.name === 'opname' && (
             <StockTake draft={draft} search={search} onSearch={setSearch} />
           )}
           {route.name === 'board' && (
             <Board items={draft.items} categories={draft.categories} inventory={inventory} search={search} />
           )}
+          {route.name === 'racks' && (
+            <RackBoard
+              items={draft.items}
+              categories={draft.categories}
+              locations={draft.locations}
+              inventory={inventory}
+              search={search}
+            />
+          )}
           {route.name === 'label' && (
-            <LabelSheet items={draft.items} categories={draft.categories} />
+            <LabelSheet items={draft.items} categories={draft.categories} locations={draft.locations} />
           )}
           {route.name === 'scan' && (
             <ScanResult
@@ -87,6 +101,7 @@ export function App() {
               id={route.id}
               items={draft.items}
               categories={draft.categories}
+              locations={draft.locations}
               inventory={inventory}
               now={now}
               onBack={() => navigate({ name: 'opname' })}
@@ -111,6 +126,17 @@ export function App() {
           )}
         </main>
       </div>
+
+      <BottomNav
+        route={route}
+        tabs={[
+          { name: 'Opname Gudang', short: 'Opname', icon: ClipboardList, route: { name: 'opname' } },
+          { name: 'Peta Rak', short: 'Rak', icon: MapPin, route: { name: 'racks' } },
+          { name: 'Stok Sekarang', short: 'Stok', icon: Package, route: { name: 'board' }, badge: inventory.notifications.length },
+          { name: 'Cetak Label', short: 'Label', icon: QrCode, route: { name: 'label' } },
+        ]}
+        onNavigate={navigate}
+      />
     </div>
   );
 }

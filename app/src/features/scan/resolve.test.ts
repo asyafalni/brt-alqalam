@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveState } from '../../../../domain/deriveState';
-import type { Item, Txn } from '../../../../domain/types';
+import type { Item, Location, Txn } from '../../../../domain/types';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createItem, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
@@ -21,22 +21,27 @@ const derive = (txns: Txn[] = []) => deriveState(items, instances, txns, TS0);
 const tx = (p: Partial<Txn>): Txn =>
   ({ txnId: 'T1', clientTxnId: 'c1', ts: TS0, type: 'adjust', qtyDelta: 0, actorUserId: 'u', ...p });
 
-const scan = (target: 'item' | 'asset', id: string, txns: Txn[] = []) =>
-  resolveScan(target, id, items, SEED_CATEGORIES, derive(txns), TS0);
+const rak: Location = {
+  locationId: 'LOC-B3', code: 'B3', name: 'Rak sabun', zone: 'Gudang Utama', order: 1, active: true,
+};
+const placed: Item[] = [{ ...sabun, locationId: 'LOC-B3' }, pisau];
+
+const scan = (target: 'item' | 'asset' | 'location', id: string, txns: Txn[] = []) =>
+  resolveScan(target, id, items, SEED_CATEGORIES, [rak], derive(txns), TS0);
 
 describe('resolveScan — the scan guard', () => {
   it('resolves a rack label by itemId or by the printed barcode', () => {
     for (const id of ['ITM-0001', 'ALQ-ITM-0001']) {
       const r = scan('item', id);
       expect(r).toMatchObject({ found: true, qty: 10, status: 'available' });
-      if (r.found) expect(r.item.name).toBe('Sabun');
+        if (r.found && r.kind === 'thing') expect(r.item.name).toBe('Sabun');
     }
   });
 
   it('resolves a unit label back to the item that owns it', () => {
     const r = scan('asset', 'ALQ-ITM-0002-002');
     expect(r.found).toBe(true);
-    if (r.found) {
+    if (r.found && r.kind === 'thing') {
       expect(r.item.name).toBe('Pisau');
       expect(r.instance?.label).toBe('Pisau #2');
       expect(r.categoryName).toBe('Kebersihan');
@@ -49,7 +54,7 @@ describe('resolveScan — the scan guard', () => {
   });
 
   it('distinguishes an empty catalog from an unknown label', () => {
-    const r = resolveScan('item', 'ITM-0001', [], SEED_CATEGORIES, deriveState([], [], [], TS0), TS0);
+    const r = resolveScan('item', 'ITM-0001', [], SEED_CATEGORIES, [], deriveState([], [], [], TS0), TS0);
     expect(r).toMatchObject({ found: false, reason: 'no-catalog' });
   });
 
@@ -105,5 +110,32 @@ describe('status vocabulary', () => {
 
   it('never renders a raw status string at an unknown value', () => {
     expect(itemStatusBadge('sesuatu').label).toBe('Tidak diketahui');
+  });
+});
+
+describe('scanning a rack — the label that actually goes on a shelf', () => {
+  it('answers "what is on this rack"', () => {
+    const derived = deriveState(placed, instances, [], TS0);
+    const r = resolveScan('location', 'LOC-B3', placed, SEED_CATEGORIES, [rak], derived, TS0);
+
+    expect(r.found).toBe(true);
+    if (r.found && r.kind === 'rack') {
+      expect(r.rack.location.code).toBe('B3');
+      expect(r.contents.map((i) => i.name)).toEqual(['Sabun']);
+      expect(r.rack.status).toBe('available');
+    }
+  });
+
+  it('shows the worst status on the shelf, since that is what earns the walk', () => {
+    const empty: Item[] = [{ ...sabun, locationId: 'LOC-B3', initialStock: 0 }];
+    const derived = deriveState(empty, [], [], TS0);
+    const r = resolveScan('location', 'LOC-B3', empty, SEED_CATEGORIES, [rak], derived, TS0);
+    if (r.found && r.kind === 'rack') expect(r.rack.status).toBe('out');
+    expect(statusBadge(r).label).toBe('Habis');
+  });
+
+  it('an unknown rack label says so rather than showing an empty shelf', () => {
+    const r = resolveScan('location', 'LOC-ZZ', placed, SEED_CATEGORIES, [rak], derive(), TS0);
+    expect(r).toMatchObject({ found: false, reason: 'unknown' });
   });
 });

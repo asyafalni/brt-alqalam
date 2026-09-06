@@ -10,7 +10,7 @@
 // a plausible-looking lie. Losing a row quietly is worse than showing an error, because the
 // whole point of the system is that the numbers can be believed.
 
-import type { AssetInstance, Category, Item, Kind, MovementType, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
+import type { AssetInstance, Category, Item, Kind, Location, MovementType, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
 import { parseCsv, toRecords } from './csv';
 
 export interface ParseIssue {
@@ -173,6 +173,17 @@ export const parseCategories = (csv: string): ParseResult<Category> =>
     active: bool(r, 'active', true),
   }));
 
+export const parseLocations = (csv: string): ParseResult<Location> =>
+  parseRows(csv, (r) => ({
+    locationId: req(r, 'locationid'),
+    code: req(r, 'code'),
+    // A rack can be known only by what is painted on it; the descriptive name is optional.
+    name: r['name'] ?? '',
+    zone: r['zone'] || 'Gudang',
+    order: num(r, 'order', 0),
+    active: bool(r, 'active', true),
+  }));
+
 export const parseItems = (csv: string): ParseResult<Item> =>
   parseRows(csv, (r) => {
     const k = kind(r);
@@ -187,6 +198,9 @@ export const parseItems = (csv: string): ParseResult<Item> =>
       minStock: minStock(r),
       initialStock: num(r, 'initialstock', 0),
       active: bool(r, 'active', true),
+      // Blank is a real state, not an error: a catalog built before locations existed has
+      // none, and "belum ditempatkan" is exactly the mess we want visible.
+      ...(r['locationid'] ? { locationId: r['locationid'] } : {}),
     };
   });
 

@@ -4,15 +4,17 @@ import { LabelSheet } from './LabelSheet';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item } from '../../../../domain/types';
+import type { Item, Location } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
   kind: 'consumable', initialStock: 10, minStock: 5, ...p,
 });
 
-const sheet = (items: Item[]) => {
-  const Harness = () => <LabelSheet items={items} categories={SEED_CATEGORIES} />;
+const sheet = (items: Item[], locations: Location[] = []) => {
+  const Harness = () => (
+    <LabelSheet items={items} categories={SEED_CATEGORIES} locations={locations} />
+  );
   return render(Harness);
 };
 

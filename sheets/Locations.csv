@@ -1,0 +1,5 @@
+locationId,code,name,zone,order,active
+LOC-A1,A1,Rak sabun & pembersih,Gudang Utama,1,TRUE
+LOC-A2,A2,Rak kain & kanebo,Gudang Utama,2,TRUE
+LOC-B1,B1,Rak alat listrik,Gudang Utama,3,TRUE
+LOC-P1,P1,Rak pisau & talenan,Gudang PHBI,1,TRUE

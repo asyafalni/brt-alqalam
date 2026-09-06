@@ -2,7 +2,7 @@
 
 **Do not hand-type these headers.** They must match `data/parse.ts` exactly; a mismatch
 quarantines every row. Import each CSV as its own tab, named exactly as the filename
-(`Categories`, `Items`, `AssetInstances`, `Transactions`).
+(`Categories`, `Locations`, `Items`, `AssetInstances`, `Transactions`).
 
 > In Google Sheets: **File → Import → Upload → Insert new sheet(s)**, then rename the tab to the
 > filename. Repeat per file. Delete the example rows once you have real data — they are marked
@@ -13,6 +13,7 @@ quarantines every row. Import each CSV as its own tab, named exactly as the file
 | Tab | Written by | Notes |
 | --- | --- | --- |
 | `Categories` | admin (by hand) | Free-form and editable (design doc Part XI). Seeded with the boss's 8 domains. |
+| `Locations` | admin **and** the stock-take | Racks, shelves and bins — **one QR per rack** (§14.2), never one per bar of soap. `code` is what is painted on the shelf ("B3"); `zone` groups racks into rooms. |
 | `Items` | admin by hand **and** the stock-take screen | The catalog. |
 | `AssetInstances` | admin / label tool | Only for `trackBy: instance` durables — one row per physical unit. |
 | `Transactions` | **the gateway only** | Append-only event log. **Never edit or delete a row here** — corrections are `reversal` rows. |
@@ -28,6 +29,9 @@ quarantines every row. Import each CSV as its own tab, named exactly as the file
 - **`minStock`** (Setting Minimum) — a number, or **`(-)`**, `-`, or blank for *no minimum,
   never notify*.
 - **numbers** — `10` or `10.5` or `10,5`. Text like `sepuluh` is quarantined, never coerced to 0.
+- **`locationId`** (on `Items`) — which rack it sits on. **Blank is allowed and meaningful**:
+  "belum ditempatkan" is a real state, and surfacing it is the point — that pile in the corner
+  is exactly the mess this system exists to make visible.
 - **`active`** — `TRUE`/`FALSE`, or `ya`/`tidak`, or blank (defaults to TRUE).
 - **timestamps** (`ts`, `acquiredTs`) — **ISO-8601 only** (`2026-09-06T13:45:00Z`) or epoch ms.
   A locale date like `9/6/2026` is **quarantined on purpose**: JavaScript would parse it and pick

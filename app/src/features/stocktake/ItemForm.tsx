@@ -1,5 +1,5 @@
 import { useRef, useState } from 'octane';
-import type { Category } from '../../../../domain/types';
+import type { Category, Location } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
 import { CARD, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
@@ -8,11 +8,13 @@ import { CARD, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 interface Props {
   input: DraftInput;
   categories: Category[];
+  locations: Location[];
   problems: DraftProblem[];
   showProblems: boolean;
   editing: boolean;
   onChange: <K extends keyof DraftInput>(key: K, value: DraftInput[K]) => void;
   onAddCategory: (name: string) => void;
+  onAddLocation: (code: string, zone: string) => void;
   onSubmit: () => void;
   onCancelEdit: () => void;
 }
@@ -22,6 +24,7 @@ export function ItemForm(p: Props) {
   // Inline, not `prompt()`. A native dialog on a gudang tablet is a small unstyled box that
   // some browsers suppress outright — the opposite of the 56px targets everything else uses.
   const [newCategory, setNewCategory] = useState<string | null>(null);
+  const [newRack, setNewRack] = useState<{ code: string; zone: string } | null>(null);
 
   const problemFor = (field: keyof DraftInput) =>
     p.showProblems ? p.problems.find((x) => x.field === field) : undefined;
@@ -30,6 +33,12 @@ export function ItemForm(p: Props) {
     const name = (newCategory ?? '').trim();
     if (name !== '') p.onAddCategory(name);
     setNewCategory(null);
+  }
+
+  function commitRack() {
+    const code = (newRack?.code ?? '').trim();
+    if (code !== '') p.onAddLocation(code, (newRack?.zone ?? '').trim());
+    setNewRack(null);
   }
 
   return (
@@ -126,6 +135,71 @@ export function ItemForm(p: Props) {
           </datalist>
           <Problem problem={problemFor('unit')} />
         </div>
+      </div>
+
+      {/* Where it physically sits. §14.2 locked one QR per rack — this is the field that
+          makes that real, and the thing that makes a messy gudang findable: "we own 12 galon
+          sabun" does not help a marbot; "Rak B3" does. Sticky, like category and unit. */}
+      <div class="mb-4">
+        <label class={LABEL} for="rak">Rak / tempat</label>
+        <div class="flex gap-2">
+          <select
+            id="rak"
+            class={FIELD}
+            value={p.input.locationId ?? ''}
+            onChange={(e: Event) => p.onChange('locationId', (e.target as HTMLSelectElement).value || undefined)}
+          >
+            <option value="">Belum ditempatkan</option>
+            {p.locations.map((l) => (
+              <option key={l.locationId} value={l.locationId}>
+                {l.code}{l.name ? ` — ${l.name}` : ''} · {l.zone}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+            onClick={() => setNewRack({ code: '', zone: p.locations.at(-1)?.zone ?? 'Gudang Utama' })}
+            aria-label="Tambah rak baru"
+            title="Tambah rak baru"
+          >
+            +
+          </button>
+        </div>
+        {newRack != null && (
+          <div class="mt-2 flex flex-wrap gap-2">
+            <input
+              class={`${FIELD} w-24 shrink-0 text-center font-bold uppercase`}
+              value={newRack.code}
+              placeholder="B3"
+              aria-label="Kode rak"
+              autocomplete="off"
+              onInput={(e: Event) => setNewRack({ ...newRack, code: (e.target as HTMLInputElement).value })}
+            />
+            <input
+              class={`${FIELD} min-w-0 flex-1`}
+              value={newRack.zone}
+              placeholder="Gudang Utama"
+              aria-label="Zona rak"
+              autocomplete="off"
+              onInput={(e: Event) => setNewRack({ ...newRack, zone: (e.target as HTMLInputElement).value })}
+            />
+            <button
+              type="button"
+              class="min-h-touch shrink-0 rounded-lg bg-[#38BDF8] px-4 font-semibold text-white hover:bg-[#0EA5E9]"
+              onClick={commitRack}
+            >
+              Simpan
+            </button>
+            <button
+              type="button"
+              class="min-h-touch shrink-0 rounded-lg border border-slate-200 px-4 font-semibold text-slate-600"
+              onClick={() => setNewRack(null)}
+            >
+              Batal
+            </button>
+          </div>
+        )}
       </div>
 
       <div class="mb-4">

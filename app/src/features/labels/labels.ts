@@ -4,7 +4,7 @@
 // the phone's own camera app, with no app installed and nothing to explain. A bare id would
 // only work inside a scanner we wrote, which is the one situation where the label is least needed.
 
-import type { Category, Item } from '../../../../domain/types';
+import type { Category, Item, Location } from '../../../../domain/types';
 import { instancesFor } from '../stocktake/draft';
 
 export interface LabelSpec {
@@ -16,7 +16,7 @@ export interface LabelSpec {
   url: string;
 }
 
-export type ScanTarget = 'item' | 'asset';
+export type ScanTarget = 'item' | 'asset' | 'location';
 
 /**
  * `?i=` is a stock location (a rack or bin, scanned then given a quantity);
@@ -28,7 +28,8 @@ export type ScanTarget = 'item' | 'asset';
  */
 export function scanUrl(baseUrl: string, target: ScanTarget, id: string): string {
   const base = baseUrl.replace(/[/#]+$/, '');
-  return `${base}/#/scan?${target === 'asset' ? 'a' : 'i'}=${encodeURIComponent(id)}`;
+  const key = target === 'asset' ? 'a' : target === 'location' ? 'l' : 'i';
+  return `${base}/#/scan?${key}=${encodeURIComponent(id)}`;
 }
 
 /**
@@ -46,12 +47,21 @@ export function isUnprintableBaseUrl(baseUrl: string): boolean {
 export function labelsFor(
   items: readonly Item[],
   categories: readonly Category[],
+  locations: readonly Location[],
   baseUrl: string,
   acquiredTs: number,
 ): LabelSpec[] {
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
 
-  return items.flatMap((item) => {
+  // Racks first — they go on the shelves, and they are the labels §14.2 actually asked for.
+  const rackLabels: LabelSpec[] = locations.filter((l) => l.active).map((l) => ({
+    code: l.locationId,
+    title: `Rak ${l.code}`,
+    subtitle: l.name || l.zone,
+    url: scanUrl(baseUrl, 'location', l.locationId),
+  }));
+
+  return rackLabels.concat(items.flatMap((item) => {
     if (item.trackBy === 'instance') {
       // One label per physical unit — this is what makes "who has knife #7" answerable.
       return instancesFor(item, acquiredTs).map((a) => ({
@@ -68,7 +78,7 @@ export function labelsFor(
       subtitle: `${categoryName(item.categoryId)} · ${item.unit}`,
       url: scanUrl(baseUrl, 'item', item.itemId),
     }];
-  });
+  }));
 }
 
 /** Sticker sheet geometry. Sizes are the common A4 label formats sold locally. */

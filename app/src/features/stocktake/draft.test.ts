@@ -82,7 +82,17 @@ describe('CSV export', () => {
 
   it('emits the exact header the Items sheet tab expects', () => {
     expect(toItemsCsv([]).trim())
-      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active');
+      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId');
+  });
+
+  it('round-trips the rack an item sits on, and leaves it blank when unplaced', () => {
+    const placed = createItem(input({ locationId: 'LOC-B3' }), []);
+    const loose = createItem(input(), [placed]);
+    const parsed = parseItems(toItemsCsv([placed, loose]));
+
+    expect(parsed.quarantined).toEqual([]);
+    expect(parsed.ok[0].locationId).toBe('LOC-B3');
+    expect(parsed.ok[1].locationId).toBeUndefined();  // "belum ditempatkan" survives the trip
   });
 });
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'octane';
-import type { Category, Item } from '../../../../domain/types';
+import type { Category, Item, Location } from '../../../../domain/types';
 import { Button, CARD, FIELD, LABEL, PageHeader } from '../../components/ui';
 import { qrSvg, qrViewBox } from './qr';
 import {
@@ -7,14 +7,17 @@ import {
 } from './labels';
 import type { LabelSpec, SheetFormat } from './labels';
 
-export function LabelSheet({ items, categories }: { items: Item[]; categories: Category[] }) {
+export function LabelSheet(
+  { items, categories, locations }:
+  { items: Item[]; categories: Category[]; locations: Location[] },
+) {
   const [baseUrl, setBaseUrl] = useState(() => location.origin);
   const [format, setFormat] = useState<SheetFormat>(SHEET_FORMATS[0]);
 
   const acquiredTs = useMemo(() => Date.now(), []);
   const labels = useMemo(
-    () => labelsFor(items, categories, baseUrl, acquiredTs),
-    [items, categories, baseUrl, acquiredTs],
+    () => labelsFor(items, categories, locations, baseUrl, acquiredTs),
+    [items, categories, locations, baseUrl, acquiredTs],
   );
   const risky = isUnprintableBaseUrl(baseUrl);
 
@@ -27,7 +30,7 @@ export function LabelSheet({ items, categories }: { items: Item[]; categories: C
         />
       </div>
 
-      {items.length === 0 ? (
+      {items.length === 0 && locations.length === 0 ? (
         <p class={`${CARD} no-print py-20 text-center italic text-slate-400`}>
           Belum ada barang. Catat dulu di Opname Gudang.
         </p>

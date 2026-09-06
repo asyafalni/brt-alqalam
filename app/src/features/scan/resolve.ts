@@ -4,22 +4,38 @@
 // state it is in, before any action. That is what stops a duplicate scan becoming a duplicate
 // withdrawal, and what makes an unknown label say so instead of failing silently.
 
-import type { AssetInstance, Category, DerivedState, Item } from '../../../../domain/types';
+import type { AssetInstance, Category, DerivedState, Item, Location } from '../../../../domain/types';
+import { rollupLocations } from '../../../../domain/locations';
+import type { LocationSummary } from '../../../../domain/locations';
 import { instancesFor } from '../stocktake/draft';
 
 export type Resolution =
   | { found: false; reason: 'unknown'; id: string }
   | { found: false; reason: 'no-catalog'; id: string }
-  | { found: true; item: Item; categoryName: string; instance?: AssetInstance; qty: number; status: string };
+  | { found: true; kind: 'thing'; item: Item; categoryName: string; instance?: AssetInstance; qty: number; status: string }
+  | { found: true; kind: 'rack'; rack: LocationSummary; contents: Item[] };
 
 export function resolveScan(
-  target: 'item' | 'asset',
+  target: 'item' | 'asset' | 'location',
   id: string,
   items: readonly Item[],
   categories: readonly Category[],
+  locations: readonly Location[],
   derived: DerivedState,
   acquiredTs: number,
 ): Resolution {
+  if (target === 'location') {
+    const location = locations.find((l) => l.locationId === id);
+    if (!location) return { found: false, reason: 'unknown', id };
+    const rack = rollupLocations([location], items, derived)[0];
+    return {
+      found: true,
+      kind: 'rack',
+      rack,
+      contents: items.filter((i) => (i.locationId ?? '') === id),
+    };
+  }
+
   if (items.length === 0) return { found: false, reason: 'no-catalog', id };
 
   const categoryName = (categoryId: string) =>
@@ -33,6 +49,7 @@ export function resolveScan(
       if (instance) {
         return {
           found: true,
+          kind: 'thing',
           item,
           categoryName: categoryName(item.categoryId),
           instance,
@@ -50,6 +67,7 @@ export function resolveScan(
   const d = derived.items[item.itemId];
   return {
     found: true,
+    kind: 'thing',
     item,
     categoryName: categoryName(item.categoryId),
     qty: d?.qty ?? item.initialStock,
@@ -107,5 +125,6 @@ export const instanceStatusBadge = (status: string): StatusBadge => INSTANCE_STA
 /** Picks the right vocabulary for whatever was scanned. */
 export const statusBadge = (resolution: Resolution): StatusBadge => {
   if (!resolution.found) return UNKNOWN;
+  if (resolution.kind === 'rack') return itemStatusBadge(resolution.rack.status);
   return resolution.instance ? instanceStatusBadge(resolution.status) : itemStatusBadge(resolution.status);
 };
