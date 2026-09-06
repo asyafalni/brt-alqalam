@@ -37,6 +37,14 @@ describe('countState', () => {
     expect(countState(loc({ lastCountedTs: daysAgo(5) }), NOW).daysSince).toBe(5);
   });
 
+  it('a count stamped after `now` reads as today, never as minus one day', () => {
+    // Screens pin `now` at mount for a stable derivation, so a count saved mid-session is
+    // stamped ahead of it. Without clamping this rendered "dicek -1 hari lalu".
+    const justCounted = countState(loc({ lastCountedTs: NOW + 60_000 }), NOW);
+    expect(justCounted.daysSince).toBe(0);
+    expect(justCounted.freshness).toBe('fresh');
+  });
+
   it('honours a custom rotation', () => {
     expect(countState(loc({ lastCountedTs: daysAgo(10) }), NOW, 7).freshness).toBe('due');
   });

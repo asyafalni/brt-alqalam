@@ -9,13 +9,17 @@
 // since orange already means `rusak`.
 
 import { useMemo, useState } from 'octane';
-import { MapPin, Package } from '@octanejs/lucide';
+import { ClipboardCheck, MapPin, Package } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
-import type { Category, Item, Location } from '../../../../domain/types';
+import { countState, racksToCount } from '../../../../domain/cycleCount';
+import type { Category, Item } from '../../../../domain/types';
+import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
-import { CARD, CODE, PageHeader, Stat } from '../../components/ui';
+import { Button, CARD, CODE, PageHeader, Stat } from '../../components/ui';
+import { applyCount, markCounted } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
+import { CountSheet } from './CountSheet';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
 const CELL: Record<LocationStatus, string> = {
@@ -33,10 +37,12 @@ const ZONE_NOTE: Record<LocationStatus, string> = {
 };
 
 export function RackBoard(
-  { items, categories, locations, inventory, search }:
-  { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory; search: string },
+  { draft, inventory, search, now }:
+  { draft: Draft; inventory: Inventory; search: string; now: number },
 ) {
+  const { items, categories, locations } = draft;
   const [selected, setSelected] = useState<string | null>(null);
+  const [counting, setCounting] = useState<string | null>(null);
 
   const racks = useMemo(
     () => rollupLocations(locations, items, inventory.derived),
@@ -44,6 +50,8 @@ export function RackBoard(
   );
   const zones = useMemo(() => groupByZone(racks), [racks]);
   const attention = racksNeedingAttention(racks);
+  // IronNest's "section health", per zone rather than per cell.
+  const due = useMemo(() => racksToCount(locations, now), [locations, now]);
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
   const selectedRack = racks.find((r) => r.location.locationId === selected) ?? null;
@@ -60,7 +68,7 @@ export function RackBoard(
       (i.locationId ?? '') === rack.location.locationId && i.name.toLowerCase().includes(q));
 
   return (
-    <div class="space-y-6 pb-8 pt-6">
+    <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <PageHeader
         title="Peta Rak"
         subtitle="Setiap kotak satu rak. Warnanya mengikuti isi yang paling perlu diurus."
@@ -77,7 +85,7 @@ export function RackBoard(
         </div>
       ) : (
         <>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="grid grid-cols-3 gap-2 sm:gap-4">
             <Stat value={racks.length} label="Rak terdaftar" />
             <Stat
               value={attention}
@@ -93,10 +101,12 @@ export function RackBoard(
 
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
-              <div class="mb-3 flex items-baseline justify-between gap-3">
+              <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                 <h2 class="font-bold text-slate-900">{zone.zone}</h2>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {zone.racks.length} rak
+                  {zone.racks.length} rak ·{' '}
+                  {zone.racks.filter((r) => r.status === 'low' || r.status === 'out').length} perlu diurus ·{' '}
+                  {zone.racks.reduce((n, r) => n + r.unitCount, 0)} unit
                 </span>
               </div>
 
@@ -130,7 +140,51 @@ export function RackBoard(
             </section>
           ))}
 
-          {selectedRack && (
+          {due.length > 0 && (
+            <section class={CARD}>
+              <div class="mb-3 flex items-center gap-3">
+                <ClipboardCheck class="h-5 w-5 text-slate-500" />
+                <h2 class="font-bold text-slate-900">Perlu dicek</h2>
+                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-50">
+                  {due.length}
+                </span>
+              </div>
+              <p class="mb-3 text-sm text-slate-500">
+                Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                {due.slice(0, 6).map((d) => (
+                  <Button
+                    key={d.location.locationId}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => { setSelected(d.location.locationId); setCounting(d.location.locationId); }}
+                  >
+                    {d.location.code}
+                    <span class="ml-1 font-normal text-slate-400">
+                      {d.freshness === 'never' ? 'belum pernah' : `${d.daysSince} hari`}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {counting && selectedRack && (
+            <CountSheet
+              rack={selectedRack.location}
+              contents={contents}
+              inventory={inventory}
+              onCancel={() => setCounting(null)}
+              onApply={(counted) => {
+                draft.setItems((prev) => applyCount(prev, counted));
+                draft.setLocations((prev) => markCounted(prev, counting, Date.now()));
+                setCounting(null);
+              }}
+            />
+          )}
+
+          {selectedRack && !counting && (
             <section class={`${CARD} border-orange-200`}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                 <div>
@@ -140,15 +194,30 @@ export function RackBoard(
                       <span class="ml-2 font-normal text-slate-500">{selectedRack.location.name}</span>
                     )}
                   </h2>
-                  <p class="text-xs text-slate-400">{selectedRack.location.zone}</p>
+                  <p class="text-xs text-slate-400">
+                    {selectedRack.location.zone}
+                    {' · '}
+                    {(() => {
+                      const c = countState(selectedRack.location, now);
+                      if (c.freshness === 'never') return 'belum pernah dicek';
+                      return c.daysSince === 0 ? 'dicek hari ini' : `dicek ${c.daysSince} hari lalu`;
+                    })()}
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  class="text-sm font-semibold text-slate-500 underline"
-                  onClick={() => setSelected(null)}
-                >
-                  Tutup
-                </button>
+                <div class="flex items-center gap-3">
+                  {selectedRack.location.locationId && (
+                    <Button size="sm" onClick={() => setCounting(selectedRack.location.locationId)}>
+                      Cek rak
+                    </Button>
+                  )}
+                  <button
+                    type="button"
+                    class="text-sm font-semibold text-slate-500 underline"
+                    onClick={() => setSelected(null)}
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
 
               {contents.length === 0 ? (

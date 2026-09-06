@@ -85,13 +85,7 @@ export function App() {
             <Board items={draft.items} categories={draft.categories} inventory={inventory} search={search} />
           )}
           {route.name === 'racks' && (
-            <RackBoard
-              items={draft.items}
-              categories={draft.categories}
-              locations={draft.locations}
-              inventory={inventory}
-              search={search}
-            />
+            <RackBoard draft={draft} inventory={inventory} search={search} now={now} />
           )}
           {route.name === 'label' && (
             <LabelSheet items={draft.items} categories={draft.categories} locations={draft.locations} />

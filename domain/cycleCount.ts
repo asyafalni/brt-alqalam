@@ -28,7 +28,10 @@ export function countState(
   intervalDays: number = DEFAULT_INTERVAL_DAYS,
 ): RackCountState {
   if (location.lastCountedTs == null) return { location, freshness: 'never', daysSince: null };
-  const daysSince = Math.floor((now - location.lastCountedTs) / DAY_MS);
+  // Clamped at 0. A count stamped *after* the caller's `now` is not "minus one day ago" — it
+  // is today. This is a real case, not a defensive nicety: screens pin `now` at mount so the
+  // derivation is stable, so any count saved during that session is stamped ahead of it.
+  const daysSince = Math.max(0, Math.floor((now - location.lastCountedTs) / DAY_MS));
   return {
     location,
     daysSince,

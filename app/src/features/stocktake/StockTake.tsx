@@ -99,7 +99,7 @@ export function StockTake(
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
 
   return (
-    <div class="space-y-6 pb-8 pt-6">
+    <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <PageHeader
         title="Opname Gudang"
         subtitle="Keliling gudang, catat setiap barang yang ditemukan. Tersimpan otomatis di perangkat ini."
@@ -122,7 +122,7 @@ export function StockTake(
         }
       />
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div class="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat value={totals.count} label="Barang dicatat" />
         <Stat value={totals.categories} label="Kategori" tint="bg-slate-100 text-slate-600" />
         <Stat value={totals.units} label="Unit dihitung" tint="bg-green-50 text-green-600" />
@@ -177,6 +177,16 @@ export function StockTake(
                         ? 'Belum ada barang. Mulai dari rak paling dekat pintu.'
                         : `Tidak ada yang cocok dengan "${search}".`}
                     </p>
+                    {items.length === 0 && (
+                      <div class="mt-4">
+                        <Button variant="secondary" size="sm" onClick={draft.loadDemo}>
+                          Muat contoh data
+                        </Button>
+                        <p class="mt-2 text-xs text-slate-400">
+                          Untuk mencoba tampilan. Kosongkan lagi sebelum opname sungguhan.
+                        </p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (

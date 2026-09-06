@@ -236,3 +236,32 @@ export function summarise(items: readonly Item[]): { count: number; categories: 
     units: items.reduce((s, i) => s + i.initialStock, 0),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Cycle counts — applying what someone actually found on the shelf.
+// ---------------------------------------------------------------------------
+
+/**
+ * ⚠️ This edits `initialStock`, and that is correct ONLY during the opname phase, where the
+ * catalog is still being established and there is no history to preserve.
+ *
+ * Once the gateway exists, a recount MUST become an appended `adjust` event instead —
+ * derive-don't-mutate (WORKING-AGREEMENT). Rewriting a starting figure after transactions
+ * exist would silently invalidate every number folded from it. Do not "simplify" this by
+ * keeping the mutation.
+ */
+export function applyCount(items: readonly Item[], counted: ReadonlyMap<string, number>): Item[] {
+  return items.map((i) => {
+    const found = counted.get(i.itemId);
+    return found == null || found === i.initialStock ? i : { ...i, initialStock: found };
+  });
+}
+
+/** Stamp the rack as checked, so the rotation knows what to offer next. */
+export function markCounted(
+  locations: readonly Location[],
+  locationId: string,
+  ts: number,
+): Location[] {
+  return locations.map((l) => (l.locationId === locationId ? { ...l, lastCountedTs: ts } : l));
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'octane';
 import type { Category, Item, Location } from '../../../domain/types';
 import { SEED_CATEGORIES } from '../data/seedCategories';
 import { clearDraft, loadDraft, saveDraft } from './persist';
+import { demoDraft } from '../data/demo';
 
 export interface Draft {
   items: Item[];
@@ -11,6 +12,7 @@ export interface Draft {
   setCategories: (update: (prev: Category[]) => Category[]) => void;
   setLocations: (update: (prev: Location[]) => Location[]) => void;
   reset: () => void;
+  loadDemo: () => void;
 }
 
 /**
@@ -33,5 +35,6 @@ export function useDraft(): Draft {
     setCategories: (update) => setState((prev) => ({ ...prev, categories: update(prev.categories) })),
     setLocations: (update) => setState((prev) => ({ ...prev, locations: update(prev.locations) })),
     reset: () => { clearDraft(); setState({ items: [], categories: SEED_CATEGORIES, locations: [] }); },
+    loadDemo: () => setState(demoDraft()),
   };
 }

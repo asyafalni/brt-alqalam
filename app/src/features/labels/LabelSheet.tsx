@@ -22,7 +22,7 @@ export function LabelSheet(
   const risky = isUnprintableBaseUrl(baseUrl);
 
   return (
-    <div class="space-y-6 pb-8 pt-6">
+    <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <div class="no-print">
         <PageHeader
           title="Cetak Label QR"

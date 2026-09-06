@@ -21,8 +21,8 @@ export function PageHeader(
   return (
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p class="text-slate-500">{subtitle}</p>}
+        <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
+        {subtitle && <p class="text-sm text-slate-500 sm:text-base">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -86,14 +86,18 @@ export const ERROR_TEXT = 'mt-1.5 text-xs text-red-500 font-medium';
 export function Stat(
   { value, label, tint = 'bg-slate-900 text-slate-50' }: { value: unknown; label: string; tint?: string },
 ) {
+  // SmartInv's tile is a desktop row (well + label side by side). Stacked full-width on a
+  // phone, three of them consumed a whole screen before any content appeared — so on mobile
+  // they become a compact centred three-across row, widening into the template's layout at
+  // `sm`. The extension is size, not structure.
   return (
-    <div class={`${CARD} flex items-center gap-4`}>
-      <div class={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold ${tint}`}>
+    <div class="flex flex-col items-center gap-1.5 rounded-lg border border-slate-100 bg-white p-3 text-center shadow-sm sm:flex-row sm:gap-4 sm:p-5 sm:text-left">
+      <div class={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold sm:h-12 sm:w-12 sm:text-xl ${tint}`}>
         {value}
       </div>
-      <div class="min-w-0">
-        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      </div>
+      <p class="text-[10px] font-semibold uppercase leading-tight tracking-wider text-slate-500 sm:text-xs">
+        {label}
+      </p>
     </div>
   );
 }

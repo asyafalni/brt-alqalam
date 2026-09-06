@@ -24,7 +24,7 @@ export function Board(
   const totalUnits = rows.reduce((n, d) => n + d.qty, 0);
 
   return (
-    <div class="space-y-6 pb-8 pt-6">
+    <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <PageHeader
         title="Stok Sekarang"
         subtitle="Dihitung dari stok awal ditambah seluruh riwayat — bukan angka yang disimpan."
@@ -46,7 +46,7 @@ export function Board(
         </div>
       ) : (
         <>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="grid grid-cols-3 gap-2 sm:gap-4">
             <Stat value={items.length} label="Jenis barang" />
             <Stat value={totalUnits} label="Total unit" tint="bg-green-50 text-green-600" />
             <Stat
