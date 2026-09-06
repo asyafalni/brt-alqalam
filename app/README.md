@@ -72,6 +72,33 @@ Completes the loop: **walk → count → label**.
 - Sized in **millimetres** for A4 sticker sheets (24 or 40 per page), because a millimetre is the
   only unit that survives the trip from screen to printer.
 
+## Stok — the board
+Renders `domain/deriveState` and `domain/deriveNotifications`: current stock folded from starting
+stock plus the whole event log, **never a stored number**. The log is empty until the gateway
+exists, so today it shows opname results — and says so on screen rather than implying live data.
+Notifikasi Stok lists anything at or below its minimum; an item set to `(-)` never appears, even
+at zero.
+
+## Pindai — where a scanned label lands
+`/scan?i=<itemId>` for a rack, `/scan?a=<assetId>` for one unit. Implements the **scan guard**
+(design doc §15.3): what the thing is and what state it is in, *before* any action, so a
+duplicate scan cannot quietly become a duplicate withdrawal. An unknown label says so and names
+the code, rather than failing silently; an empty catalog is reported differently from an
+unrecognised label, because the fix is different.
+
+⚠️ **Deep links need SPA fallback on the host** — without it every printed sticker 404s. See
+`docs/SETUP.md` Stage 5.
+
+## Two vocabularies for one status
+`out` means "stock is zero" for a quantity item and "someone has it" for a physical unit.
+Showing *Habis* on a borrowed knife would be actively misleading — the knife exists, it just
+isn't here. `itemStatusBadge` and `instanceStatusBadge` keep those apart, and `rusak`/`hilang`
+never share a colour because they demand different actions.
+
+**Class strings are literal, never interpolated.** Tailwind scans source for literal class names,
+so `bg-${color}` generates no CSS and fails *silently* — the badge just renders colourless. A
+test asserts the shape, and the build is checked against `dist/assets/*.css`.
+
 ## Layout
 ```
 src/
@@ -83,7 +110,11 @@ src/
 │   ├── qr.ts           PURE — QR matrix to SVG path
 │   ├── labels.ts       PURE — what gets printed, deep links, sheet geometry
 │   └── LabelSheet.tsx  the printable sheet
-├── state/useDraft.ts   the draft, owned once and shared by both screens
+├── features/board/     Board.tsx — derived stock + Notifikasi Stok
+├── features/scan/      resolve.ts (PURE) + ScanResult.tsx — the scan guard
+├── state/route.ts      PURE route parsing; useRoute.ts adds history
+├── state/useInventory.ts  folds the catalog + log into current state
+├── state/useDraft.ts   the draft, owned once and shared by every screen
 ├── state/persist.ts    localStorage, defensive on every read
 ├── data/seedCategories.ts
 └── styles.css          the authored token layer + print rules
