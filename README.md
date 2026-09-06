@@ -13,7 +13,9 @@ source of truth, a Clerk-gated Apps Script gateway as the only server-side compo
 
 ```
 ├── docs/
-│   ├── BRT-Inventory-System-Design.md   Design log, Parts 0–XVI (the "why")
+│   ├── Sistem Data Inventaris ... rev.pdf   ← the boss's original requirements
+│   ├── SPEC-INVENTORY.md                Every screen of that PDF, transcribed literally
+│   ├── BRT-Inventory-System-Design.md   Design log, Parts 0–XVII (the "why")
 │   ├── BRT-Inventory-Build-Spec.md      Schema, gateway API, reducer (the "how")
 │   ├── DECISIONS.md                     Every locked decision — read the v1.6 section first
 │   ├── SETUP.md                         ⚙️ What YOU need to prepare (Clerk, Sheet, gateway)

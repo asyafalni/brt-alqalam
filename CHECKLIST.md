@@ -5,7 +5,9 @@
 Legend: ✅ done & tested · 🔨 partly done · ⛔ blocked on you · ⬜ not started · ➖ deliberately not doing
 
 > Spec coverage is verified against `docs/SPEC-INVENTORY.md`, extracted page-by-page from
-> *Sistem Data Inventaris BRT Masjid Al-Qalam – rev.pdf*. Where we deliver something a
+> [`docs/Sistem Data Inventaris BRT Masjid Al-Qalam - rev.pdf`](docs/Sistem%20Data%20Inventaris%20BRT%20Masjid%20Al-Qalam%20-%20rev.pdf)
+> — the original from the boss, kept for reference. Its text layer is headings only; every
+> screen is an image, which is why it went unread in detail until Part XVII. Where we deliver something a
 > **different way**, the row says how — the test is whether the boss's need is met, not whether
 > the screen looks identical (his words: *"tidak harus sama"*).
 
