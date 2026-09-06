@@ -19,10 +19,18 @@ the PDF as **input, not specification**: it carries the goal, not the design.
 4. Underneath all three: the inventory is **very messy, both physically and informationally**
    — the gudang itself is chaotic *and* there are no records.
 
-**Who uses it.** Daily operators are the **marbot masjid** — one to three permanent, trusted
-caretakers, working from a shared kiosk device, identified by PIN. Admins (and the boss) sign
-in with a Clerk password. **Equipment borrowers are outsiders** — jamaah, panitia, contractors
-— who have no accounts and will never open the app.
+**Who uses it.** *(Corrected 2026-09-06 — see the note below.)* The **marbot masjid** are
+**one user group among several**, not the only operators. They use a **PIN** because their job is
+to report *fast* what was taken and what was used. Admins (and the boss) sign in with a Clerk
+password. **Equipment borrowers may be outsiders** — jamaah, panitia, contractors — who have no
+accounts and will never open the app.
+
+> ⚠️ **This paragraph originally said the daily operators were "one to three marbot".** That was
+> wrong, and one conclusion was built on it: that with so few people the PIN is merely *access
+> control*, since everyone already knows who took the soap, making the daily flow a consumption
+> counter rather than an accountability ledger. **With a larger roster that reasoning does not
+> hold** — attribution is real work, and both the PIN and device enrolment (§65.2) matter more,
+> not less. The roster size is still unknown; see OPEN-QUESTIONS.md.
 
 **Consequences that override earlier Parts:**
 

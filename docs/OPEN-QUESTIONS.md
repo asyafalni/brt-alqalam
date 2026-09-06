@@ -8,6 +8,11 @@ design — it is **three things only a human can find out**, plus the build.
 
 ## Actions on the owner (these invalidate work if wrong)
 
+0. **Who are all the users, and how many?** Marbot are one group among several — the roster size
+   is unknown, and it drives PIN uniqueness pressure, lockout policy, how many devices need
+   enrolling, and whether attribution or throughput is the priority. **NEXT.**
+
+
 1. **Watch the marbot for one hour.** How many are there, own phone or a shared gudang tablet,
    comfortable with apps or WhatsApp-only, do they read fluently. Write it up as Design doc §0.5.
    Currently assumed: shared tablet, Bahasa, icon-led, large touch targets.

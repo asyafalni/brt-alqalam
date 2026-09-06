@@ -106,8 +106,10 @@ Full reasoning in BRT-Inventory-System-Design.md (Parts I–XVI) and BRT-Invento
 - **Real pains:** (1) nobody knows what we own · (2) things go missing · (3) reporting upward ·
   (4) inventory is **very messy, physically and informationally**.
 - **Top risk is ADOPTION**, not the alpha stack. Replacing nothing is harder than replacing a book.
-- **Users:** 1–3 **marbot** daily (kiosk + PIN) · admins/boss via Clerk password · equipment
-  borrowers are **outsiders with no accounts**.
+- **Users:** **marbot are one group among several**, not the only operators — they use a PIN to
+  report *fast* what was taken and used · admins/boss via Clerk password · equipment borrowers
+  may be **outsiders with no accounts**. ⚠️ Corrected from "1–3 marbot"; the claim that the PIN
+  is merely access control rested on that and **no longer holds** — attribution is real work.
 
 ### Locked
 - **Write path = Apps Script gateway** (forced: PIN hashes live in Clerk `privateMetadata`, reading
