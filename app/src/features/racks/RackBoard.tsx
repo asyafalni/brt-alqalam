@@ -38,8 +38,8 @@ const ZONE_NOTE: Record<LocationStatus, string> = {
 };
 
 export function RackBoard(
-  { draft, inventory, search, now }:
-  { draft: Draft; inventory: Inventory; search: string; now: number },
+  { draft, inventory, search, now, onOpenItem }:
+  { draft: Draft; inventory: Inventory; search: string; now: number; onOpenItem: (id: string) => void },
 ) {
   const { items, categories, locations } = draft;
   const [selected, setSelected] = useState<string | null>(null);
@@ -232,7 +232,13 @@ export function RackBoard(
                     const d = inventory.derived.items[i.itemId];
                     const badge = itemStatusBadge(d?.status ?? 'available');
                     return (
-                      <li key={i.itemId} class="flex items-center gap-3 py-3">
+                      <li key={i.itemId}>
+                        <button
+                          type="button"
+                          class="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
+                          aria-label={`Buka ${i.name}`}
+                          onClick={() => onOpenItem(i.itemId)}
+                        >
                         {(() => {
                           const Icon = itemIcon(i, categoryName(i.categoryId));
                           return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
@@ -242,10 +248,11 @@ export function RackBoard(
                           <p class={CODE}>{categoryName(i.categoryId)}</p>
                         </div>
                         <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
-                        <span class="w-20 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
-                          {d?.qty ?? i.initialStock}{' '}
-                          <span class="text-xs font-normal text-slate-400">{i.unit}</span>
-                        </span>
+                          <span class="w-20 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
+                            {d?.qty ?? i.initialStock}{' '}
+                            <span class="text-xs font-normal text-slate-400">{i.unit}</span>
+                          </span>
+                        </button>
                       </li>
                     );
                   })}

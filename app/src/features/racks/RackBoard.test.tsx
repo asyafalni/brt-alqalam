@@ -19,7 +19,15 @@ const NOW = Date.now();
 // The draft is owned above the screen (App), so the test supplies it the same way.
 function Harness() {
   const draft = useDraft();
-  return <RackBoard draft={draft} inventory={useInventory(draft, NOW)} search="" now={NOW} />;
+  return (
+    <RackBoard
+      draft={draft}
+      inventory={useInventory(draft, NOW)}
+      search=""
+      now={NOW}
+      onOpenItem={() => {}}
+    />
+  );
 }
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({

@@ -6,6 +6,7 @@ import { BottomNav } from './components/BottomNav';
 import { Card } from './components/ui';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
+import { ItemDetail } from './features/items/ItemDetail';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
 // on the path anyone opens first. The label sheet pulls a QR *encoder* (~43kB) and the scanner
@@ -120,10 +121,31 @@ export function App() {
             <StockTake draft={draft} search={search} onSearch={setSearch} />
           )}
           {route.name === 'board' && (
-            <Board items={draft.items} categories={draft.categories} inventory={inventory} search={search} />
+            <Board
+              items={draft.items}
+              categories={draft.categories}
+              inventory={inventory}
+              search={search}
+              onOpenItem={(id) => navigate({ name: 'item', id })}
+            />
           )}
           {route.name === 'racks' && (
-            <RackBoard draft={draft} inventory={inventory} search={search} now={now} />
+            <RackBoard
+              draft={draft}
+              inventory={inventory}
+              search={search}
+              now={now}
+              onOpenItem={(id) => navigate({ name: 'item', id })}
+            />
+          )}
+          {route.name === 'item' && (
+            <ItemDetail
+              id={route.id}
+              draft={draft}
+              inventory={inventory}
+              now={now}
+              onNavigate={navigate}
+            />
           )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>

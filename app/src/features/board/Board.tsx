@@ -10,8 +10,9 @@ import { itemStatusBadge, PILL } from '../scan/resolve';
 import { itemIcon } from '../items/itemIcon';
 
 export function Board(
-  { items, categories, inventory, search }:
-  { items: Item[]; categories: Category[]; inventory: Inventory; search: string },
+  { items, categories, inventory, search, onOpenItem }:
+  { items: Item[]; categories: Category[]; inventory: Inventory; search: string;
+    onOpenItem: (itemId: string) => void },
 ) {
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
@@ -127,7 +128,17 @@ export function Board(
                     rows.map((d) => {
                       const badge = itemStatusBadge(d.status);
                       return (
-                        <tr key={d.item.itemId} class="transition-colors hover:bg-slate-50/50">
+                        <tr
+                          key={d.item.itemId}
+                          class="cursor-pointer transition-colors hover:bg-slate-50"
+                          tabindex={0}
+                          role="link"
+                          aria-label={`Buka ${d.item.name}`}
+                          onClick={() => onOpenItem(d.item.itemId)}
+                          onKeyDown={(e: KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenItem(d.item.itemId); }
+                          }}
+                        >
                           <td class={TD}>
                             <div class="flex items-center gap-3">
                               <span class={`h-8 w-1 shrink-0 rounded-full ${badge.rail}`} aria-hidden="true" />
