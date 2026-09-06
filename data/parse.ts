@@ -143,8 +143,15 @@ const STATUSES = ['available', 'out', 'broken', 'lost', 'retired'] as const;
 // Row loop — shared by every parser so quarantine behaviour is identical.
 // ---------------------------------------------------------------------------
 
-function parseRows<T>(csv: string, build: (r: Record<string, string>) => T): ParseResult<T> {
-  const records = toRecords(parseCsv(csv));
+/**
+ * The row loop, shared by both sources. Sheet values arrive as strings whether they came via a
+ * CSV export or the gateway's JSON, so they get identical coercion and identical quarantine —
+ * one place to be right about "sepuluh" not being a number.
+ */
+export function parseRecords<T>(
+  records: readonly Record<string, string>[],
+  build: (r: Record<string, string>) => T,
+): ParseResult<T> {
   const ok: T[] = [];
   const quarantined: ParseIssue[] = [];
 
@@ -165,16 +172,33 @@ function parseRows<T>(csv: string, build: (r: Record<string, string>) => T): Par
   return { ok, quarantined };
 }
 
-export const parseCategories = (csv: string): ParseResult<Category> =>
-  parseRows(csv, (r) => ({
+/**
+ * Field lookups are case-insensitive: `toRecords` lower-cases CSV headers, and the gateway's
+ * JSON arrives camelCased, so both must be normalised the same way or the builders silently
+ * see every field as missing. Values are stringified because JSON can carry real numbers where
+ * CSV only ever carried text — the coercion rules must not depend on which transport was used.
+ */
+export const normaliseKeys = (row: Record<string, unknown>): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(row)) {
+    const value = row[key];
+    out[key.trim().toLowerCase()] = value == null ? '' : String(value).trim();
+  }
+  return out;
+};
+
+/** CSV in, same result out. */
+const parseRows = <T>(csv: string, build: (r: Record<string, string>) => T): ParseResult<T> =>
+  parseRecords(toRecords(parseCsv(csv)), build);
+
+export const buildCategory = (r: Record<string, string>): Category => ({
     categoryId: req(r, 'categoryid'),
     name: req(r, 'name'),
     order: num(r, 'order', 0),
     active: bool(r, 'active', true),
-  }));
+  });
 
-export const parseLocations = (csv: string): ParseResult<Location> =>
-  parseRows(csv, (r) => ({
+export const buildLocation = (r: Record<string, string>): Location => ({
     locationId: req(r, 'locationid'),
     code: req(r, 'code'),
     // A rack can be known only by what is painted on it; the descriptive name is optional.
@@ -182,10 +206,9 @@ export const parseLocations = (csv: string): ParseResult<Location> =>
     zone: r['zone'] || 'Gudang',
     order: num(r, 'order', 0),
     active: bool(r, 'active', true),
-  }));
+  });
 
-export const parseItems = (csv: string): ParseResult<Item> =>
-  parseRows(csv, (r) => {
+export const buildItem = (r: Record<string, string>): Item => {
     const k = kind(r);
     return {
       itemId: req(r, 'itemid'),
@@ -202,19 +225,17 @@ export const parseItems = (csv: string): ParseResult<Item> =>
       // none, and "belum ditempatkan" is exactly the mess we want visible.
       ...(r['locationid'] ? { locationId: r['locationid'] } : {}),
     };
-  });
+};
 
-export const parseInstances = (csv: string): ParseResult<AssetInstance> =>
-  parseRows(csv, (r) => ({
+export const buildInstance = (r: Record<string, string>): AssetInstance => ({
     assetId: req(r, 'assetid'),
     itemId: req(r, 'itemid'),
     label: req(r, 'label'),
     acquiredTs: ts(r, 'acquiredts'),
     active: bool(r, 'active', true),
-  }));
+  });
 
-export const parseTxns = (csv: string): ParseResult<Txn> =>
-  parseRows(csv, (r) => {
+export const buildTxn = (r: Record<string, string>): Txn => {
     const t: Txn = {
       txnId: req(r, 'txnid'),
       clientTxnId: req(r, 'clienttxnid'),
@@ -238,8 +259,18 @@ export const parseTxns = (csv: string): ParseResult<Txn> =>
       throw new FieldError('itemid', 'transaksi tanpa itemId maupun assetId');
     }
     return t;
-  });
+};
 
 /** One-line summary for the admin "data bermasalah" banner. */
 export const describeIssues = (issues: ParseIssue[]): string =>
   issues.map((i) => `Baris ${i.row}${i.field ? ` (${i.field})` : ''}: ${i.message}`).join('\n');
+
+// ---------------------------------------------------------------------------
+// The two entry points. Same builders, same quarantine, different transport.
+// ---------------------------------------------------------------------------
+
+export const parseCategories = (csv: string): ParseResult<Category> => parseRows(csv, buildCategory);
+export const parseLocations = (csv: string): ParseResult<Location> => parseRows(csv, buildLocation);
+export const parseItems = (csv: string): ParseResult<Item> => parseRows(csv, buildItem);
+export const parseInstances = (csv: string): ParseResult<AssetInstance> => parseRows(csv, buildInstance);
+export const parseTxns = (csv: string): ParseResult<Txn> => parseRows(csv, buildTxn);

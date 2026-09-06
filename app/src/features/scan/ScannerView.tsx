@@ -73,6 +73,12 @@ export function ScannerView({ onFound, onClose }: { onFound: (route: Route) => v
         <div class="relative m-4 mt-auto rounded-2xl bg-white p-5" role="alert">
           <h2 class="font-bold text-slate-900">{help.title}</h2>
           <p class="mt-1 text-sm text-slate-500">{help.body}</p>
+          {/* The browser's own words, for the case the help text does not cover. Carried but
+              never shown would make the field write-only, and diagnosing a camera on someone
+              else's phone is exactly when you want it. */}
+          {scanner.message && (
+            <p class="mt-2 break-all font-mono text-[11px] text-slate-400">{scanner.message}</p>
+          )}
           <Button class="mt-4 w-full" size="touch" onClick={onClose}>Tutup</Button>
         </div>
       )}
