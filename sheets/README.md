@@ -1,0 +1,43 @@
+# sheets/ — importable templates for the Google Spreadsheet
+
+**Do not hand-type these headers.** They must match `data/parse.ts` exactly; a mismatch
+quarantines every row. Import each CSV as its own tab, named exactly as the filename
+(`Categories`, `Items`, `AssetInstances`, `Transactions`).
+
+> In Google Sheets: **File → Import → Upload → Insert new sheet(s)**, then rename the tab to the
+> filename. Repeat per file. Delete the example rows once you have real data — they are marked
+> below and exist only to show the accepted formats.
+
+## Tabs
+
+| Tab | Written by | Notes |
+| --- | --- | --- |
+| `Categories` | admin (by hand) | Free-form and editable (design doc Part XI). Seeded with the boss's 8 domains. |
+| `Items` | admin by hand **and** the stock-take screen | The catalog. |
+| `AssetInstances` | admin / label tool | Only for `trackBy: instance` durables — one row per physical unit. |
+| `Transactions` | **the gateway only** | Append-only event log. **Never edit or delete a row here** — corrections are `reversal` rows. |
+
+## Column formats the parser accepts
+
+- **`kind`** — plain language, as admins actually type it: `Bisa habis` / `habis` / `perlengkapan`
+  / `consumable` all mean *consumable*; `Barang tetap` / `tetap` / `peralatan` / `equipment` all
+  mean *equipment*. Anything else is quarantined, not guessed.
+- **`trackBy`** — leave **blank** to default from `kind` (consumable→`quantity`, equipment→
+  `instance`). Override with `quantity`/`jumlah` or `instance`/`unit` — e.g. `ITM-0005` (terpal)
+  is a durable you count rather than label individually.
+- **`minStock`** (Setting Minimum) — a number, or **`(-)`**, `-`, or blank for *no minimum,
+  never notify*.
+- **numbers** — `10` or `10.5` or `10,5`. Text like `sepuluh` is quarantined, never coerced to 0.
+- **`active`** — `TRUE`/`FALSE`, or `ya`/`tidak`, or blank (defaults to TRUE).
+- **timestamps** (`ts`, `acquiredTs`) — **ISO-8601 only** (`2026-09-06T13:45:00Z`) or epoch ms.
+  A locale date like `9/6/2026` is **quarantined on purpose**: JavaScript would parse it and pick
+  a month on its own — 9 June or 6 September? — silently corrupting the 24-jam rule.
+
+## Privacy (design doc §12.4, settled in Part XVI)
+This spreadsheet holds `recipient` and `actorUserId` — **it is never published to the web.**
+Reads that include a person go through the gateway. The public dashboard reads a separate
+PII-free projection (stock levels, low-stock, status *counts* — never who has what).
+
+## Bad rows are not silently dropped
+`data/parse.ts` quarantines any row it cannot read and reports it with the **sheet row number**,
+e.g. `Baris 7 (initialstock): "sepuluh" bukan angka`. Fix the cell; nothing is lost.

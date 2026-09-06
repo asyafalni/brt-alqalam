@@ -1,0 +1,9 @@
+categoryId,name,order,active
+CAT-KEBERSIHAN,Kebersihan,1,TRUE
+CAT-SANITASI,Sanitasi & Plumbing,2,TRUE
+CAT-LISTRIK,Listrik,3,TRUE
+CAT-ELEKTRONIK,Elektronik,4,TRUE
+CAT-SIPIL,Sipil,5,TRUE
+CAT-KEAMANAN,Keamanan,6,TRUE
+CAT-PHBI,PHBI,7,TRUE
+CAT-LAIN,Lain-lain,8,TRUE

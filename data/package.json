@@ -1,0 +1,17 @@
+{
+  "name": "brt-inventaris-data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Adapter layer for BRT Inventaris \u2014 ports (repository interfaces) + the parse boundary between Google Sheets and the pure domain.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.0",
+    "vite": "^8.2.2"
+  }
+}
