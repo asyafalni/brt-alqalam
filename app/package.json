@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "dev:https": "HTTPS=1 vite --host"
   },
   "dependencies": {
     "@octanejs/lucide": "^0.1.47",
@@ -22,6 +23,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tsrx/typescript-plugin": "^0.3.133",
     "@types/node": "^22.14.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "happy-dom": "^20.0.0",
     "rollup-plugin-visualizer": "^7.1.1",
     "tailwindcss": "^4.3.3",
