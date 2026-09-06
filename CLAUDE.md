@@ -1074,3 +1074,51 @@ owner's "keep the free version" constraint — a 2-minute dashboard check, and t
 - **Idempotency needs `LockService`:** neither `appendRow` nor Sheets `values.append` documents
   atomicity, and `clientTxnId` dedup is a check-then-append.
 - **clasp is healthy** (v3.4.1, 2026-08-28) — the script lives in git; secrets do not.
+
+## 66. The theme, corrected (2026-09-06) — reuse means reuse
+
+§63 recorded the token layer as **"shadcn's token system + SmartInv's layout recipes"**. Building
+it that way produced an app that shared SmartInv's *conventions* but not its *look* — an
+authored teal palette and plain tabs against a slate-and-sky sidebar app. **That is a gap
+against the working agreement's prime directive, not a design decision**, and the owner was
+right to call it. §63's token choice is superseded by this section.
+
+**What we actually do now.** SmartInv has no token layer (§62), but it does have a *convention*:
+stock Tailwind utilities, a `slate` ground with `sky` brand, and `Plus Jakarta Sans` as the only
+theme extension. We adopt that convention rather than substituting a different system:
+
+- `styles.css` declares **only the font**, exactly as `frontend/tailwind.config.js:11-13` does,
+  plus their `.glass` and `.custom-scrollbar` utilities. Everything else is stock Tailwind.
+  **Dark mode is dropped** — the template ships none, and a sunlit gudang wants a light ground.
+- `components/ui.tsx` ports their `Card`, `Button`, `Input`, page header, stat tile and table
+  class strings verbatim, each cited to a file and line.
+- `components/Sidebar.tsx` and `Navbar.tsx` port their shell class-for-class — the
+  `md:rounded-[32px]` dark panel, the sky-gradient brand mark, the active-nav gradient pill with
+  its `border-l-4 border-sky-400`, the blurred background glows, the `h-20` translucent header.
+- **Hash routing**, as their `HashRouter` does. Independently the better choice for us: a hash
+  never reaches the server, so a printed QR works on any static host with **zero rewrite config**
+  — with path routing, a host missing its SPA fallback turns every sticker into dead paper, and
+  only after they are printed.
+
+**The status palette now extends the template instead of replacing it.** `StockBadge.tsx:10-17`
+uses a `bg-X-50 / text-X-700 / border-X-100` triple from a stock Tailwind family and ships three
+statuses. We keep those three unchanged (green/amber/red) and add four more in the identical
+shape: **dipinjam** sky · **rusak** orange · **hilang** rose (deliberately deeper — a terminal
+write-off, not a repair-queue item) · **pensiun** slate. Pill geometry is theirs, verbatim.
+
+**Extensions kept, each against a written need** — and only these:
+- `--spacing-touch: 3.5rem` and a `touch` Button size. SmartInv's controls are 32–44px; a shared
+  tablet handled with wet or gloved hands needs 56px (Part XVI).
+- `font-size: max(16px, 1em)` on inputs, so a mis-tap never zooms the kiosk.
+- The four extra status colours above.
+- The notification bell is **bound** to Notifikasi Stok. In the template its unread dot is always
+  rendered and wired to nothing (`Navbar.tsx:47-53`); carrying that over would ship a permanent
+  red dot that means nothing.
+- `.custom-scrollbar` is **defined**. The template applies it in three files but never declares
+  it anywhere — a no-op there.
+
+**Departures forced by the port, not chosen:** no `useAuth` in the Sidebar or Navbar (nobody is
+signed in on a kiosk), and framer-motion's spring widths and `layoutId` shared-layout pill become
+CSS transitions — `@octanejs/motion` is not yet a dependency, and its `layoutId` is single-element
+FLIP rather than a projection tree (§62). Static appearance is identical; only the animation
+between nav items is lost. Revisit when motion is added.

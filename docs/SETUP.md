@@ -145,26 +145,19 @@ one wall-mounted tablet in the gudang.
 
 ## Stage 5 — Deploy, before you print a single label 🚀
 
-The QR codes encode **deep links** — `https://<your-app>/scan?i=ITM-0001` — so the app must be
-online at a stable address *before* labels are printed. The label screen refuses to print
-against `localhost` for exactly this reason: a sticker outlives the laptop that made it.
+The QR codes encode **deep links** — `https://<your-app>/#/scan?i=ITM-0001` — so the app must be
+online at a stable address *before* labels are printed. The label screen refuses to print against
+`localhost` for exactly this reason: a sticker outlives the laptop that made it.
 
 1. **Build:** `cd app && npm run build` → static files in `app/dist/`.
 2. **Host it** on Vercel or Cloudflare Pages (both free for this). Point the project at `app/`,
    build command `npm run build`, output directory `dist`.
-3. **⚠️ Turn on SPA fallback, or every printed label 404s.** The app uses real paths, so the host
-   must serve `index.html` for unknown routes:
-
-   | Host | File | Contents |
-   | --- | --- | --- |
-   | Vercel | `app/vercel.json` | `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` |
-   | Cloudflare Pages | `app/public/_redirects` | `/*  /index.html  200` |
-
-   **Test it before printing:** open `https://<your-app>/scan?i=ITM-0001` directly in a browser
-   (not by clicking through the app). If you get a 404, the fallback is not on, and every sticker
-   you print will be dead paper.
-4. **Put that address into the label screen's "Alamat aplikasi" field** before printing. It is
-   baked into every QR.
+3. **No server config needed.** The app uses **hash routing** (`/#/scan?...`), the same as
+   SmartInv's `HashRouter`. A hash never reaches the server, so any static host serves it
+   correctly with zero rewrites — and there is no way to end up with a gudang full of stickers
+   pointing at 404s because a fallback rule was missed.
+4. **Put the deployed address into the label screen's "Alamat aplikasi" field** before printing.
+   It is baked into every QR. Test one: open `https://<your-app>/#/scan?i=ITM-0001` on a phone.
 
 ---
 
@@ -198,7 +191,7 @@ is exactly the right semantic because a local queue already holds the truth. Not
 - [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
 - [ ] **Stage 3** — deploy as *Execute as: Me* + *Who has access: Anyone*, send me the URL
 - [ ] **Stage 4** — decide which device is the kiosk, and where it physically lives
-- [ ] **Stage 5** — deploy, **turn on SPA fallback**, and verify `/scan?i=ITM-0001` loads directly
+- [ ] **Stage 5** — deploy to Vercel/Cloudflare (no rewrite rules needed — hash routing)
 - [ ] **Stage 5** — put the deployed address into "Alamat aplikasi" *before* printing labels
 - [ ] ~~Google Form~~ — **not now**, deliberately
 

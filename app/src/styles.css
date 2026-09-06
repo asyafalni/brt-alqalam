@@ -1,109 +1,41 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   TOKEN LAYER
-   SmartInv ships no design tokens at all (docs/SMARTINV-REUSE-MAP.md): its
-   tailwind.config.js extends only fontFamily, there are no CSS variables, no
-   dark mode, and every colour is a stock utility or one of eight inline hex
-   literals. So the layer below is AUTHORED, following shadcn's token names and
-   shape, in Tailwind 4's CSS-first form. Decision recorded in Part XVI §63.
+   THEME — reused from SmartInv, not authored.
+   The template has no token layer (docs/SMARTINV-REUSE-MAP.md §0): its Tailwind
+   config extends only `fontFamily`, and every colour is a stock Tailwind utility.
+   So we adopt the same approach — stock utilities, slate ground, sky brand — and
+   declare only the font, exactly as `frontend/tailwind.config.js:11-13` does.
+
+   No dark mode: the template ships none, and the device is a tablet read in a
+   sunlit gudang, where a light ground is the right answer anyway.
 --------------------------------------------------------------------------- */
 
-:root {
-  color-scheme: light;
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  --background: oklch(0.99 0.002 250);
-  --foreground: oklch(0.19 0.02 255);
-  --card: oklch(1 0 0);
-  --card-foreground: var(--foreground);
-  --muted: oklch(0.96 0.005 250);
-  --muted-foreground: oklch(0.44 0.02 255);
-  --primary: oklch(0.46 0.13 195);
-  --primary-foreground: oklch(0.99 0.005 195);
-  --border: oklch(0.87 0.008 250);
-  --input: oklch(0.87 0.008 250);
-  --ring: var(--primary);
-  --destructive: oklch(0.52 0.20 27);
-  --destructive-foreground: oklch(0.99 0 0);
-
-  /* FIELD-OPS EXTENSION — the seven-status colour language.
-     Justified by a written need (Part IV/XVI): rusak and hilang are different
-     outcomes demanding different actions, so they must never share a colour.
-     SmartInv ships three status colours; the model needs seven. */
-  --status-tersedia: oklch(0.55 0.15 150);   /* available            */
-  --status-menipis:  oklch(0.70 0.16 75);    /* low — near minimum   */
-  --status-habis:    oklch(0.50 0.15 25);    /* out — zero stock     */
-  --status-dipinjam: oklch(0.55 0.15 250);   /* out on loan          */
-  --status-rusak:    oklch(0.58 0.17 45);    /* broken — repairable  */
-  --status-hilang:   oklch(0.42 0.17 15);    /* lost — written off   */
-  --status-pensiun:  oklch(0.55 0.01 260);   /* retired              */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --background: oklch(0.17 0.015 255);
-    --foreground: oklch(0.97 0.005 250);
-    --card: oklch(0.22 0.018 255);
-    --card-foreground: var(--foreground);
-    --muted: oklch(0.26 0.015 255);
-    --muted-foreground: oklch(0.72 0.015 255);
-    --primary: oklch(0.72 0.13 195);
-    --primary-foreground: oklch(0.17 0.02 255);
-    --border: oklch(0.32 0.015 255);
-    --input: oklch(0.32 0.015 255);
-    --destructive: oklch(0.62 0.19 27);
-
-    --status-tersedia: oklch(0.72 0.16 150);
-    --status-menipis:  oklch(0.80 0.16 75);
-    --status-habis:    oklch(0.65 0.18 25);
-    --status-dipinjam: oklch(0.70 0.14 250);
-    --status-rusak:    oklch(0.72 0.16 45);
-    --status-hilang:   oklch(0.58 0.18 15);
-    --status-pensiun:  oklch(0.65 0.01 260);
-  }
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-
-  --color-tersedia: var(--status-tersedia);
-  --color-menipis: var(--status-menipis);
-  --color-habis: var(--status-habis);
-  --color-dipinjam: var(--status-dipinjam);
-  --color-rusak: var(--status-rusak);
-  --color-hilang: var(--status-hilang);
-  --color-pensiun: var(--status-pensiun);
-
-  /* FIELD-OPS EXTENSION — touch targets. 56px, not the usual 44px: the device
-     is a shared tablet handled with wet or gloved hands in a gudang. */
+  /* FIELD-OPS EXTENSION — 56px, where SmartInv's controls are 32–44px. Justified by a
+     written need: a shared tablet handled with wet or gloved hands (design doc Part XVI). */
   --spacing-touch: 3.5rem;
 }
 
-* { box-sizing: border-box; }
-
-html { -webkit-text-size-adjust: 100%; }
-
+/* SmartInv `frontend/index.css:5-9` — the app ground and default ink. */
 body {
   margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  /* 17px base, not 16 — read at arm's length, sometimes in sunlight. */
-  font: 400 17px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  @apply bg-slate-50 text-slate-900 font-sans antialiased;
 }
+
+/* SmartInv `frontend/index.css:11-15` — the only custom class in their CSS. */
+.glass {
+  @apply border border-white/30 bg-white/70 backdrop-blur-md;
+}
+
+/* SmartInv `frontend/index.css:17-28`. Applied in three of their files but never
+   defined there — a no-op in the template; defined here so it actually works. */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { @apply rounded-full bg-slate-300; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
 
 /* Never let a mis-tap zoom the kiosk. */
 input, select, textarea, button { font: inherit; }
@@ -111,8 +43,7 @@ input, select, textarea { font-size: max(16px, 1em); }
 
 :where(button, [role="button"], a):focus-visible,
 :where(input, select, textarea):focus-visible {
-  outline: 3px solid var(--ring);
-  outline-offset: 2px;
+  @apply outline-2 outline-offset-2 outline-sky-500;
 }
 
 /* ---------------------------------------------------------------------------
@@ -136,42 +67,25 @@ input, select, textarea { font-size: max(16px, 1em); }
   height: var(--label-h);
   padding: 2mm;
   overflow: hidden;
-  /* On screen only — a printed sticker sheet must not carry ink borders. */
-  border: 1px dashed var(--border);
+  border: 1px dashed #cbd5e1;   /* on screen only — a sticker sheet carries no ink borders */
   background: #fff;
   color: #000;
 }
 
-.label-qr {
-  width: calc(var(--label-h) - 4mm);
-  height: calc(var(--label-h) - 4mm);
-  flex-shrink: 0;
-}
-
+.label-qr { width: calc(var(--label-h) - 4mm); height: calc(var(--label-h) - 4mm); flex-shrink: 0; }
 .label-text { min-width: 0; line-height: 1.25; }
 
 .label-title {
-  display: block;
-  overflow: hidden;
-  font-size: 3mm;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block; overflow: hidden; font-size: 3mm; font-weight: 700;
+  text-overflow: ellipsis; white-space: nowrap;
 }
 .label-subtitle {
-  display: block;
-  overflow: hidden;
-  color: #444;
-  font-size: 2.2mm;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block; overflow: hidden; color: #444; font-size: 2.2mm;
+  text-overflow: ellipsis; white-space: nowrap;
 }
 .label-code {
-  display: block;
-  margin-top: 0.5mm;
+  display: block; margin-top: 0.5mm; font-size: 2.2mm; letter-spacing: 0.02em;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 2.2mm;
-  letter-spacing: 0.02em;
 }
 
 @page { size: A4; margin: 8mm; }
@@ -180,8 +94,5 @@ input, select, textarea { font-size: max(16px, 1em); }
   .no-print { display: none !important; }
   body { background: #fff; color: #000; }
   main { max-width: none; padding: 0; }
-  .label { border: none; }
-  .label-sheet { gap: 0; }
-  /* Never split a sticker across two sheets. */
-  .label { break-inside: avoid; page-break-inside: avoid; }
+  .label { border: none; break-inside: avoid; page-break-inside: avoid; }
 }

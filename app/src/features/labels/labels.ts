@@ -21,10 +21,14 @@ export type ScanTarget = 'item' | 'asset';
 /**
  * `?i=` is a stock location (a rack or bin, scanned then given a quantity);
  * `?a=` is one physical unit with its own identity and status.
+ *
+ * Hash routes, like SmartInv's HashRouter. A hash needs no server rewrite, so a printed
+ * sticker works on any static host — with path routing, a host missing its SPA fallback
+ * turns every label in the gudang into dead paper, and only after they are printed.
  */
 export function scanUrl(baseUrl: string, target: ScanTarget, id: string): string {
-  const base = baseUrl.replace(/\/+$/, '');
-  return `${base}/scan?${target === 'asset' ? 'a' : 'i'}=${encodeURIComponent(id)}`;
+  const base = baseUrl.replace(/[/#]+$/, '');
+  return `${base}/#/scan?${target === 'asset' ? 'a' : 'i'}=${encodeURIComponent(id)}`;
 }
 
 /**

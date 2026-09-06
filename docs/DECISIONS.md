@@ -152,9 +152,12 @@ Full reasoning in BRT-Inventory-System-Design.md (Parts I–XVI) and BRT-Invento
 - **Charts: `@tanstack/charts` + the `/octane` subpath.** NOT `@tanstack/octane-charts` (a compat
   shim its own README tells new apps to skip). §8 unchanged. Peer range says `octane ^0.1.13` vs
   actual 0.2.3 — expect an install complaint; confirm at spike.
-- **Token layer: shadcn tokens + SmartInv layout recipes + justified field-ops overrides.**
-  SmartInv has **no** token layer (no custom Tailwind theme, no CSS variables, no dark mode,
-  8 hardcoded hex literals, 3 status colours vs our 8). §9's "reuse its tokens" is impossible.
+- ~~**Token layer: shadcn tokens** + SmartInv layout recipes.~~ **SUPERSEDED (§66)** — that
+  produced an app sharing SmartInv's conventions but not its look. We now adopt SmartInv's own
+  convention: stock Tailwind utilities, slate ground + sky brand, Plus Jakarta Sans as the only
+  theme extension, no dark mode. Sidebar/Navbar/Card/Button/Input ported class-for-class.
+  Status pills **extend** StockBadge's `bg-X-50 / text-X-700 / border-X-100` triple — their three
+  kept unchanged, four added in the same shape.
 - **`OctaneCompat` lives in `octane/react`** (not `@octanejs/compat`, which doesn't exist).
 - **Standard `.tsx` compiles as-is under Octane** — the SmartInv port needs no rewrite. `.tsrx` is opt-in.
 - **Toolchain pins:** Vite 8 · Node ≥ 22.22.2 · TypeScript `~5.9.3` (TS 6 breaks `tsrx-tsc`).
@@ -192,3 +195,13 @@ Full reasoning in BRT-Inventory-System-Design.md (Parts I–XVI) and BRT-Invento
 - **PIN hash = HMAC-SHA256 + per-user salt + secret pepper.** No bcrypt/argon2 in Apps Script.
 - **Clerk tokens live 60s** — never store one in the offline queue; mint at flush time.
 - **`LockService` required** for `clientTxnId` idempotency (append is not documented atomic).
+
+### v1.6 addendum — theme + routing (§66)
+- **Reuse means reuse.** SmartInv's shell, palette, font and component class strings are ported
+  verbatim and cited to file:line. Extensions limited to: 56px touch targets, 16px input floor,
+  four extra status colours, a notification bell actually bound to Notifikasi Stok, and defining
+  `.custom-scrollbar` (the template applies it but never declares it).
+- **Hash routing** (`/#/scan?i=…`), as SmartInv's HashRouter. Needs **no SPA rewrite** on the
+  host — with path routing, a missing fallback turns every printed sticker into dead paper.
+- **No dark mode**: the template ships none, and a sunlit gudang wants a light ground.
+- Motion is CSS transitions for now; `@octanejs/motion`'s `layoutId` is single-element FLIP.

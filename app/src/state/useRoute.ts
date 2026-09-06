@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'octane';
-import { parseRoute, routeToPath } from './route';
+import { parseRoute, routeToHash } from './route';
 import type { Route } from './route';
 
 export function useRoute(): [Route, (route: Route) => void] {
-  const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search));
+  const [route, setRoute] = useState<Route>(() => parseRoute(location.hash));
 
-  // Back/forward must work: a marbot who scans a label and taps back should land where they
-  // came from, not on a dead screen.
+  // `hashchange` covers both back/forward and a link tapped from outside the app — which is
+  // exactly how a marbot arrives, from their phone's camera.
   useEffect(() => {
-    const onPop = () => setRoute(parseRoute(location.pathname, location.search));
-    addEventListener('popstate', onPop);
-    return () => removeEventListener('popstate', onPop);
+    const onHash = () => setRoute(parseRoute(location.hash));
+    addEventListener('hashchange', onHash);
+    return () => removeEventListener('hashchange', onHash);
   }, []);
 
   return [
     route,
     (next: Route) => {
-      history.pushState(null, '', routeToPath(next));
+      location.hash = routeToHash(next);
       setRoute(next);
     },
   ];

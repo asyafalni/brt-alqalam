@@ -1,11 +1,10 @@
-// A 60-line router. Pure parsing here; the hook lives in useRoute.ts.
+// Hash routing, as SmartInv does (frontend/index.tsx:13-20 uses HashRouter, and the live app
+// is served at /#/login).
 //
-// Why not @octanejs/tanstack-router yet: three routes, no nesting, no loaders, no code
-// splitting. A router earns its place when there is something to route — until then it is a
-// pre-1.0 binding surface between us and the one thing a printed label depends on.
-//
-// Paths, not hashes: a QR encoding `#/scan?a=X` is uglier and some scanner apps mangle the
-// fragment. Paths need SPA fallback on the host, which is one line of config (see SETUP.md).
+// It is also the right call for us independently: a hash route needs NO server rewrite, so a
+// printed QR works on any static host with zero configuration. With path routing, a host
+// missing its SPA fallback turns every sticker in the gudang into dead paper — a failure that
+// shows up only after printing.
 
 export type Route =
   | { name: 'opname' }
@@ -14,9 +13,12 @@ export type Route =
   | { name: 'scan'; target: 'item' | 'asset'; id: string }
   | { name: 'scan-empty' };
 
-export function parseRoute(pathname: string, search: string): Route {
-  const path = pathname.replace(/\/+$/, '') || '/';
-  const params = new URLSearchParams(search);
+/** Accepts a raw `location.hash` ("#/scan?i=X"), with or without the leading "#". */
+export function parseRoute(hash: string): Route {
+  const raw = hash.replace(/^#/, '') || '/';
+  const [rawPath, rawQuery = ''] = raw.split('?');
+  const path = rawPath.replace(/\/+$/, '') || '/';
+  const params = new URLSearchParams(rawQuery);
 
   if (path === '/scan') {
     const asset = params.get('a');
@@ -30,12 +32,12 @@ export function parseRoute(pathname: string, search: string): Route {
   return { name: 'opname' };
 }
 
-export function routeToPath(route: Route): string {
+export function routeToHash(route: Route): string {
   switch (route.name) {
-    case 'label': return '/label';
-    case 'board': return '/board';
-    case 'scan': return `/scan?${route.target === 'asset' ? 'a' : 'i'}=${encodeURIComponent(route.id)}`;
-    case 'scan-empty': return '/scan';
-    default: return '/';
+    case 'label': return '#/label';
+    case 'board': return '#/board';
+    case 'scan': return `#/scan?${route.target === 'asset' ? 'a' : 'i'}=${encodeURIComponent(route.id)}`;
+    case 'scan-empty': return '#/scan';
+    default: return '#/';
   }
 }

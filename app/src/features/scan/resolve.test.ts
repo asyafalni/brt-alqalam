@@ -69,21 +69,28 @@ describe('status vocabulary', () => {
   it('"out" reads as Habis for stock but Dipinjam for a unit — the knife still exists', () => {
     expect(itemStatusBadge('out').label).toBe('Habis');
     expect(instanceStatusBadge('out').label).toBe('Dipinjam');
-    expect(itemStatusBadge('out').dot).not.toBe(instanceStatusBadge('out').dot);
+    expect(itemStatusBadge('out').chip).not.toBe(instanceStatusBadge('out').chip);
   });
 
   it('rusak and hilang never share a colour — they demand different actions', () => {
-    expect(instanceStatusBadge('broken').chip).toContain('rusak');
-    expect(instanceStatusBadge('lost').chip).toContain('hilang');
+    expect(instanceStatusBadge('broken').chip).toContain('orange');
+    expect(instanceStatusBadge('lost').chip).toContain('rose');
     expect(instanceStatusBadge('broken').chip).not.toBe(instanceStatusBadge('lost').chip);
   });
 
+  it('keeps the three the template already ships, unchanged', () => {
+    // SmartInv StockBadge.tsx:10-14 — Safe / Low / Out of Stock.
+    expect(itemStatusBadge('available').chip).toBe('bg-green-50 text-green-700 border-green-100');
+    expect(itemStatusBadge('low').chip).toBe('bg-amber-50 text-amber-700 border-amber-100');
+    expect(itemStatusBadge('out').chip).toBe('bg-red-50 text-red-700 border-red-100');
+  });
+
   it('every class string is a literal Tailwind can actually see', () => {
-    // `bg-${color}` generates no CSS and fails silently — the badge renders colourless.
+    // `bg-${family}-50` generates no CSS and fails silently — colourless badges.
     for (const status of ['available', 'out', 'broken', 'lost', 'retired']) {
       const badge = instanceStatusBadge(status);
-      expect(badge.dot).toMatch(/^bg-[a-z]+$/);
-      expect(badge.chip).toMatch(/^bg-[a-z]+\/15 text-[a-z]+$/);
+      expect(badge.rail).toMatch(/^bg-[a-z]+-\d{3}$/);
+      expect(badge.chip).toMatch(/^bg-[a-z]+-\d{2,3} text-[a-z]+-\d{3} border-[a-z]+-\d{2,3}$/);
     }
   });
 

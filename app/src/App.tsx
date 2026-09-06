@@ -1,4 +1,7 @@
-import { useMemo } from 'octane';
+import { useEffect, useMemo, useState } from 'octane';
+import { Sidebar } from './components/Sidebar';
+import { Navbar } from './components/Navbar';
+import { Card } from './components/ui';
 import { useDraft } from './state/useDraft';
 import { useInventory } from './state/useInventory';
 import { useRoute } from './state/useRoute';
@@ -6,102 +9,108 @@ import { StockTake } from './features/stocktake/StockTake';
 import { LabelSheet } from './features/labels/LabelSheet';
 import { Board } from './features/board/Board';
 import { ScanResult } from './features/scan/ScanResult';
-import { CARD } from './features/stocktake/ItemForm';
 
 export function App() {
   // One draft, shared. Two screens each loading from storage would be two sources of truth,
   // and the label sheet would quietly print a stale count.
   const draft = useDraft();
   const [route, go] = useRoute();
+  const [search, setSearch] = useState('');
 
-  // Pinned per mount rather than read on every render: `deriveState` is a pure function of
-  // `now`, so a moving clock would recompute the whole fold on every keystroke.
+  // Pinned per mount: `deriveState` is a pure function of `now`, so a moving clock would
+  // recompute the whole fold on every keystroke.
   const now = useMemo(() => Date.now(), []);
   const inventory = useInventory(draft, now);
 
-  const scanning = route.name === 'scan' || route.name === 'scan-empty';
+  // SmartInv App.tsx:51-64 owns this the same way. Their version force-expands on every
+  // resize, overriding a manual collapse; ours only reacts when the breakpoint is crossed.
+  const [isMobile, setIsMobile] = useState(() => innerWidth < 768);
+  const [collapsed, setCollapsed] = useState(() => innerWidth < 768);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = innerWidth < 768;
+      setIsMobile((was) => {
+        if (was !== mobile) setCollapsed(mobile);
+        return mobile;
+      });
+    };
+    addEventListener('resize', onResize);
+    return () => removeEventListener('resize', onResize);
+  }, []);
+
+  const navigate = (next: Parameters<typeof go>[0]) => {
+    go(next);
+    if (isMobile) setCollapsed(true);
+  };
 
   return (
-    <>
-      {!scanning && (
-        <nav class="no-print sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-          <div class="mx-auto flex max-w-5xl gap-2 overflow-x-auto p-2">
-            <Tab active={route.name === 'opname'} onPick={() => go({ name: 'opname' })}>
-              Opname
-            </Tab>
-            <Tab active={route.name === 'board'} onPick={() => go({ name: 'board' })}>
-              Stok
-              {inventory.notifications.length > 0 && (
-                <span class="ml-2 rounded-full bg-menipis px-2 py-0.5 text-sm tabular-nums text-background">
-                  {inventory.notifications.length}
-                </span>
-              )}
-            </Tab>
-            <Tab active={route.name === 'label'} onPick={() => go({ name: 'label' })}>
-              Cetak Label
-              {draft.items.length > 0 && (
-                <span class="ml-2 rounded-full bg-muted px-2 py-0.5 text-sm tabular-nums">
-                  {draft.items.length}
-                </span>
-              )}
-            </Tab>
-          </div>
-        </nav>
-      )}
+    // SmartInv App.tsx:67 — the app frame.
+    <div class="flex h-screen bg-slate-50 font-sans">
+      {/* App.tsx:69-70 — decorative background glow. */}
+      <div class="pointer-events-none fixed right-[-5%] top-[-10%] h-[40%] w-[40%] rounded-full bg-sky-200/20 blur-[120px]" />
+      <div class="pointer-events-none fixed bottom-[-10%] left-[-5%] h-[40%] w-[40%] rounded-full bg-blue-200/10 blur-[120px]" />
 
-      {route.name === 'opname' && <StockTake draft={draft} />}
-      {route.name === 'board' && (
-        <Board items={draft.items} categories={draft.categories} inventory={inventory} />
-      )}
-      {route.name === 'label' && (
-        <LabelSheet items={draft.items} categories={draft.categories} />
-      )}
-      {route.name === 'scan' && (
-        <ScanResult
-          target={route.target}
-          id={route.id}
-          items={draft.items}
-          categories={draft.categories}
-          inventory={inventory}
-          now={now}
-          onBack={() => go({ name: 'opname' })}
+      <Sidebar
+        route={route}
+        collapsed={collapsed}
+        isMobile={isMobile}
+        itemCount={draft.items.length}
+        alertCount={inventory.notifications.length}
+        onNavigate={navigate}
+        onClose={() => setCollapsed(true)}
+      />
+
+      {/* App.tsx:74-77 — content column. */}
+      <div class="relative flex min-w-0 flex-1 flex-col">
+        <Navbar
+          search={search}
+          alertCount={inventory.notifications.length}
+          onSearch={setSearch}
+          onToggleSidebar={() => setCollapsed(!collapsed)}
+          onShowAlerts={() => navigate({ name: 'board' })}
         />
-      )}
-      {route.name === 'scan-empty' && (
-        <main class="mx-auto max-w-2xl p-4">
-          <div class={`${CARD} border-2 border-destructive p-6 text-center`} role="alert">
-            <h1 class="mb-2 text-2xl font-bold">Label tidak terbaca</h1>
-            <p class="mb-5 text-muted-foreground">
-              QR ini tidak menyebut barang apa pun. Mungkin rusak atau tercetak sebagian.
-            </p>
-            <button
-              type="button"
-              class="min-h-touch rounded-xl bg-primary px-6 font-semibold text-primary-foreground"
-              onClick={() => go({ name: 'opname' })}
-            >
-              Buka Opname Gudang
-            </button>
-          </div>
-        </main>
-      )}
-    </>
-  );
-}
 
-function Tab(
-  { active, onPick, children }: { active: boolean; onPick: () => void; children?: unknown },
-) {
-  return (
-    <button
-      type="button"
-      aria-current={active ? 'page' : undefined}
-      class={
-        'min-h-touch shrink-0 rounded-xl px-5 font-semibold ' +
-        (active ? 'bg-primary text-primary-foreground' : 'border-2 border-border')
-      }
-      onClick={onPick}
-    >
-      {children}
-    </button>
+        <main class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-4 pb-8 md:px-8">
+          {route.name === 'opname' && (
+            <StockTake draft={draft} search={search} onSearch={setSearch} />
+          )}
+          {route.name === 'board' && (
+            <Board items={draft.items} categories={draft.categories} inventory={inventory} search={search} />
+          )}
+          {route.name === 'label' && (
+            <LabelSheet items={draft.items} categories={draft.categories} />
+          )}
+          {route.name === 'scan' && (
+            <ScanResult
+              target={route.target}
+              id={route.id}
+              items={draft.items}
+              categories={draft.categories}
+              inventory={inventory}
+              now={now}
+              onBack={() => navigate({ name: 'opname' })}
+            />
+          )}
+          {route.name === 'scan-empty' && (
+            <div class="space-y-6 pt-6">
+              <Card class="border-red-100 text-center">
+                <h1 class="mb-2 text-2xl font-bold text-slate-900">Label tidak terbaca</h1>
+                <p class="mb-5 text-slate-500">
+                  QR ini tidak menyebut barang apa pun. Mungkin rusak atau tercetak sebagian.
+                </p>
+                <button
+                  type="button"
+                  class="min-h-touch rounded-lg bg-[#38BDF8] px-6 font-semibold text-white hover:bg-[#0EA5E9]"
+                  onClick={() => navigate({ name: 'opname' })}
+                >
+                  Buka Opname Gudang
+                </button>
+              </Card>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }

@@ -51,17 +51,18 @@ describe('qrSvg', () => {
 
 describe('scanUrl', () => {
   it('uses ?i= for a stock location and ?a= for one physical unit', () => {
-    expect(scanUrl('https://x.test', 'item', 'ITM-0001')).toBe('https://x.test/scan?i=ITM-0001');
+    expect(scanUrl('https://x.test', 'item', 'ITM-0001')).toBe('https://x.test/#/scan?i=ITM-0001');
     expect(scanUrl('https://x.test', 'asset', 'ALQ-ITM-0004-001'))
-      .toBe('https://x.test/scan?a=ALQ-ITM-0004-001');
+      .toBe('https://x.test/#/scan?a=ALQ-ITM-0004-001');
   });
 
-  it('tolerates a trailing slash rather than producing a double one', () => {
-    expect(scanUrl('https://x.test/', 'item', 'ITM-1')).toBe('https://x.test/scan?i=ITM-1');
+  it('tolerates a trailing slash or hash rather than producing a double one', () => {
+    expect(scanUrl('https://x.test/', 'item', 'ITM-1')).toBe('https://x.test/#/scan?i=ITM-1');
+    expect(scanUrl('https://x.test/#', 'item', 'ITM-1')).toBe('https://x.test/#/scan?i=ITM-1');
   });
 
   it('escapes ids so a stray character cannot break the link', () => {
-    expect(scanUrl('https://x.test', 'item', 'ITM 1&x')).toBe('https://x.test/scan?i=ITM%201%26x');
+    expect(scanUrl('https://x.test', 'item', 'ITM 1&x')).toBe('https://x.test/#/scan?i=ITM%201%26x');
   });
 });
 
@@ -88,7 +89,7 @@ describe('labelsFor', () => {
       code: 'ALQ-ITM-0001',
       title: 'Sabun',
       subtitle: 'Kebersihan · galon',
-      url: 'https://x.test/scan?i=ITM-0001',
+      url: 'https://x.test/#/scan?i=ITM-0001',
     });
   });
 
@@ -96,7 +97,7 @@ describe('labelsFor', () => {
     const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), []);
     const labels = labelsFor([pisau], SEED_CATEGORIES, base, TS0);
     expect(labels.map((l) => l.title)).toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
-    expect(labels[2].url).toBe('https://x.test/scan?a=ALQ-ITM-0001-003');
+    expect(labels[2].url).toBe('https://x.test/#/scan?a=ALQ-ITM-0001-003');
   });
 
   it('a counted durable gets a rack label, not one per unit', () => {

@@ -62,34 +62,43 @@ export function resolveScan(
 // knife would be actively misleading — the knife exists, it is just not here.
 
 /**
- * Class strings are written out in full, never interpolated. Tailwind scans source for
- * LITERAL class names — `bg-${color}` generates no CSS at all, and the failure is silent:
- * the badge simply renders colourless.
+ * Status pills EXTEND SmartInv's `StockBadge` (components/StockBadge.tsx:10-17) rather than
+ * inventing a palette. The template's pattern is a `bg-X-50 / text-X-700 / border-X-100`
+ * triple from a stock Tailwind family; it ships three statuses and our model needs seven, so
+ * four more families are added in the same shape. Pill geometry is theirs, verbatim.
+ *
+ * Class strings are literal, never interpolated: Tailwind scans source for literal class
+ * names, so `bg-${family}-50` generates no CSS and fails silently — colourless badges.
  */
+export const PILL =
+  'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border';
+
 export interface StatusBadge {
   label: string;
-  /** Solid fill, for the rail down the side of a row. */
-  dot: string;
-  /** Tinted pill with matching text. */
+  /** Tinted pill — SmartInv's StockBadge triple. */
   chip: string;
+  /** Solid fill, for the rail down the side of a list row. */
+  rail: string;
 }
 
 const ITEM_STATUS: Record<string, StatusBadge> = {
-  available: { label: 'Tersedia', dot: 'bg-tersedia', chip: 'bg-tersedia/15 text-tersedia' },
-  low: { label: 'Menipis', dot: 'bg-menipis', chip: 'bg-menipis/15 text-menipis' },
-  out: { label: 'Habis', dot: 'bg-habis', chip: 'bg-habis/15 text-habis' },
+  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500' },
+  low: { label: 'Menipis', chip: 'bg-amber-50 text-amber-700 border-amber-100', rail: 'bg-amber-500' },
+  out: { label: 'Habis', chip: 'bg-red-50 text-red-700 border-red-100', rail: 'bg-red-500' },
 };
 
 const INSTANCE_STATUS: Record<string, StatusBadge> = {
-  available: { label: 'Tersedia', dot: 'bg-tersedia', chip: 'bg-tersedia/15 text-tersedia' },
-  out: { label: 'Dipinjam', dot: 'bg-dipinjam', chip: 'bg-dipinjam/15 text-dipinjam' },
-  broken: { label: 'Rusak', dot: 'bg-rusak', chip: 'bg-rusak/15 text-rusak' },
-  lost: { label: 'Hilang', dot: 'bg-hilang', chip: 'bg-hilang/15 text-hilang' },
-  retired: { label: 'Pensiun', dot: 'bg-pensiun', chip: 'bg-pensiun/15 text-pensiun' },
+  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500' },
+  // Extensions beyond the template's three, same shape, distinct families.
+  out: { label: 'Dipinjam', chip: 'bg-sky-50 text-sky-700 border-sky-100', rail: 'bg-sky-500' },
+  broken: { label: 'Rusak', chip: 'bg-orange-50 text-orange-700 border-orange-100', rail: 'bg-orange-500' },
+  // Deeper than rusak on purpose: hilang is a terminal write-off, not a repair queue item.
+  lost: { label: 'Hilang', chip: 'bg-rose-50 text-rose-800 border-rose-200', rail: 'bg-rose-700' },
+  retired: { label: 'Pensiun', chip: 'bg-slate-100 text-slate-600 border-slate-200', rail: 'bg-slate-400' },
 };
 
 const UNKNOWN: StatusBadge = {
-  label: 'Tidak diketahui', dot: 'bg-pensiun', chip: 'bg-pensiun/15 text-pensiun',
+  label: 'Tidak diketahui', chip: 'bg-slate-100 text-slate-600 border-slate-200', rail: 'bg-slate-400',
 };
 
 export const itemStatusBadge = (status: string): StatusBadge => ITEM_STATUS[status] ?? UNKNOWN;

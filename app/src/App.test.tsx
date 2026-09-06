@@ -19,15 +19,15 @@ function seed(...inputs: DraftInput[]) {
   return items;
 }
 
-const at = (path: string) => history.pushState(null, '', path);
+const at = (hash: string) => { location.hash = hash; };
 
-beforeEach(() => { localStorage.clear(); at('/'); });
-afterEach(() => { cleanup(); at('/'); });
+beforeEach(() => { localStorage.clear(); at('#/'); });
+afterEach(() => { cleanup(); at('#/'); });
 
 describe('deep links — the whole point of a printed label', () => {
   it('a rack QR opens the item with its derived stock', () => {
     seed(input({ name: 'Sabun cuci', initialStock: 12 }));
-    at('/scan?i=ITM-0001');
+    at('#/scan?i=ITM-0001');
     const r = render(App);
 
     expect(r.getByText('Sabun cuci')).toBeTruthy();
@@ -38,7 +38,7 @@ describe('deep links — the whole point of a printed label', () => {
 
   it('a unit QR opens that one physical unit, not the item', () => {
     seed(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }));
-    at('/scan?a=ALQ-ITM-0001-002');
+    at('#/scan?a=ALQ-ITM-0001-002');
     const r = render(App);
 
     expect(r.getByText('Pisau #2')).toBeTruthy();
@@ -47,7 +47,7 @@ describe('deep links — the whole point of a printed label', () => {
 
   it('says so when a label is not in this catalog, instead of failing silently', () => {
     seed(input());
-    at('/scan?i=ITM-9999');
+    at('#/scan?i=ITM-9999');
     const r = render(App);
 
     expect(r.getByRole('alert')).toBeTruthy();
@@ -56,25 +56,25 @@ describe('deep links — the whole point of a printed label', () => {
   });
 
   it('distinguishes an empty catalog from an unknown label', () => {
-    at('/scan?i=ITM-0001');
+    at('#/scan?i=ITM-0001');
     expect(render(App).getByText('Katalog masih kosong')).toBeTruthy();
   });
 
   it('a damaged QR that names nothing still reaches a screen that explains', () => {
     seed(input());
-    at('/scan');
+    at('#/scan');
     expect(render(App).getByText('Label tidak terbaca')).toBeTruthy();
   });
 
-  it('hides the nav while scanning — the marbot arrived here from a camera, mid-task', () => {
+  it('returns to the stock-take from a scan', () => {
     seed(input());
-    at('/scan?i=ITM-0001');
+    at('#/scan?i=ITM-0001');
     const r = render(App);
-    expect(r.queryByText('Cetak Label')).toBeNull();
 
     fireEvent.click(r.getByText('Kembali'));
-    expect(r.getByText('Cetak Label')).toBeTruthy();
-    expect(location.pathname).toBe('/');
+    expect(location.hash).toBe('#/');
+    // The label appears twice — sidebar nav and page heading. The heading is the assertion.
+    expect(r.getByRole('heading', { name: 'Opname Gudang' })).toBeTruthy();
   });
 });
 
@@ -84,24 +84,24 @@ describe('navigation', () => {
     const r = render(App);
 
     fireEvent.click(r.getByText('Stok'));
-    expect(location.pathname).toBe('/board');
+    expect(location.hash).toBe('#/board');
     expect(r.getByText('Stok Sekarang')).toBeTruthy();
 
     fireEvent.click(r.getByText('Cetak Label'));
-    expect(location.pathname).toBe('/label');
+    expect(location.hash).toBe('#/label');
     expect(r.getByText('Cetak Label QR')).toBeTruthy();
   });
 
   it('an unknown path lands on the stock-take rather than a dead end', () => {
-    at('/sesuatu');
-    expect(render(App).getByText('Opname Gudang')).toBeTruthy();
+    at('#/sesuatu');
+    expect(render(App).getByRole('heading', { name: 'Opname Gudang' })).toBeTruthy();
   });
 });
 
 describe('the board renders derived state, not stored numbers', () => {
   it('shows current stock with a status badge', () => {
     seed(input({ name: 'Sabun', initialStock: 12, minStock: 5 }));
-    at('/board');
+    at('#/board');
     const r = render(App);
     expect(r.getByText('Sabun')).toBeTruthy();
     expect(r.getByText('Tersedia')).toBeTruthy();
@@ -112,26 +112,56 @@ describe('the board renders derived state, not stored numbers', () => {
       input({ name: 'Sabun', initialStock: 12, minStock: 5 }),
       input({ name: 'Kanebo', initialStock: 3, minStock: 5 }),
     );
-    at('/board');
+    at('#/board');
     const r = render(App);
 
     expect(r.getByText('Notifikasi Stok')).toBeTruthy();
-    expect(r.getByText(/sisa/)).toBeTruthy();
+    // Kanebo appears in the alert rail AND the stock table — both are correct.
+    expect(r.getAllByText('Kanebo')).toHaveLength(2);
     expect(r.getByText('Menipis')).toBeTruthy();
+    expect(r.queryByText('Semua stok aman.')).toBeNull();
   });
 
   it('an item with no minimum "(-)" never raises one, even at zero', () => {
     seed(input({ name: 'Kanebo', initialStock: 0, minStock: null }));
-    at('/board');
+    at('#/board');
     const r = render(App);
 
-    expect(r.queryByText('Notifikasi Stok')).toBeNull();
+    // The alert card is always present; what matters is that it reports nothing to act on.
+    expect(r.getByText('Semua stok aman.')).toBeTruthy();
     expect(r.getByText('Habis')).toBeTruthy();   // still reported as out of stock
   });
 
   it('is honest that there is no gateway yet', () => {
     seed(input());
-    at('/board');
-    expect(render(App).getByText(/Belum terhubung ke gateway/)).toBeTruthy();
+    at('#/board');
+    expect(render(App).getByText('Belum terhubung ke gateway.')).toBeTruthy();
+  });
+});
+
+describe('the navbar search filters the screen you are on', () => {
+  const type = (el: HTMLElement, value: string) =>
+    fireEvent.input(el, { target: { value } });
+
+  it('filters the opname list, and says so when nothing matches', () => {
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    const r = render(App);
+
+    type(r.getByLabelText('Cari barang'), 'sabun');
+    expect(r.getByText('Sabun cuci')).toBeTruthy();
+    expect(r.queryByText('Pisau dapur')).toBeNull();
+
+    type(r.getByLabelText('Cari barang'), 'zzz');
+    expect(r.getByText(/Tidak ada yang cocok/)).toBeTruthy();
+  });
+
+  it('filters the stock board too', () => {
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/board');
+    const r = render(App);
+
+    type(r.getByLabelText('Cari barang'), 'pisau');
+    expect(r.getByText('Pisau dapur')).toBeTruthy();
+    expect(r.queryByText('Sabun cuci')).toBeNull();
   });
 });

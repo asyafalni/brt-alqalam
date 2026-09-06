@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'octane';
 import type { Category, Item } from '../../../../domain/types';
-import { CARD, FIELD, LABEL } from '../stocktake/ItemForm';
+import { Button, CARD, FIELD, LABEL, PageHeader } from '../../components/ui';
 import { qrSvg, qrViewBox } from './qr';
 import {
   isUnprintableBaseUrl, labelsFor, perSheet, SHEET_FORMATS, sheetCount,
@@ -19,21 +19,21 @@ export function LabelSheet({ items, categories }: { items: Item[]; categories: C
   const risky = isUnprintableBaseUrl(baseUrl);
 
   return (
-    <main class="mx-auto max-w-5xl p-4 pb-24">
-      <header class="no-print mb-5">
-        <h1 class="text-3xl font-bold tracking-tight">Cetak Label QR</h1>
-        <p class="mt-1 text-muted-foreground">
-          Tempel di rak untuk barang yang dihitung, atau di tiap unit untuk barang berlabel satu-satu.
-        </p>
-      </header>
+    <div class="space-y-6 pb-8 pt-6">
+      <div class="no-print">
+        <PageHeader
+          title="Cetak Label QR"
+          subtitle="Tempel di rak untuk barang yang dihitung, atau di tiap unit untuk barang berlabel satu-satu."
+        />
+      </div>
 
       {items.length === 0 ? (
-        <p class={`${CARD} no-print px-5 py-8 text-center text-muted-foreground`}>
+        <p class={`${CARD} no-print py-20 text-center italic text-slate-400`}>
           Belum ada barang. Catat dulu di Opname Gudang.
         </p>
       ) : (
         <>
-          <section class={`${CARD} no-print mb-4 p-5`}>
+          <section class={`${CARD} no-print`}>
             <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label class={LABEL} for="base-url">Alamat aplikasi</label>
@@ -65,7 +65,7 @@ export function LabelSheet({ items, categories }: { items: Item[]; categories: C
             {risky && (
               <p
                 role="alert"
-                class="mb-4 rounded-xl border-2 border-destructive px-4 py-3 font-medium text-destructive"
+                class="mb-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm font-medium text-red-700"
               >
                 Alamat ini hanya hidup di komputer ini. Label yang dicetak sekarang tidak akan
                 bisa dibuka dari HP lain — isi dulu alamat aplikasi yang sudah online.
@@ -75,17 +75,12 @@ export function LabelSheet({ items, categories }: { items: Item[]; categories: C
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               {/* One live region rather than numbers stitched from several elements — a
                   screen reader announces the whole count when the format changes. */}
-              <p role="status" class="text-muted-foreground">
+              <p role="status" class="text-sm text-slate-500">
                 {`${labels.length} label · ${sheetCount(labels.length, format)} lembar A4 · ${perSheet(format)} per lembar`}
               </p>
-              <button
-                type="button"
-                class="ml-auto min-h-touch rounded-xl bg-primary px-6 font-semibold text-primary-foreground disabled:opacity-40"
-                disabled={risky}
-                onClick={() => print()}
-              >
-                Cetak
-              </button>
+              <span class="ml-auto">
+                <Button size="touch" disabled={risky} onClick={() => print()}>Cetak</Button>
+              </span>
             </div>
           </section>
 
@@ -97,7 +92,7 @@ export function LabelSheet({ items, categories }: { items: Item[]; categories: C
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }
 

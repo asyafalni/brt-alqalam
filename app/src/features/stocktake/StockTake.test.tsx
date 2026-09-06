@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { StockTake } from './StockTake';
+import { useState } from 'octane';
 import { useDraft } from '../../state/useDraft';
 import { toItemsCsv, toInstancesCsv } from './draft';
 import { parseItems, parseInstances } from '../../../../data/parse';
 
-// The draft is owned above the screen (App), so tests supply it the same way.
+// The draft and the search box are owned above the screen (App / Navbar), so tests
+// supply them the same way.
 function Harness() {
-  return <StockTake draft={useDraft()} />;
+  const [search, setSearch] = useState('');
+  return <StockTake draft={useDraft()} search={search} onSearch={setSearch} />;
 }
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.
@@ -36,7 +39,8 @@ describe('StockTake — walking the gudang', () => {
     const r = render(Harness);
     addItem(r, 'Sabun cuci tangan', '12');
     expect(r.getByText('Sabun cuci tangan')).toBeTruthy();
-    expect(r.getByText(/Kebersihan · Bisa habis/)).toBeTruthy();
+    expect(r.getByText('ALQ-ITM-0001')).toBeTruthy();   // the code cell — unique to the row
+    expect(r.getByText('bisa habis')).toBeTruthy();
     expect(r.queryByText(/Belum ada barang/)).toBeNull();
   });
 
@@ -176,7 +180,9 @@ describe('categories are free-form', () => {
     fireEvent.click(r.getByText('Simpan'));
     addItem(r, 'Panci besar', '2');
 
-    expect(r.getByText(/Alat Masak · Bisa habis/)).toBeTruthy();
+    // Appears twice on purpose: as the selected <option> and in the row it was filed under.
+    expect(r.getAllByText('Alat Masak').length).toBeGreaterThan(1);
+    expect(stored().items[0].categoryId).toBe('CAT-ALAT-MASAK');
     expect(stored().categories.at(-1)).toMatchObject({ categoryId: 'CAT-ALAT-MASAK', name: 'Alat Masak' });
   });
 
@@ -222,28 +228,5 @@ describe('export', () => {
     const parsed = parseItems(toItemsCsv(stored().items));
     expect(parsed.quarantined).toEqual([]);
     expect(parsed.ok[0]).toMatchObject({ name: 'Sabun', initialStock: 12, kind: 'consumable' });
-  });
-});
-
-describe('finding a row in a long list', () => {
-  it('the search box appears only once the list is long enough to need it', () => {
-    const r = render(Harness);
-    for (let n = 1; n <= 5; n += 1) addItem(r, `Barang ${n}`, '1');
-    expect(r.queryByLabelText('Cari barang')).toBeNull();
-    addItem(r, 'Sabun cuci', '1');
-    expect(r.getByLabelText('Cari barang')).toBeTruthy();
-  });
-
-  it('filters the list, and says so when nothing matches', () => {
-    const r = render(Harness);
-    for (let n = 1; n <= 5; n += 1) addItem(r, `Barang ${n}`, '1');
-    addItem(r, 'Sabun cuci', '1');
-
-    type(r.getByLabelText('Cari barang'), 'sabun');
-    expect(r.getByText('Sabun cuci')).toBeTruthy();
-    expect(r.queryByText('Barang 1')).toBeNull();
-
-    type(r.getByLabelText('Cari barang'), 'zzz');
-    expect(r.getByText(/Tidak ada yang cocok/)).toBeTruthy();
   });
 });

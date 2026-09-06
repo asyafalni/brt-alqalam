@@ -1,8 +1,8 @@
 import { useMemo } from 'octane';
 import type { Category, Item } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
-import { CARD } from '../stocktake/ItemForm';
-import { resolveScan, statusBadge } from './resolve';
+import { Button, CARD, CODE } from '../../components/ui';
+import { PILL, resolveScan, statusBadge } from './resolve';
 
 interface Props {
   target: 'item' | 'asset';
@@ -22,26 +22,20 @@ export function ScanResult(p: Props) {
 
   if (!resolution.found) {
     return (
-      <main class="mx-auto max-w-2xl p-4">
-        <div class={`${CARD} border-2 border-destructive p-6 text-center`} role="alert">
-          <h1 class="mb-2 text-2xl font-bold">
+      <div class="mx-auto max-w-2xl space-y-6 pt-6">
+        <div class={`${CARD} border-red-100 text-center`} role="alert">
+          <h1 class="mb-2 text-2xl font-bold text-slate-900">
             {resolution.reason === 'no-catalog' ? 'Katalog masih kosong' : 'Label tidak dikenal'}
           </h1>
-          <p class="mb-1 text-muted-foreground">
+          <p class="mb-1 text-slate-500">
             {resolution.reason === 'no-catalog'
               ? 'Belum ada barang yang dicatat di perangkat ini.'
               : 'Label ini tidak ada di katalog. Mungkin dicetak dari daftar yang berbeda.'}
           </p>
-          <p class="mb-5 font-mono text-sm">{resolution.id}</p>
-          <button
-            type="button"
-            class="min-h-touch rounded-xl bg-primary px-6 font-semibold text-primary-foreground"
-            onClick={p.onBack}
-          >
-            Buka Opname Gudang
-          </button>
+          <p class="mb-5 font-mono text-sm text-slate-400">{resolution.id}</p>
+          <Button size="touch" onClick={p.onBack}>Buka Opname Gudang</Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -49,45 +43,37 @@ export function ScanResult(p: Props) {
   const { item, instance } = resolution;
 
   return (
-    <main class="mx-auto max-w-2xl p-4">
+    <div class="mx-auto max-w-2xl space-y-4 pt-6">
       {/* The scan guard (§15.3): what it is and what state it is in, BEFORE any action —
           so a duplicate scan cannot quietly become a duplicate withdrawal. */}
-      <div class={`${CARD} p-6`}>
-        <p class="mb-1 text-sm font-semibold text-muted-foreground">{resolution.categoryName}</p>
-        <h1 class="text-3xl font-bold tracking-tight">{instance?.label ?? item.name}</h1>
+      <div class={CARD}>
+        <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          {resolution.categoryName}
+        </p>
+        <h1 class="text-2xl font-bold text-slate-900">{instance?.label ?? item.name}</h1>
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span class={`rounded-full px-4 py-2 font-bold ${badge.chip}`}>
-            {badge.label}
-          </span>
+          <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
           {!instance && (
-            <span class="text-2xl font-bold tabular-nums">
+            <span class="text-2xl font-bold tabular-nums text-slate-900">
               {resolution.qty}{' '}
-              <span class="text-base font-normal text-muted-foreground">{item.unit}</span>
+              <span class="text-base font-normal text-slate-400">{item.unit}</span>
             </span>
           )}
         </div>
 
-        <p class="mt-4 font-mono text-sm text-muted-foreground">
-          {instance?.assetId ?? item.barcode}
-        </p>
+        <p class={`mt-4 ${CODE}`}>{instance?.assetId ?? item.barcode}</p>
       </div>
 
-      <div class={`${CARD} mt-4 p-5`}>
-        <p class="text-muted-foreground">
-          <strong class="text-foreground">Belum bisa mencatat keluar/masuk.</strong>{' '}
+      <div class={`${CARD} border-sky-100 bg-gradient-to-br from-white to-sky-50/30`}>
+        <p class="text-sm text-slate-600">
+          <span class="font-bold text-slate-900">Belum bisa mencatat keluar/masuk.</span>{' '}
           Transaksi ditulis lewat gateway, dan gateway belum terpasang. Sementara ini layar
           pindai hanya menampilkan status.
         </p>
       </div>
 
-      <button
-        type="button"
-        class="mt-4 min-h-touch w-full rounded-xl border-2 border-border font-semibold"
-        onClick={p.onBack}
-      >
-        Kembali
-      </button>
-    </main>
+      <Button variant="outline" size="touch" class="w-full" onClick={p.onBack}>Kembali</Button>
+    </div>
   );
 }

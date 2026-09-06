@@ -2,12 +2,8 @@ import { useRef, useState } from 'octane';
 import type { Category } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
+import { CARD, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 
-export const CARD = 'rounded-2xl border border-border bg-card text-card-foreground';
-export const LABEL = 'block text-sm font-semibold text-muted-foreground mb-1.5';
-export const FIELD =
-  'w-full min-h-touch rounded-xl border-2 border-input bg-background px-4 text-lg ' +
-  'outline-none focus:border-primary';
 
 interface Props {
   input: DraftInput;
