@@ -1,0 +1,116 @@
+// Stock-take (opname) — pure logic. No framework, no storage, no DOM.
+//
+// Phase 1 of the inverted roadmap (design doc §59): both the gudang and the records are a
+// mess, so there is no catalog for a checkout flow to stand on. This is the screen that
+// builds one — walk the room, add what you find, count it, label it.
+//
+// The draft IS `domain/Item[]`. Nothing new is invented: what the marbot types is exactly
+// what the Items sheet holds, so the export round-trips through the real parser.
+
+import type { Item, Kind, TrackBy } from '../../../../domain/types';
+
+/** What the operator actually fills in. Everything else is derived. */
+export interface DraftInput {
+  name: string;
+  categoryId: string;
+  unit: string;
+  kind: Kind;
+  initialStock: number;
+  /** Setting Minimum. `null` = "(-)", i.e. never notify. */
+  minStock: number | null;
+  /** Optional override; defaults from `kind` (design doc §50). */
+  trackBy?: TrackBy;
+}
+
+const PREFIX = 'ITM-';
+const pad = (n: number) => String(n).padStart(4, '0');
+
+/**
+ * Next free id, continuing from the highest existing one rather than the count — so
+ * deleting a row mid-walk can never resurrect an id that was already printed on a label.
+ */
+export function nextItemId(existing: readonly Item[]): string {
+  const highest = existing.reduce((max, i) => {
+    const m = /^ITM-(\d+)$/.exec(i.itemId);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  return PREFIX + pad(highest + 1);
+}
+
+export function createItem(input: DraftInput, existing: readonly Item[]): Item {
+  const itemId = nextItemId(existing);
+  return {
+    itemId,
+    barcode: `ALQ-${itemId}`,
+    name: input.name.trim(),
+    categoryId: input.categoryId,
+    kind: input.kind,
+    unit: input.unit.trim(),
+    trackBy: input.trackBy ?? (input.kind === 'consumable' ? 'quantity' : 'instance'),
+    minStock: input.minStock,
+    initialStock: input.initialStock,
+    active: true,
+  };
+}
+
+export interface DraftProblem { field: keyof DraftInput; message: string }
+
+/** Validation the operator sees, in their language. Blocking only on what truly cannot be fixed later. */
+export function validate(input: DraftInput, existing: readonly Item[]): DraftProblem[] {
+  const problems: DraftProblem[] = [];
+  const name = input.name.trim();
+
+  if (name === '') problems.push({ field: 'name', message: 'Nama barang belum diisi' });
+  if (input.categoryId === '') problems.push({ field: 'categoryId', message: 'Kategori belum dipilih' });
+  if (input.unit.trim() === '') problems.push({ field: 'unit', message: 'Satuan belum diisi' });
+
+  if (!Number.isFinite(input.initialStock) || input.initialStock < 0) {
+    problems.push({ field: 'initialStock', message: 'Jumlah tidak boleh kurang dari 0' });
+  }
+  if (input.minStock != null && (!Number.isFinite(input.minStock) || input.minStock < 0)) {
+    problems.push({ field: 'minStock', message: 'Minimum tidak boleh kurang dari 0' });
+  }
+
+  // A warning, not a block: duplicates are real ("Pisau" on two racks) and the marbot
+  // decides. Surfacing it beats silently creating a second row nobody reconciles.
+  if (name !== '' && existing.some((i) => i.name.toLowerCase() === name.toLowerCase())) {
+    problems.push({ field: 'name', message: `"${name}" sudah ada di daftar — tetap tambah?` });
+  }
+  return problems;
+}
+
+/** True blockers only — the duplicate-name warning does not stop a save. */
+export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tetap tambah?');
+
+// ---------------------------------------------------------------------------
+// Export — must match sheets/Items.csv exactly, because it is imported into that tab.
+// ---------------------------------------------------------------------------
+
+const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active';
+
+const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
+export function toItemsCsv(items: readonly Item[]): string {
+  const rows = items.map((i) => [
+    i.itemId,
+    i.barcode,
+    i.name,
+    i.categoryId,
+    i.kind,
+    i.unit,
+    i.trackBy,
+    i.minStock == null ? '(-)' : String(i.minStock),
+    String(i.initialStock),
+    i.active ? 'TRUE' : 'FALSE',
+  ].map(cell).join(','));
+  return [ITEMS_HEADER, ...rows].join('\n') + '\n';
+}
+
+/** Progress line for the header — the only number that matters while walking. */
+export function summarise(items: readonly Item[]): { count: number; categories: number; units: number } {
+  return {
+    count: items.length,
+    categories: new Set(items.map((i) => i.categoryId)).size,
+    units: items.reduce((s, i) => s + i.initialStock, 0),
+  };
+}

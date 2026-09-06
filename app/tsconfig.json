@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["vite/client"],
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  },
+  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts", "../domain/*.ts", "../data/*.ts"]
+}

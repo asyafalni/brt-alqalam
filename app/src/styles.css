@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   TOKEN LAYER
+   SmartInv ships no design tokens at all (docs/SMARTINV-REUSE-MAP.md): its
+   tailwind.config.js extends only fontFamily, there are no CSS variables, no
+   dark mode, and every colour is a stock utility or one of eight inline hex
+   literals. So the layer below is AUTHORED, following shadcn's token names and
+   shape, in Tailwind 4's CSS-first form. Decision recorded in Part XVI §63.
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.19 0.02 255);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.96 0.005 250);
+  --muted-foreground: oklch(0.44 0.02 255);
+  --primary: oklch(0.46 0.13 195);
+  --primary-foreground: oklch(0.99 0.005 195);
+  --border: oklch(0.87 0.008 250);
+  --input: oklch(0.87 0.008 250);
+  --ring: var(--primary);
+  --destructive: oklch(0.52 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* FIELD-OPS EXTENSION — the seven-status colour language.
+     Justified by a written need (Part IV/XVI): rusak and hilang are different
+     outcomes demanding different actions, so they must never share a colour.
+     SmartInv ships three status colours; the model needs seven. */
+  --status-tersedia: oklch(0.55 0.15 150);   /* available            */
+  --status-menipis:  oklch(0.70 0.16 75);    /* low — near minimum   */
+  --status-habis:    oklch(0.50 0.15 25);    /* out — zero stock     */
+  --status-dipinjam: oklch(0.55 0.15 250);   /* out on loan          */
+  --status-rusak:    oklch(0.58 0.17 45);    /* broken — repairable  */
+  --status-hilang:   oklch(0.42 0.17 15);    /* lost — written off   */
+  --status-pensiun:  oklch(0.55 0.01 260);   /* retired              */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: oklch(0.17 0.015 255);
+    --foreground: oklch(0.97 0.005 250);
+    --card: oklch(0.22 0.018 255);
+    --card-foreground: var(--foreground);
+    --muted: oklch(0.26 0.015 255);
+    --muted-foreground: oklch(0.72 0.015 255);
+    --primary: oklch(0.72 0.13 195);
+    --primary-foreground: oklch(0.17 0.02 255);
+    --border: oklch(0.32 0.015 255);
+    --input: oklch(0.32 0.015 255);
+    --destructive: oklch(0.62 0.19 27);
+
+    --status-tersedia: oklch(0.72 0.16 150);
+    --status-menipis:  oklch(0.80 0.16 75);
+    --status-habis:    oklch(0.65 0.18 25);
+    --status-dipinjam: oklch(0.70 0.14 250);
+    --status-rusak:    oklch(0.72 0.16 45);
+    --status-hilang:   oklch(0.58 0.18 15);
+    --status-pensiun:  oklch(0.65 0.01 260);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-tersedia: var(--status-tersedia);
+  --color-menipis: var(--status-menipis);
+  --color-habis: var(--status-habis);
+  --color-dipinjam: var(--status-dipinjam);
+  --color-rusak: var(--status-rusak);
+  --color-hilang: var(--status-hilang);
+  --color-pensiun: var(--status-pensiun);
+
+  /* FIELD-OPS EXTENSION — touch targets. 56px, not the usual 44px: the device
+     is a shared tablet handled with wet or gloved hands in a gudang. */
+  --spacing-touch: 3.5rem;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  /* 17px base, not 16 — read at arm's length, sometimes in sunlight. */
+  font: 400 17px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Never let a mis-tap zoom the kiosk. */
+input, select, textarea, button { font: inherit; }
+input, select, textarea { font-size: max(16px, 1em); }
+
+:where(button, [role="button"], a):focus-visible,
+:where(input, select, textarea):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
