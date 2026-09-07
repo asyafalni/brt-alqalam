@@ -10,8 +10,18 @@
  * produces at render time (design doc §30).
  */
 
+/*
+ * `locationId` is not optional decoration — it says WHICH SHELF a movement came off, and the
+ * whole of Part XXI rests on it. Without the column the gateway appends every row without one,
+ * so every withdrawal folds onto the unplaced pile and the register quietly reports that
+ * nothing was ever taken from any rack.
+ *
+ * It was missing here, in `sheets/Transactions.csv`, and from `checkSpreadsheet` — and the
+ * checker therefore reported "header matches", because both sides were wrong in the same way.
+ * A checker that agrees with the mistake is the deepest version of this bug.
+ */
 var TXN_COLUMNS = [
-  'txnId', 'clientTxnId', 'ts', 'type', 'itemId', 'assetId', 'qtyDelta',
+  'txnId', 'clientTxnId', 'ts', 'type', 'itemId', 'assetId', 'locationId', 'qtyDelta',
   'recipient', 'actorUserId', 'condition', 'note', 'toStatus', 'reversesTxnId',
 ];
 
@@ -87,6 +97,11 @@ function readPublicState() {
     categories: readTab('Categories'),
     locations: readTab('Locations'),
     items: readTab('Items'),
+    /* Quantity does NOT live on an item any more (design doc Part XXI): a thing kept on two
+       racks has two figures, and `Items` carries none of them. Without this tab the public
+       dashboard would show a catalog with every count at zero — which reads as an empty
+       masjid rather than as a missing tab. */
+    stock: readTab('Stock'),
     instances: readTab('AssetInstances'),
     txns: readTab('Transactions').map(function (t) {
       var copy = {};
@@ -106,26 +121,74 @@ function readDetailedState() {
     categories: readTab('Categories'),
     locations: readTab('Locations'),
     items: readTab('Items'),
+    stock: readTab('Stock'),
     instances: readTab('AssetInstances'),
+    /* Requests are in THIS tier only, never the public one: `requestedBy`, `decidedBy` and the
+       decision note all name real people, and §39 puts the public dashboard on stock levels,
+       low-stock and status counts alone. */
+    requests: readTab('Requests'),
     txns: readTab('Transactions'),
     serverTs: new Date().toISOString(),
     tier: 'detailed',
   };
 }
 
-/** Run from the editor after importing the tabs — fails loudly if anything is missing. */
+/**
+ * Every tab this gateway reads, with the header each one must have.
+ *
+ * The lists are the ones in `sheets/*.csv`, and they are checked column FOR column rather than
+ * "does a tab exist": a header that is merely close quarantines every row underneath it, and
+ * that is discovered months later, from the shelf.
+ */
+var REQUIRED_TABS = {
+  Categories: ['categoryId', 'name', 'order', 'active'],
+  Locations: ['locationId', 'code', 'name', 'zone', 'order', 'active', 'artId'],
+  Items: ['itemId', 'barcode', 'name', 'categoryId', 'kind', 'unit', 'trackBy', 'minStock',
+    'active', 'keterangan', 'artId'],
+  Stock: ['itemId', 'locationId', 'initialStock'],
+  AssetInstances: ['assetId', 'itemId', 'label', 'acquiredTs', 'active'],
+  Requests: ['requestId', 'type', 'name', 'itemId', 'assetId', 'qty', 'unit', 'price', 'reason',
+    'url', 'status', 'requestedBy', 'requestedTs', 'decidedBy', 'decidedTs', 'note'],
+  Transactions: TXN_COLUMNS,
+};
+
+/**
+ * Run from the editor after importing the tabs — fails loudly if anything is missing.
+ *
+ * It used to check five tabs and one header, and reported OK while `Stock` and `Requests` went
+ * unexamined — the two newest, and the ones most likely to be absent from a sheet imported
+ * before they existed. A checker that passes on a sheet the app cannot use is worse than no
+ * checker: it converts a loud failure into a quiet one.
+ */
 function checkSpreadsheet() {
-  ['Categories', 'Locations', 'Items', 'AssetInstances', 'Transactions'].forEach(function (name) {
+  var problems = 0;
+
+  Object.keys(REQUIRED_TABS).forEach(function (name) {
+    var wanted = REQUIRED_TABS[name];
+    var sheet;
     try {
-      var rows = readTab(name);
-      Logger.log('OK   ' + name + ' — ' + rows.length + ' rows');
+      sheet = sheetNamed(name);
     } catch (e) {
       Logger.log('FAIL ' + name + ' — ' + e.message);
+      problems += 1;
+      return;
+    }
+
+    var rows = readTab(name);
+    var headers = sheet.getRange(1, 1, 1, wanted.length).getValues()[0];
+    var mismatch = wanted.filter(function (c, i) { return String(headers[i]).trim() !== c; });
+
+    if (mismatch.length) {
+      Logger.log('FAIL ' + name + ' — header does not match at: ' + mismatch.join(', '));
+      Logger.log('       expected: ' + wanted.join(','));
+      Logger.log('       found:    ' + headers.join(','));
+      problems += 1;
+    } else {
+      Logger.log('OK   ' + name + ' — ' + rows.length + ' rows, header matches');
     }
   });
-  var headers = txnSheet().getRange(1, 1, 1, TXN_COLUMNS.length).getValues()[0];
-  var mismatch = TXN_COLUMNS.filter(function (c, i) { return String(headers[i]).trim() !== c; });
-  Logger.log(mismatch.length
-    ? 'FAIL Transactions header mismatch at: ' + mismatch.join(', ')
-    : 'OK   Transactions header matches');
+
+  Logger.log(problems
+    ? problems + ' PROBLEM(S). Fix these before deploying — the app cannot read past them.'
+    : 'All ' + Object.keys(REQUIRED_TABS).length + ' tabs present and correct.');
 }

@@ -270,3 +270,27 @@ describe('parseRequests', () => {
     expect(r.ok[0]).toMatchObject({ type: 'perbaikan', assetId: 'AST-9-2', unit: '' });
   });
 });
+
+describe('a movement remembers which shelf it came off', () => {
+  // The column was missing from `sheets/Transactions.csv` and from the gateway's own column
+  // list — and `checkSpreadsheet()` reported "header matches" because both were wrong the same
+  // way. Every withdrawal would have folded onto the unplaced pile, and the register would have
+  // said nothing was ever taken from any rack.
+  const HEADER = 'txnId,clientTxnId,ts,type,itemId,assetId,locationId,qtyDelta,recipient,'
+    + 'actorUserId,condition,note,toStatus,reversesTxnId\n';
+
+  it('reads the rack a quantity came from', () => {
+    const r = parseTxns(HEADER
+      + 'T1,c1,2026-09-06T13:45:00Z,pemakaian,ITM-S,,LOC-A1,-2,,u1,,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].locationId).toBe('LOC-A1');
+  });
+
+  it('still reads a log written before the column existed', () => {
+    // Those rows fold onto the unplaced pile, which is visibly wrong rather than quietly wrong
+    // (§87) — and quarantining them over a column we added ourselves would be worse.
+    const r = parseTxns(TXN_HEADER + 'T1,c1,2026-09-06T13:45:00Z,pemakaian,ITM-S,,-2,,u1,,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].locationId).toBeUndefined();
+  });
+});

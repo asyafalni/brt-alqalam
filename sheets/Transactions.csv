@@ -1,1 +1,1 @@
-txnId,clientTxnId,ts,type,itemId,assetId,qtyDelta,recipient,actorUserId,condition,note,toStatus,reversesTxnId
+txnId,clientTxnId,ts,type,itemId,assetId,locationId,qtyDelta,recipient,actorUserId,condition,note,toStatus,reversesTxnId

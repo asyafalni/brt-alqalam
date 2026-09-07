@@ -50,15 +50,23 @@ Everything else — opname, racks, labels, stock, cycle counts — works fine ov
 
 ## Stage 1 — Google Spreadsheet 📋 *(~10 minutes)*
 
-**Create one spreadsheet** named e.g. `BRT Inventaris — Masjid Al-Qalam`, with **four tabs**
+**Create one spreadsheet** named e.g. `BRT Inventaris — Masjid Al-Qalam`, with **seven tabs**
 named exactly:
 
 | Tab | Written by |
 | --- | --- |
 | `Categories` | you, by hand |
-| `Items` | you + the stock-take export |
+| `Locations` | you + the stock-take export — the racks |
+| `Items` | you + the stock-take export — the catalog, **with no quantities on it** |
+| `Stock` | the stock-take export — one row per (barang × rak). **This is where quantity lives** |
 | `AssetInstances` | you / the label tool (only for individually-labelled durables) |
+| `Requests` | the Pengajuan screen |
 | `Transactions` | **the gateway only — never edit or delete a row** |
+
+> **It was four tabs when this was written, and that is the point.** `Stock` arrived with
+> per-rack quantities (Part XXI) and `Requests` with Pengajuan (Part XXIII). A sheet imported
+> from the old list has a catalog with no quantities anywhere — which renders as an empty
+> masjid, not as a missing tab. `checkSpreadsheet()` now checks all seven, column for column.
 
 **Import, don't type.** Headers must match `data/parse.ts` exactly; one typo quarantines every
 row. For each file in `sheets/`:
@@ -252,7 +260,7 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 ## Checklist
 
 - [x] **Stage 0** — run `cd app && npm run dev`, walk the gudang *(nothing to prepare)*
-- [ ] **Stage 1** — create the spreadsheet, import the four tabs from `sheets/`, **don't publish**
+- [ ] **Stage 1** — create the spreadsheet, import **all seven** tabs from `sheets/`, **don't publish**
 - [ ] **Stage 1** — send me the spreadsheet ID
 - [x] **Stage 2** — ~~check Clerk → Configure → JWT Templates~~ **available on the free plan**
 - [x] **Stage 2** — app created, **Email + Username** both enabled *(a marbot may have no email,
