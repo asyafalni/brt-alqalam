@@ -41,7 +41,9 @@ describe('Laporan', () => {
     expect(r.getByText('Kualitas data')).toBeTruthy();
     expect(r.getByText(/1 belum ditempatkan/)).toBeTruthy();
     expect(r.getByText(/1 tanpa minimum/)).toBeTruthy();
-    expect(r.getByText('50%')).toBeTruthy();   // half placed, half monitored
+    // The trust score itself, addressed through the ring's label rather than its text, so
+    // this asserts the score and not whichever other row happens to also read 50%.
+    expect(r.getByRole('img', { name: /Skor kualitas data 50 persen/ })).toBeTruthy();
   });
 
   it('calls an unchecked rack unknown rather than fine', () => {

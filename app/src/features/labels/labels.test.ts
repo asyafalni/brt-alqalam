@@ -147,11 +147,11 @@ describe('racks get their own label — what §14.2 actually asked for', () => {
 });
 
 describe('sheet arithmetic', () => {
-  const besar = SHEET_FORMATS[0];
+  const besar = SHEET_FORMATS.find((f) => f.id === 'rak')!;
 
   it('knows how many fit on a page', () => {
     expect(perSheet(besar)).toBe(24);
-    expect(perSheet(SHEET_FORMATS[1])).toBe(40);
+    expect(perSheet(SHEET_FORMATS.find((f) => f.id === 'tag')!)).toBe(40);
   });
 
   it('rounds up — a part-full page is still a page of stickers', () => {

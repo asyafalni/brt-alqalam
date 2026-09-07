@@ -147,3 +147,53 @@ describe('percent', () => {
     expect(percent(0, 0)).toBe(0);
   });
 });
+
+// --- Rusak and hilang -----------------------------------------------------------------------
+//
+// The two sections management acts on. They exist to answer "what do we repair" and "what do we
+// re-buy" — questions the boss asked for directly — and they must answer them without naming a
+// person, because this sheet is printed and handed over (§39).
+
+describe('buildReport — aset rusak & hilang', () => {
+  const pisau = item({
+    itemId: 'ITM-P', name: 'Pisau potong', kind: 'equipment', trackBy: 'instance', initialStock: 3,
+  });
+  const asset = (n: number) => ({
+    assetId: `A-${n}`, itemId: 'ITM-P', label: `Pisau potong #${n}`, acquiredTs: 0, active: true,
+  });
+  const move = (p: Partial<Txn>): Txn => ({
+    txnId: p.txnId!, clientTxnId: p.txnId!, ts: p.ts!, type: p.type!,
+    assetId: p.assetId, qtyDelta: 0, actorUserId: 'u', ...p,
+  });
+
+  const trouble = () => {
+    const txns = [
+      move({ txnId: 'T1', ts: NOW - DAY * 29, type: 'peminjaman', assetId: 'A-1', recipient: 'Panitia Qurban' }),
+      move({ txnId: 'T2', ts: NOW - DAY * 28, type: 'pengembalian', assetId: 'A-1', condition: 'hilang', recipient: 'Panitia Qurban' }),
+      move({ txnId: 'T3', ts: NOW - DAY * 20, type: 'peminjaman', assetId: 'A-2', recipient: 'Panitia Qurban' }),
+      move({ txnId: 'T4', ts: NOW - DAY * 14, type: 'pengembalian', assetId: 'A-2', condition: 'rusak', recipient: 'Panitia Qurban' }),
+    ];
+    const derived = deriveState([pisau], [asset(1), asset(2), asset(3)], txns, NOW);
+    return buildReport([pisau], [], (id) => NAMES[id] ?? id, derived, NOW);
+  };
+
+  it('keeps the repair queue and the write-off list apart', () => {
+    const r = trouble();
+    expect(r.broken.map((b) => b.assetId)).toEqual(['A-2']);
+    expect(r.lost.map((b) => b.assetId)).toEqual(['A-1']);
+    // Lost leaves the active asset base; broken is still ours and still here (Part IV).
+    expect(r.activeAssets).toBe(2);
+  });
+
+  it('names the thing, never the person who had it', () => {
+    const printed = JSON.stringify(trouble());
+    expect(printed).toContain('Pisau potong');
+    expect(printed).not.toContain('Panitia Qurban');
+  });
+
+  it('says when it went wrong, so the oldest problem can sort first', () => {
+    const r = trouble();
+    expect(r.lost[0].since).toBe(NOW - DAY * 28);
+    expect(r.broken[0].since).toBe(NOW - DAY * 14);
+  });
+});

@@ -15,7 +15,13 @@ import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { instancesFor } from '../stocktake/draft';
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
-import { itemIcon } from './itemIcon';
+import { artFor, ItemArt } from './ItemArt';
+import { ItemPhotos } from './ItemPhotos';
+import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
+
+/* One store for the whole app, created once. Building it per render would open a fresh
+   IndexedDB connection every time somebody opened an item. */
+const photoStore = createIndexedDbPhotoStore();
 
 const when = (ts: number) =>
   new Date(ts).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
@@ -88,7 +94,7 @@ export function ItemDetail(
   const derived = inventory.derived.items[item.itemId];
   const badge = itemStatusBadge(derived?.status ?? 'available');
   const categoryName = draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '';
-  const Icon = itemIcon(item, categoryName);
+  const art = artFor(item, categoryName);
   const rack = draft.locations.find((l) => l.locationId === item.locationId);
 
   const instances = useMemo(
@@ -143,9 +149,12 @@ export function ItemDetail(
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div class={`${CARD} sm:col-span-2`}>
           <div class="flex items-start gap-4">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <Icon class="h-7 w-7 text-slate-500" />
-            </div>
+            {/* Big here on purpose. This is the one screen with room for it, and the
+                illustration is what makes an item recognisable before it is read — the same
+                asset as the 36px row, drawn as filled shapes so it holds up at this size
+                instead of becoming a large thin outline. */}
+            <ItemArt art={art} size={96} class="hidden sm:block" />
+            <ItemArt art={art} size={64} class="sm:hidden" />
             <div class="min-w-0 flex-1">
               <div class="mb-2 flex flex-wrap items-center gap-3">
                 <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
@@ -234,6 +243,10 @@ export function ItemDetail(
           </ul>
         </section>
       )}
+
+      {/* Above the history, below the identity: a photo answers "is this the one?", which is a
+          question asked before "what happened to it?" and after "what is it?". */}
+      <ItemPhotos itemId={item.itemId} itemName={item.name} store={photoStore} />
 
       <section class={CARD_FLUSH}>
         <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/50 p-4">

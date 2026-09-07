@@ -85,7 +85,7 @@ export function ItemForm(p: Props) {
                 stop the walk — that is exactly when a stock-take gets abandoned. */}
             <button
               type="button"
-              class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+              class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
               onClick={() => setNewCategory('')}
               aria-label="Tambah kategori baru"
               title="Tambah kategori baru"
@@ -112,7 +112,7 @@ export function ItemForm(p: Props) {
               </button>
               <button
                 type="button"
-                class="min-h-touch shrink-0 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
+                class="min-h-touch shrink-0 rounded-lg border border-slate-400 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => setNewCategory(null)}
               >
                 Batal
@@ -158,7 +158,7 @@ export function ItemForm(p: Props) {
           </select>
           <button
             type="button"
-            class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+            class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
             onClick={() => setNewRack({ code: '', zone: p.locations.at(-1)?.zone ?? 'Gudang Utama' })}
             aria-label="Tambah rak baru"
             title="Tambah rak baru"
@@ -193,7 +193,7 @@ export function ItemForm(p: Props) {
             </button>
             <button
               type="button"
-              class="min-h-touch shrink-0 rounded-lg border border-slate-200 px-4 font-semibold text-slate-600"
+              class="min-h-touch shrink-0 rounded-lg border border-slate-400 px-4 font-semibold text-slate-600"
               onClick={() => setNewRack(null)}
             >
               Batal
@@ -265,7 +265,7 @@ export function ItemForm(p: Props) {
               <Stepper id="minimum" value={p.input.minStock} onChange={(v) => p.onChange('minStock', v)} />
               <button
                 type="button"
-                class="min-h-touch shrink-0 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
+                class="min-h-touch shrink-0 rounded-lg border border-slate-400 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => p.onChange('minStock', null)}
                 title="Tanpa minimum"
               >
@@ -302,7 +302,7 @@ function Choice(
       aria-pressed={active}
       class={
         'min-h-touch rounded-lg border px-4 py-3 text-left transition-colors ' +
-        (active ? 'border-slate-900 bg-slate-900/5' : 'border-slate-200 bg-white hover:bg-slate-50')
+        (active ? 'border-slate-900 bg-slate-900/5' : 'border-slate-400 bg-white hover:bg-slate-50')
       }
       onClick={onPick}
     >
@@ -318,7 +318,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
     <div class="flex items-stretch gap-2">
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(-1)}
         aria-label="Kurangi"
       >
@@ -336,7 +336,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
       />
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(1)}
         aria-label="Tambah"
       >

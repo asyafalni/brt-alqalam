@@ -19,7 +19,7 @@ import { CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { instanceStatusBadge, PILL } from '../scan/resolve';
-import { itemIcon } from '../items/itemIcon';
+import { artFor, ItemArt } from '../items/ItemArt';
 
 /**
  * Desktop column shaping, in the only place a caller can reach it: `DataTable` takes no
@@ -183,14 +183,15 @@ function Section(
       mobile: 'title',
       cell: (d) => {
         const item = itemOf(d);
-        const Ic = item
-          ? itemIcon(item, draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '')
-          : Package;
+        const art = artFor(
+          item ?? { name: d.instance.label, unit: '', kind: 'equipment' },
+          item ? draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '' : '',
+        );
         // The width floor is a desk-only concern: it stops the name column collapsing to its
         // text while the slack pools elsewhere. A phone has no slack to give.
         return (
           <div class="flex items-center gap-3 sm:min-w-[14rem]">
-            <Ic class="h-5 w-5 shrink-0 text-slate-400" />
+            <ItemArt art={art} size={32} />
             <div class="min-w-0">
               <p class="truncate text-sm font-bold text-slate-900">{d.instance.label}</p>
               <p class={`${CODE} truncate`}>{d.instance.assetId}</p>

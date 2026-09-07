@@ -6,9 +6,9 @@
 // the template's value (it has no token layer at all).
 
 // --- Card — SmartInv components/Card.tsx:17-19 -----------------------------------------
-export const CARD = 'rounded-lg p-5 bg-white shadow-sm border border-slate-100';
+export const CARD = 'rounded-lg p-5 bg-white shadow-sm border border-slate-200';
 /** Card with its own padding removed, for tables — Inventory.tsx:100. */
-export const CARD_FLUSH = 'rounded-lg bg-white shadow-sm border border-slate-100 p-0 overflow-hidden';
+export const CARD_FLUSH = 'rounded-lg bg-white shadow-sm border border-slate-200 p-0 overflow-hidden';
 
 export function Card({ children, class: cls = '' }: { children?: unknown; class?: string }) {
   return <div class={`${CARD} ${cls}`}>{children}</div>;
@@ -34,18 +34,18 @@ export function PageHeader(
 // handled with wet hands needs 56px (design doc Part XVI). Everything else is verbatim.
 const BUTTON_BASE =
   'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ' +
-  'rounded-lg focus:outline-none active:scale-95 disabled:opacity-50 disabled:pointer-events-none';
+  'rounded-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none';
 
 // DOSS's restraint applied where it costs nothing: the primary action is black on beige,
 // the highest-contrast pairing available, leaving colour free to mean *status*.
 const VARIANT = {
   primary: 'bg-slate-900 text-slate-50 hover:bg-slate-800 shadow-sm',
-  secondary: 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-100',
+  secondary: 'bg-white text-slate-900 border border-slate-400 hover:bg-slate-100',
   danger: 'bg-red-500 text-white hover:bg-red-600',
   ghost: 'bg-transparent hover:bg-slate-100 text-slate-600',
   success: 'bg-[#22C55E] text-white',
   warning: 'bg-[#F59E0B] text-white',
-  outline: 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50',
+  outline: 'bg-white border border-slate-400 text-slate-700 hover:bg-slate-50',
 } as const;
 
 const SIZE = {
@@ -76,8 +76,8 @@ export function Button(props: {
 // --- Input — SmartInv components/Input.tsx:12-25 ----------------------------------------
 export const LABEL = 'block text-sm font-medium text-slate-700 mb-1.5';
 export const FIELD =
-  'w-full px-4 rounded-lg border border-slate-200 bg-white text-slate-900 transition-all ' +
-  'duration-200 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 ' +
+  'w-full px-4 rounded-lg border border-slate-400 bg-white text-slate-900 transition-all ' +
+  'duration-200 focus:ring-2 focus:ring-slate-900/40 focus:border-slate-900 ' +
   'placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
 export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
 export const ERROR_TEXT = 'mt-1.5 text-xs text-red-500 font-medium';

@@ -14,7 +14,7 @@ import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader } from '../../components/ui';
 import { itemStatusBadge, PILL } from '../scan/resolve';
-import { itemIcon } from '../items/itemIcon';
+import { artFor, ItemArt } from '../items/ItemArt';
 
 export function Dashboard(
   { draft, inventory, now, onNavigate }:
@@ -185,14 +185,16 @@ export function Dashboard(
             {inventory.notifications.slice(0, 6).map((n) => {
               const d = inventory.derived.items[n.itemId];
               const badge = itemStatusBadge(d?.status ?? 'low');
-              const Icon = d ? itemIcon(d.item, categoryNameOf(d.item.categoryId)) : Package;
+              const art = d
+                ? artFor(d.item, categoryNameOf(d.item.categoryId))
+                : ('default' as const);
               return (
                 // Stacked on a phone so the name gets the full width: truncating "Kantong
                 // daging" to "Kantong dagi…" to protect a pill is the wrong trade — the name
                 // is the only part that tells you what to go and buy.
                 <li key={n.itemId} class="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-3">
                   <div class="flex min-w-0 flex-1 items-center gap-3">
-                    <Icon class="h-4 w-4 shrink-0 text-slate-400" />
+                    <ItemArt art={art} size={28} />
                     <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
                   </div>
                   <div class="flex items-center gap-3 pl-7 sm:pl-0">
@@ -255,7 +257,7 @@ const CHIP_TONE = {
   amber: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
   orange: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
   rose: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100',
-  slate: 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50',
+  slate: 'bg-white text-slate-700 border-slate-400 hover:bg-slate-50',
 } as const;
 
 function Chip(

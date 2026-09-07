@@ -19,7 +19,7 @@ import {
 } from './draft';
 import type { DraftInput } from './draft';
 import { ItemForm } from './ItemForm';
-import { itemIcon } from '../items/itemIcon';
+import { artFor, ItemArt } from '../items/ItemArt';
 
 const emptyInput = (categories: Category[]): DraftInput => ({
   name: '', categoryId: categories[0]?.categoryId ?? '', unit: 'buah',
@@ -118,10 +118,9 @@ export function StockTake(
       header: 'Barang',
       mobile: 'title',
       cell: (i) => {
-        const Icon = itemIcon(i, categoryName(i.categoryId));
         return (
           <div class="flex min-w-0 items-center gap-3">
-            <Icon class="h-5 w-5 shrink-0 text-slate-400" />
+            <ItemArt art={artFor(i, categoryName(i.categoryId))} size={36} />
             <div class="min-w-0 max-w-[24rem]">
               <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
               <p class={`${CODE} truncate`}>{i.barcode}</p>

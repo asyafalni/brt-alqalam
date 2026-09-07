@@ -7,6 +7,8 @@
 import type { Category, Item, Location } from '../../../../domain/types';
 import { instancesFor } from '../stocktake/draft';
 
+export type LabelKind = 'rack' | 'item' | 'asset';
+
 export interface LabelSpec {
   /** Stable key and the human-readable code printed under the QR. */
   code: string;
@@ -14,6 +16,11 @@ export interface LabelSpec {
   subtitle: string;
   /** What the QR encodes. */
   url: string;
+  kind: LabelKind;
+  /** Which rack this label belongs to — `''` when the item has no rack yet. */
+  locationId: string;
+  /** Free text the search box matches against, lowercased once at build time. */
+  haystack: string;
 }
 
 export type ScanTarget = 'item' | 'asset' | 'location';
@@ -59,9 +66,13 @@ export function labelsFor(
     title: `Rak ${l.code}`,
     subtitle: l.name || l.zone,
     url: scanUrl(baseUrl, 'location', l.locationId),
+    kind: 'rack' as const,
+    locationId: l.locationId,
+    haystack: `${l.code} ${l.name} ${l.zone} ${l.locationId}`.toLowerCase(),
   }));
 
-  return rackLabels.concat(items.flatMap((item) => {
+  return rackLabels.concat(items.flatMap((item): LabelSpec[] => {
+    const where = item.locationId ?? '';
     if (item.trackBy === 'instance') {
       // One label per physical unit — this is what makes "who has knife #7" answerable.
       return instancesFor(item, acquiredTs).map((a) => ({
@@ -69,6 +80,9 @@ export function labelsFor(
         title: a.label,
         subtitle: categoryName(item.categoryId),
         url: scanUrl(baseUrl, 'asset', a.assetId),
+        kind: 'asset' as const,
+        locationId: where,
+        haystack: `${a.label} ${a.assetId} ${item.name} ${categoryName(item.categoryId)}`.toLowerCase(),
       }));
     }
     // One durable label per rack or bin, not per bar of soap (design doc §14.2).
@@ -77,26 +91,122 @@ export function labelsFor(
       title: item.name,
       subtitle: `${categoryName(item.categoryId)} · ${item.unit}`,
       url: scanUrl(baseUrl, 'item', item.itemId),
+      kind: 'item' as const,
+      locationId: where,
+      haystack: `${item.name} ${item.barcode} ${categoryName(item.categoryId)}`.toLowerCase(),
     }];
   }));
 }
+
+// --- Grouping -----------------------------------------------------------------------------
+
+export interface LabelGroup {
+  /** Rack id, or `''` for the items nobody has placed yet. */
+  key: string;
+  title: string;
+  subtitle: string;
+  labels: LabelSpec[];
+}
+
+/**
+ * Grouped by rack, because that is how the labels are actually applied: somebody walks to one
+ * shelf holding one sheet. A rack's own label leads its own group, so "print rack A1" means the
+ * shelf tag *and* everything that lives on it — one trip, one sheet, one shelf finished.
+ *
+ * Groups are ordered by the racks themselves, with the unplaced bucket last: it is a to-do
+ * list, not a location, and it should not sit between two real shelves.
+ */
+export function groupLabels(
+  labels: readonly LabelSpec[],
+  locations: readonly Location[],
+): LabelGroup[] {
+  const byId = new Map<string, LabelGroup>();
+  for (const l of locations.filter((x) => x.active)) {
+    byId.set(l.locationId, {
+      key: l.locationId,
+      title: `Rak ${l.code}`,
+      subtitle: l.name || l.zone,
+      labels: [],
+    });
+  }
+  const loose: LabelGroup = { key: '', title: 'Belum ditempatkan', subtitle: 'Barang tanpa rak', labels: [] };
+
+  for (const label of labels) {
+    (byId.get(label.locationId) ?? loose).labels.push(label);
+  }
+
+  const groups = [...byId.values()].filter((g) => g.labels.length > 0);
+  if (loose.labels.length > 0) groups.push(loose);
+  return groups;
+}
+
+// --- Sheet formats ------------------------------------------------------------------------
+
+export type LabelLayout = 'row' | 'stack';
 
 /** Sticker sheet geometry. Sizes are the common A4 label formats sold locally. */
 export interface SheetFormat {
   id: string;
   name: string;
+  /** What this size is *for*. A millimetre figure means nothing until it has a job. */
+  purpose: string;
   columns: number;
   rows: number;
   /** Label size in millimetres. */
   width: number;
   height: number;
+  /** `row` puts the text beside the QR; `stack` puts it under, for near-square labels. */
+  layout: LabelLayout;
 }
 
+/**
+ * Four sizes, named by the job rather than by the millimetre. Somebody choosing a label is
+ * deciding "is this going on a keyring or on a shelf?", not "is this 30mm or 70mm?" — so the
+ * job is the label and the measurement is the fine print.
+ */
 export const SHEET_FORMATS: SheetFormat[] = [
-  { id: 'besar', name: 'Besar — 24 per lembar', columns: 3, rows: 8, width: 70, height: 37 },
-  { id: 'kecil', name: 'Kecil — 40 per lembar', columns: 4, rows: 10, width: 48.5, height: 25.4 },
+  {
+    id: 'gantungan',
+    name: 'Gantungan kunci',
+    purpose: 'Tag kecil untuk digantung di alat — QR besar, nama pendek.',
+    columns: 6, rows: 9, width: 30, height: 30, layout: 'stack',
+  },
+  {
+    id: 'tag',
+    name: 'Tag barang',
+    purpose: 'Stiker kecil untuk ditempel langsung di barang.',
+    columns: 4, rows: 10, width: 48.5, height: 25.4, layout: 'row',
+  },
+  {
+    id: 'rak',
+    name: 'Label rak',
+    purpose: 'Ukuran umum untuk ditempel di rak — terbaca dari dekat.',
+    columns: 3, rows: 8, width: 70, height: 37, layout: 'row',
+  },
+  {
+    // `row`, not `stack`: on a board this size the rack *name* is the thing being read from a
+    // distance and the QR is for scanning up close, so the name gets the width. Stacking would
+    // hand 70mm of height to a code nobody reads with their eyes.
+    id: 'jumbo',
+    name: 'Rak jumbo',
+    purpose: 'Papan rak besar — terbaca dari ujung gudang.',
+    columns: 2, rows: 4, width: 99, height: 70, layout: 'row',
+  },
 ];
 
 export const perSheet = (f: SheetFormat): number => f.columns * f.rows;
 export const sheetCount = (labels: number, f: SheetFormat): number =>
   Math.ceil(labels / perSheet(f)) || 0;
+
+/**
+ * The size that suits a selection, used to move the default rather than to lock it. All racks
+ * → a shelf-sized label; all individually-tagged tools → a keyring tag; anything mixed keeps
+ * the general-purpose size. Wrong once is a dropdown away; wrong every time is a wasted sheet.
+ */
+export function suggestFormat(labels: readonly LabelSpec[]): SheetFormat {
+  const general = SHEET_FORMATS.find((f) => f.id === 'rak')!;
+  if (labels.length === 0) return general;
+  if (labels.every((l) => l.kind === 'rack')) return SHEET_FORMATS.find((f) => f.id === 'jumbo')!;
+  if (labels.every((l) => l.kind === 'asset')) return SHEET_FORMATS.find((f) => f.id === 'gantungan')!;
+  return general;
+}

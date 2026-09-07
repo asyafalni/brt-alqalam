@@ -19,15 +19,15 @@ import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader, Stat } from '../../components/ui';
 import { applyCount, markCounted } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
-import { itemIcon } from '../items/itemIcon';
+import { artFor, ItemArt } from '../items/ItemArt';
 import { CountSheet } from './CountSheet';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
 const CELL: Record<LocationStatus, string> = {
   out: 'bg-red-50 border-red-200 text-red-800 hover:border-red-300',
   low: 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300',
-  available: 'bg-white border-slate-200 text-slate-700 hover:border-slate-300',
-  empty: 'bg-slate-50 border-dashed border-slate-200 text-slate-400 hover:border-slate-300',
+  available: 'bg-white border-slate-400 text-slate-700 hover:border-slate-900',
+  empty: 'bg-slate-50 border-dashed border-slate-400 text-slate-500 hover:border-slate-900',
 };
 
 const ZONE_NOTE: Record<LocationStatus, string> = {
@@ -255,10 +255,7 @@ export function RackBoard(
                           aria-label={`Buka ${i.name}`}
                           onClick={() => onOpenItem(i.itemId)}
                         >
-                        {(() => {
-                          const Icon = itemIcon(i, categoryName(i.categoryId));
-                          return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
-                        })()}
+                        <ItemArt art={artFor(i, categoryName(i.categoryId))} size={30} />
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
                           <p class={CODE}>{categoryName(i.categoryId)}</p>

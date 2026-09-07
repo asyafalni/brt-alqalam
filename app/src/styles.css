@@ -80,9 +80,21 @@ body {
 input, select, textarea, button { font: inherit; }
 input, select, textarea { font-size: max(16px, 1em); }
 
-:where(button, [role="button"], a):focus-visible,
-:where(input, select, textarea):focus-visible {
-  @apply outline-2 outline-offset-2 outline-slate-900;
+/* `outline-solid` is not optional here. Tailwind 4's `outline-2` sets the WIDTH only, and the
+   preflight leaves `outline-style: none` — so a ring declared without it renders nothing at
+   all, silently. Measured: seven of thirty-two tab stops on the rack board had no visible
+   focus indicator whatsoever.
+
+   Not wrapped in `:where()` either. Zero specificity meant any utility on the element — a
+   `focus:outline-none` in a button's base classes, for instance — beat it, which is exactly
+   what had happened. A focus ring is a guarantee, so it is written as one. */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  @apply outline-2 outline-solid outline-offset-2 outline-slate-900;
 }
 
 /* ---------------------------------------------------------------------------
@@ -97,6 +109,10 @@ input, select, textarea { font-size: max(16px, 1em); }
   justify-content: center;
   gap: 0;
 }
+
+/* Every sheet stays in the DOM so the printer receives the whole run, but only the one being
+   reviewed is painted. Scrolling forty sheets to check one is not reviewing, it is scrolling. */
+.label-sheet.is-offscreen { display: none; }
 
 .label {
   display: flex;
@@ -114,16 +130,43 @@ input, select, textarea { font-size: max(16px, 1em); }
 .label-qr { width: calc(var(--label-h) - 4mm); height: calc(var(--label-h) - 4mm); flex-shrink: 0; }
 .label-text { min-width: 0; line-height: 1.25; }
 
+/* A near-square label — a keyring tag, or a jumbo shelf board — has no room for a column of
+   text beside the code, so the text goes underneath and the QR takes the width it can get.
+   A keyring tag is read by a camera at arm's length, so the QR wins the space and the name is
+   a confirmation, not the label. */
+.label--stack {
+  flex-direction: column;
+  justify-content: center;
+  gap: 1mm;
+  text-align: center;
+}
+.label--stack .label-qr {
+  width: auto;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  aspect-ratio: 1;
+}
+.label--stack .label-text { width: 100%; }
+.label--stack .label-subtitle { display: none; }  /* no room, and the code is the identifier */
+
+/* Type scales with the sticker, because the sizes exist for different reading distances.
+   A fixed 3mm name is right on a 37mm rack label, cramped on a 25mm tag, and absurd on a
+   99×70mm shelf board that is meant to be read from the far end of the gudang — the whole
+   point of printing one that size. Clamped at both ends so the extremes stay sane. */
 .label-title {
-  display: block; overflow: hidden; font-size: 3mm; font-weight: 700;
+  display: block; overflow: hidden; font-weight: 700;
+  font-size: clamp(2.6mm, calc(var(--label-h) * 0.115), 9mm);
   text-overflow: ellipsis; white-space: nowrap;
 }
 .label-subtitle {
-  display: block; overflow: hidden; color: #444; font-size: 2.2mm;
+  display: block; overflow: hidden; color: #444;
+  font-size: clamp(2mm, calc(var(--label-h) * 0.07), 5mm);
   text-overflow: ellipsis; white-space: nowrap;
 }
 .label-code {
-  display: block; margin-top: 0.5mm; font-size: 2.2mm; letter-spacing: 0.02em;
+  display: block; margin-top: 0.5mm; letter-spacing: 0.02em;
+  font-size: clamp(1.9mm, calc(var(--label-h) * 0.06), 4.5mm);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -137,4 +180,8 @@ input, select, textarea { font-size: max(16px, 1em); }
   body { background: #fff; color: #000; }
   main { max-width: none; padding: 0; }
   .label { border: none; break-inside: avoid; page-break-inside: avoid; }
+  /* Hidden on screen, printed on paper: the pager is a preview control, not a print filter. */
+  .label-sheet.is-offscreen { display: grid; }
+  .label-sheet { break-after: page; page-break-after: always; }
+  .label-sheet:last-of-type { break-after: auto; page-break-after: auto; }
 }

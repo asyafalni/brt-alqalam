@@ -1223,3 +1223,99 @@ each of them.
   identifies, so changing it re-states who you are.
 - On TAMBAH/KURANG STOK the **STOK AKHIR column shows stock while its stepper edits the
   minimum** (default `-`). Easy to implement backwards; we keep them separate fields.
+
+# Part XVIII — Screens reviewed against real feedback (v1.8)
+
+Recorded 2026-09-07. Everything here came from the owner looking at running screens, which is
+the first time in this document that a design decision has been driven by use rather than by
+argument. That is worth naming: §57 warned about design iterating on itself, and this Part is
+what the correction looks like.
+
+## 73. The first real loss story — pisau
+
+> **"pisau itu salah satu yang sering hilang terutama setelah kegiatan Qurban."**
+
+This is the answer §60 asked for, and it lands on the one feature §0.0 had marked as *failing*
+the "does this remove work?" test — per-unit QR on every knife. That objection assumed knives
+were an ordinary durable. They are not: they are the thing that actually disappears, at the one
+event where many hands pass many blades. **Per-instance tracking of pisau is the case where the
+labelling cost is most likely to be repaid**, and it is the worked example for equipment loans
+and the Qurban close-out report. Still unanswered: lent-and-lost, or lost in the mess.
+
+## 74. Laporan rebuilt — and rusak/hilang put in it
+
+The report was one long column of hairline bars; at 1440px a 2px bar stretched to ~1470px, so a
+6% slice was an indistinguishable stub. Now capped at `max-w-6xl`, with the four headline
+numbers on an ink panel, the trust score as a ring rather than a fourth bar, status as one
+segmented bar plus a legend, and composition as **donuts** — asked for by name, and right: the
+question is "how is the store divided up", which a circle answers before it is read, with the
+sorted legend carrying the precision a ring cannot.
+
+**New section: Aset rusak & hilang**, at the owner's request — *"itu penting sebagai laporan
+untuk bisa diperbaiki lagi dalam proses inventaris."* Kept as two columns, per Part IV: rusak is
+a repair queue (still ours, costs a repair), hilang is a write-off list (gone, costs a
+replacement). Each leads with a **per-item rollup** before the individual units, because the
+pattern is the finding — "Pisau potong — 6 unit" is what decides what gets bought before the
+next Qurban; six separate rows are six facts. **No holder is printed** (§39): the report names
+the thing, never the person, and a test asserts it.
+
+Domain change this forced: `DerivedInstance.since` now means *"in this status since"*. It was
+being cleared on `pengembalian` regardless of condition, so a repair queue could not say how
+long anything had been waiting.
+
+## 75. Cetak Label is a picker, not a dump
+
+It printed the entire catalog every time — right exactly once, and a wasted A4 of sticker stock
+every time after. The real jobs are small: one label fell off, a new rack needs its tag,
+somebody is walking to rack A1 and wants that shelf finished in one trip, twelve new knives each
+need a keyring tag. So the page now asks *what* and *how big*, with labels grouped **by rack**
+(a rack's own tag leads its group, so "print rack A1" means the shelf tag and everything on it).
+
+**Four sizes named by the job, not the millimetre**: Gantungan kunci 30×30 · Tag barang 48×25 ·
+Label rak 70×37 · Rak jumbo 99×70. Type scales with the sticker, because the sizes exist for
+different reading distances — a fixed 3mm name is absurd on a board meant to be read from the
+far end of the gudang. Only the previewed sheet is painted; all sheets still print.
+
+Side effect that matters more than the UX: encoding every QR in the catalog is ~570ms of
+synchronous work. That cost is now proportional to the selection, not to the size of the gudang.
+
+## 76. Item illustrations, and photographs
+
+`itemIcon` (Lucide glyphs) is **deleted**. A 1.5px outline designed for 24px becomes a large thin
+rectangle at 96px, so it could not serve both a list row and a detail hero. `ItemArt` replaces it
+with 18 drawn archetypes as filled SVG shapes — a few hundred bytes each, no network, sharp at
+any size on the tablet least able to afford either.
+
+- **All one brass-and-ink pairing, never varying by item.** Colour in this UI means status
+  (§66); spending eight more hues on categories would make the loudest colours on screen the
+  ones signalling nothing.
+- **Resolution cascade: strong unit → name → weak unit → category → kind.** A `galon` names the
+  container and outranks the name; a `pak` only names the packaging and does not — a pak of bin
+  bags was being drawn as a carton, a roll of cable as a tarpaulin.
+- **Word boundaries, not substrings.** `/tang/` matched "Sabun cuci **tang**an" and drew the
+  hand soap as a wrench. Every short token is anchored and every trap has a test.
+- The drawings were reviewed **as a set**, rendered to one contact sheet, which is how four
+  unreadable ones (knife, bag, cylinder, tap) were caught at once rather than one at a time.
+
+**Photographs are a separate thing** and now exist alongside: a drawing says what *kind* of
+thing this is and is always there; a photo says what *this* thing looks like. Up to 6 per item,
+downscaled to ≤1600px on write, behind a `PhotoStore` port — IndexedDB today, Google Drive
+behind the gateway later (`data/drivePhotos.ts` records why the spreadsheet cannot hold them).
+The screen says out loud that photos are device-local and not yet synced, rather than implying a
+sharing that does not exist.
+
+## 77. Contrast, measured rather than asserted
+
+An audit of all 9 routes at two viewports measured **927 failing contrast nodes** and, worse,
+every form input, stepper, toggle and rack tile sitting on a **1.81:1** boundary where WCAG
+1.4.11 requires 3:1 — with card outlines at **1.10:1**. axe does not test that rule, so it was
+invisible to tooling. In a sunlit gudang this is not "hard to read": the input, its stepper and
+its kind toggle were one flat white area.
+
+Control boundaries moved to `slate-400` (3.6:1); card outlines to `slate-200`. Separately, the
+focus ring was declared with `outline-2` but no `outline-style`, which in Tailwind 4 renders
+**nothing at all**, and it lived in a zero-specificity `:where()` rule that any utility beat —
+so seven of thirty-two tab stops on the rack board had no visible focus at all. Both fixed.
+
+Still open from that audit: the closed mobile drawer keeps 8 controls in the tab order
+off-screen, and it is not a real dialog (no focus trap, no Escape, no scroll lock).

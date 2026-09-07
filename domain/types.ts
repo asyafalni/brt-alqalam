@@ -90,7 +90,9 @@ export interface DerivedItem {
   takenTotal: number;
 }
 export interface DerivedInstance {
-  instance: AssetInstance; status: InstanceStatus; holder?: string; since?: number;
+  instance: AssetInstance; status: InstanceStatus; holder?: string;
+  /** When it entered `status`. Undefined only for `available`, which has nothing pending. */
+  since?: number;
 }
 export interface DerivedState {
   items: Record<string, DerivedItem>;

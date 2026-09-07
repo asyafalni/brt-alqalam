@@ -14,7 +14,7 @@ import { CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { itemStatusBadge, PILL } from '../scan/resolve';
-import { itemIcon } from '../items/itemIcon';
+import { artFor, ItemArt } from '../items/ItemArt';
 
 export function Board(
   { items, categories, inventory, search, onOpenItem }:
@@ -43,11 +43,12 @@ export function Board(
       mobile: 'title',
       cell: (d) => {
         const badge = itemStatusBadge(d.status);
-        const Icon = itemIcon(d.item, categoryName(d.item.categoryId));
         return (
           <div class="flex min-w-0 items-center gap-3">
             <span class={`h-8 w-1 shrink-0 rounded-full ${badge.rail}`} aria-hidden="true" />
-            <Icon class="h-5 w-5 shrink-0 text-slate-400" />
+            {/* Drawn, not a glyph: this is the list somebody scans for "the soap", and a
+                recognisable object is found faster than a word or an outline. */}
+            <ItemArt art={artFor(d.item, categoryName(d.item.categoryId))} size={36} />
             <div class="min-w-0 max-w-[26rem]">
               <p class="truncate text-sm font-bold text-slate-900">{d.item.name}</p>
               <p class={`${CODE} truncate`}>{d.item.barcode}</p>
@@ -180,7 +181,9 @@ export function Board(
               </div>
             ) : (
               <ul class="space-y-2">
-                {notifications.map((n) => (
+                {notifications.map((n) => {
+                  const d = inventory.derived.items[n.itemId];
+                  return (
                   <li
                     key={n.itemId}
                     class={`flex items-center gap-3 rounded-xl border p-3 ${
@@ -191,12 +194,20 @@ export function Board(
                       class={`h-8 w-1 shrink-0 rounded-full ${n.stokAkhir <= 0 ? 'bg-red-500' : 'bg-amber-500'}`}
                       aria-hidden="true"
                     />
+                    {/* The same drawing the row below in the table carries. A shopping list is
+                        read by shape as much as by name — this is the list somebody takes to
+                        the shop, so it should look like the shelf they are replacing. */}
+                    <ItemArt
+                      art={d ? artFor(d.item, categoryName(d.item.categoryId)) : 'default'}
+                      size={30}
+                    />
                     <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
                     <span class="shrink-0 whitespace-nowrap text-xs text-slate-500 tabular-nums">
                       sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

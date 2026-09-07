@@ -52,14 +52,20 @@ export function deriveState(
       if (t.type === 'peminjaman' || t.type === 'digunakan') {
         di.status = 'out'; di.holder = t.recipient; di.since = t.ts;
       } else if (t.type === 'pengembalian') {
-        if (t.condition === 'rusak') { di.status = 'broken'; di.holder = undefined; di.since = undefined; }
-        else if (t.condition === 'hilang') { di.status = 'lost'; di.since = undefined; } // keep holder for "hilang oleh"
+        // `since` means "in this status since", not "borrowed since". A repair queue whose
+        // rows cannot say how long they have been waiting is a list, not a queue — and the
+        // oldest broken unit is the one the report has to be able to put at the top.
+        if (t.condition === 'rusak') { di.status = 'broken'; di.holder = undefined; di.since = t.ts; }
+        else if (t.condition === 'hilang') { di.status = 'lost'; di.since = t.ts; } // keep holder for "hilang oleh"
         else { di.status = 'available'; di.holder = undefined; di.since = undefined; }
       } else if (t.type === 'status_change') {
-        if (t.toStatus) { di.status = t.toStatus; if (t.toStatus === 'available') { di.holder = undefined; di.since = undefined; } }
-        else if (t.condition === 'normal') di.status = 'available';
-        else if (t.condition === 'rusak') di.status = 'broken';
-        else if (t.condition === 'hilang') di.status = 'lost';
+        if (t.toStatus) {
+          di.status = t.toStatus;
+          if (t.toStatus === 'available') { di.holder = undefined; di.since = undefined; }
+          else di.since = t.ts;
+        } else if (t.condition === 'normal') { di.status = 'available'; di.since = undefined; }
+        else if (t.condition === 'rusak') { di.status = 'broken'; di.since = t.ts; }
+        else if (t.condition === 'hilang') { di.status = 'lost'; di.since = t.ts; }
         else di.status = 'retired';
       }
     }

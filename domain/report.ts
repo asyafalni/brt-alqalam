@@ -39,6 +39,27 @@ export interface DataHealth {
   score: number;
 }
 
+/**
+ * One physical unit that is not where it should be, for the two sections management actually
+ * acts on: the repair queue and the write-off list.
+ *
+ * NO HOLDER. `DerivedInstance` carries who had it, and that is exactly the field this tier may
+ * not publish (§39) — the report is handed to takmir and may be printed, so it names the thing
+ * and not the person. Accountability lives behind the PIN wall, on the Aset screen; what a
+ * report needs is "which knife, since when, and what does it cost to put right".
+ */
+export interface AssetProblem {
+  assetId: string;
+  /** What is written on the label — the thing somebody will go and look for. */
+  label: string;
+  itemName: string;
+  categoryName: string;
+  /** Where it belongs, so a search has somewhere to start. */
+  zone: string;
+  /** When it entered this state, so the oldest problem sorts first. */
+  since?: number;
+}
+
 export interface Report {
   totalItems: number;
   totalUnits: number;
@@ -46,6 +67,16 @@ export interface Report {
   byZone: Slice[];
   byStatus: Slice[];
   health: DataHealth;
+  /**
+   * Damaged units: present, ours, out of service, and *fixable*. A repair queue.
+   * Kept apart from `lost` deliberately (design doc Part IV) — one costs a repair and the
+   * other costs a replacement, and collapsing them into "masalah" hides which is which.
+   */
+  broken: AssetProblem[];
+  /** Written off: gone, and out of the active asset base. A procurement list. */
+  lost: AssetProblem[];
+  /** Individually-tagged units still owned and present — everything but lost and retired. */
+  activeAssets: number;
   /** True while there is no event log, so the report can say which sections are missing. */
   movementAvailable: boolean;
 }
@@ -111,6 +142,25 @@ export function buildReport(
 
   const STATUS_LABEL: Record<string, string> = { available: 'Tersedia', low: 'Menipis', out: 'Habis' };
 
+  const itemById = new Map(items.map((i) => [i.itemId, i]));
+  const problem = (d: { instance: { assetId: string; itemId: string; label: string }; since?: number }): AssetProblem => {
+    const item = itemById.get(d.instance.itemId);
+    return {
+      assetId: d.instance.assetId,
+      label: d.instance.label,
+      itemName: item?.name ?? d.instance.itemId,
+      categoryName: item ? categoryName(item.categoryId) : '',
+      zone: locations.find((l) => l.locationId === item?.locationId)?.zone ?? '',
+      since: d.since,
+    };
+  };
+  // Oldest first: a unit broken three months ago is the one that has been waiting longest,
+  // and a list sorted by anything else buries it under this week's news.
+  const byAge = (a: AssetProblem, b: AssetProblem) => (a.since ?? 0) - (b.since ?? 0);
+
+  const activeAssets = Object.values(derived.instances)
+    .filter((d) => d.status !== 'lost' && d.status !== 'retired').length;
+
   return {
     totalItems: items.length,
     totalUnits,
@@ -122,6 +172,9 @@ export function buildReport(
       (s) => STATUS_LABEL[s] ?? s,
     ),
     health,
+    broken: derived.rusak.map(problem).sort(byAge),
+    lost: derived.hilang.map(problem).sort(byAge),
+    activeAssets,
     movementAvailable,
   };
 }
