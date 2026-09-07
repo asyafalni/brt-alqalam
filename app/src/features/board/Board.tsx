@@ -226,6 +226,9 @@ export function Board(
             </div>
 
             <DataTable
+              // The gudang has hundreds of rows. Rendering them all is not the cost — reading
+              // them is, and a list nobody reads to the end may as well end sooner.
+              pageSize={25}
               columns={columns}
               rows={rows}
               keyOf={(d) => d.item.itemId}

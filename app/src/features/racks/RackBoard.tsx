@@ -9,7 +9,9 @@
 // since orange already means `rusak`.
 
 import { useEffect, useMemo, useState } from 'octane';
-import { Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2 } from '@octanejs/lucide';
+import {
+  Archive, Check, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
+} from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState } from '../../../../domain/cycleCount';
@@ -179,9 +181,13 @@ export function RackBoard(
                   // the badge lives here and is itself the shortcut into the count.
                   const count = countState(rack.location, now);
                   const overdue = id !== '' && count.freshness !== 'fresh';
-                  const overdueNote = count.freshness === 'never'
+                  // Counted inside the rotation (30 days). Marked, not silent: the point of a
+                  // rotation is knowing which shelves are already done, so nobody re-counts a
+                  // rack somebody walked last week.
+                  const checked = id !== '' && count.freshness === 'fresh';
+                  const countNote = count.freshness === 'never'
                     ? 'belum pernah dicek'
-                    : `dicek ${count.daysSince} hari lalu`;
+                    : count.daysSince === 0 ? 'dicek hari ini' : `dicek ${count.daysSince} hari lalu`;
                   return (
                     // Wrapped, because the badge is a second action and a button cannot
                     // contain a button.
@@ -191,7 +197,7 @@ export function RackBoard(
                         aria-pressed={isSelected}
                         aria-label={
                           `Rak ${rack.location.code}, ${rack.itemCount} barang, ${ZONE_NOTE[rack.status]}`
-                          + (overdue ? `, ${overdueNote}` : '')
+                          + (id !== '' ? `, ${countNote}` : '')
                         }
                         class={
                           'flex min-h-touch w-full flex-col items-start justify-center rounded-xl border px-3 py-2 ' +
@@ -209,12 +215,23 @@ export function RackBoard(
                         <button
                           type="button"
                           class="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-500 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50"
-                          aria-label={`Cek Rak ${rack.location.code} — ${overdueNote}`}
-                          title={overdueNote}
+                          aria-label={`Cek Rak ${rack.location.code} — ${countNote}`}
+                          title={countNote}
                           onClick={() => { setSelected(id); setCounting(id); }}
                         >
                           <ClipboardCheck class="h-3.5 w-3.5" />
                         </button>
+                      )}
+                      {checked && (
+                        // A mark, not a tile colour: the tile's colour already means what is
+                        // ON the rack (habis / menipis / aman), and overwriting that with
+                        // "counted" would trade a fact somebody acts on for one they do not.
+                        <span
+                          class="pointer-events-none absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg bg-green-500 text-white"
+                          title={countNote}
+                        >
+                          <Check class="h-4 w-4" />
+                        </span>
                       )}
                     </div>
                   );

@@ -365,6 +365,9 @@ export function StockTake(
         </div>
 
         <DataTable
+          // A walk adds rows all day; past a screenful the list stops being something you read and
+          // becomes something you scroll past on the way to the form.
+          pageSize={25}
           columns={columns}
           rows={rows}
           keyOf={(r) => rowKey(r.item, r.line)}

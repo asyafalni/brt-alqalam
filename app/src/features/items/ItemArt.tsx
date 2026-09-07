@@ -33,7 +33,8 @@ const STONE_DARK = '#8d8578';
 export type ArtId =
   | 'botol' | 'spray' | 'pel' | 'kain' | 'pisau' | 'talenan' | 'lampu' | 'kabel'
   | 'kantong' | 'kardus' | 'terpal' | 'timbangan' | 'alat' | 'pipa' | 'audio'
-  | 'tabung' | 'kunci' | 'default';
+  | 'tabung' | 'kunci' | 'ember' | 'cooler' | 'tangga' | 'sarung' | 'cat'
+  | 'default';
 
 /* -------------------------------------------------------------------------------------------
    The drawings. Every one is authored inside the same 64×64 box, sitting on the same baseline
@@ -275,6 +276,68 @@ const SHAPES: Record<ArtId, () => unknown> = {
     </>
   ),
 
+  /** Ember, baskom, timba — an open tub. */
+  ember: () => (
+    <>
+      <path d="M25 30a10 10 0 0 1 14 0" stroke={STONE_DARK} stroke-width="2.4" fill="none" stroke-linecap="round" />
+      <path d="M17 31h30l-4 21a5 5 0 0 1-5 4.4H26a5 5 0 0 1-5-4.4z" fill={BRASS} />
+      <path d="M32 31h15l-4 21a5 5 0 0 1-5 4.4h-6z" fill={BRASS_DARK} />
+      <rect x="15" y="28" width="34" height="6" rx="3" fill={BRASS_DARK} />
+      <rect x="15" y="28" width="34" height="2.6" rx="1.3" fill={CREAM} opacity="0.55" />
+      <path d="M25 39h14" stroke={CREAM} stroke-width="2" stroke-linecap="round" opacity="0.6" />
+    </>
+  ),
+
+  /** Cooler box, termos es — a lidded chest, which is what tells it from an ordinary carton. */
+  cooler: () => (
+    <>
+      <rect x="12" y="33" width="40" height="21" rx="4" fill={BRASS} />
+      <path d="M32 33h16a4 4 0 0 1 4 4v13a4 4 0 0 1-4 4H32z" fill={BRASS_DARK} />
+      <rect x="9" y="24" width="46" height="10" rx="3.5" fill={CREAM} stroke={STONE_DARK} stroke-width="1.6" />
+      <path d="M26 24a6 6 0 0 1 12 0" stroke={STONE_DARK} stroke-width="2.4" fill="none" stroke-linecap="round" />
+      <rect x="28" y="36" width="8" height="6" rx="1.6" fill={INK} />
+      <path d="M14 46h36" stroke={BRASS_DARK} stroke-width="1.8" opacity="0.6" />
+    </>
+  ),
+
+  /** Tangga lipat — rails and rungs, the one silhouette nothing else here shares. */
+  tangga: () => (
+    <>
+      <rect x="18" y="10" width="5" height="46" rx="2.5" fill={STONE_DARK} />
+      <rect x="41" y="10" width="5" height="46" rx="2.5" fill={STONE_DARK} />
+      <rect x="18" y="10" width="1.8" height="46" fill={STONE} />
+      {/* Written out rather than mapped: these drawings are reviewed by rendering the file's
+          SVG directly, and a JS expression is the one thing that review cannot evaluate. */}
+      <rect x="21" y="18" width="22" height="4.6" rx="2.3" fill={BRASS} />
+      <rect x="21" y="28" width="22" height="4.6" rx="2.3" fill={BRASS} />
+      <rect x="21" y="38" width="22" height="4.6" rx="2.3" fill={BRASS} />
+      <rect x="21" y="48" width="22" height="4.6" rx="2.3" fill={BRASS} />
+    </>
+  ),
+
+  /** Sarung tangan — a mitten, read by its thumb. */
+  sarung: () => (
+    <>
+      <path d="M24 20h14a6 6 0 0 1 6 6v20a6 6 0 0 1-6 6H26a6 6 0 0 1-6-6V30z" fill={BRASS} />
+      <path d="M32 20h6a6 6 0 0 1 6 6v20a6 6 0 0 1-6 6h-6z" fill={BRASS_DARK} />
+      <path d="M20 32c-4-3-8-2-9 1.4-1 3.4 2 6.6 6 7.6l3 .8z" fill={BRASS} />
+      <rect x="20" y="46" width="24" height="5" fill={CREAM} opacity="0.7" />
+      <path d="M27 26v9M33 26v9M39 26v9" stroke={CREAM} stroke-width="1.4" stroke-linecap="round" opacity="0.55" />
+    </>
+  ),
+
+  /** Cat, tiner, lem kaleng — a tin with a bail handle. */
+  cat: () => (
+    <>
+      <path d="M20 27a12 5 0 0 1 24 0v24a4 4 0 0 1-4 3.6H24a4 4 0 0 1-4-3.6z" fill={BRASS} />
+      <path d="M32 22a12 5 0 0 1 12 5v24a4 4 0 0 1-4 3.6h-8z" fill={BRASS_DARK} />
+      <ellipse cx="32" cy="27" rx="12" ry="4.6" fill={CREAM} />
+      <ellipse cx="32" cy="27" rx="7" ry="2.6" fill={STONE} />
+      <path d="M21 26c1-9 21-9 22 0" stroke={STONE_DARK} stroke-width="2" fill="none" stroke-linecap="round" />
+      <rect x="24" y="38" width="16" height="9" rx="2" fill={CREAM} />
+    </>
+  ),
+
   /** Nothing more specific is known — a crate, which is honest rather than decorative. */
   default: () => (
     <>
@@ -332,6 +395,11 @@ const BY_UNIT_WEAK: Record<string, ArtId> = {
 const BY_NAME: [RegExp, ArtId][] = [
   // Gembok before the tool list, so "kunci gembok" is a padlock and "kunci pas" is a spanner.
   [/gembok|cctv|alarm|kamera/i, 'kunci'],
+  [/ember|baskom|timba|\bwadah\b|panci/i, 'ember'],
+  [/cooler|termos|\bes ?box\b|\bboks\b/i, 'cooler'],
+  [/tangga/i, 'tangga'],
+  [/sarung|kaos tangan|\bmasker\b/i, 'sarung'],
+  [/\bcat\b|tiner|kaleng|kuas/i, 'cat'],
   [/pisau|golok|parang|cutter/i, 'pisau'],
   [/talenan|nampan|papan|baki/i, 'talenan'],
   [/asahan|\bkunci\b|obeng|\btang\b|palu|gergaji|\bbor\b|tukang/i, 'alat'],
@@ -356,7 +424,10 @@ const BY_CATEGORY: [RegExp, ArtId][] = [
   [/sanitasi|plumbing|\bair\b/i, 'pipa'],
   [/sipil|bangunan/i, 'alat'],
   [/keamanan|security/i, 'kunci'],
-  [/phbi|qurban|dapur|masak/i, 'pisau'],
+  // NOT a knife. A category is a filing decision, and defaulting all of PHBI to a blade drew
+  // "Baskom besar" and "Cooler box" as knives — a wrong picture is worse than a neutral one,
+  // because it is confidently wrong. Only an actual knife, matched by name above, gets one.
+  [/phbi|qurban|dapur|masak/i, 'default'],
 ];
 
 /** Every drawing, in the order the picker shows them. */

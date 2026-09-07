@@ -93,3 +93,55 @@ describe('DataTable', () => {
     expect(table.querySelector('tr[tabindex]')).toBeNull();
   });
 });
+
+describe('pagination', () => {
+  interface Short { id: string; name: string }
+  const many: Short[] = Array.from({ length: 60 }, (_, n) => ({ id: `R${n + 1}`, name: `Barang ${n + 1}` }));
+  const paged = () => render(() => (
+    <DataTable
+      pageSize={25}
+      columns={[{ key: 'name', header: 'Barang', mobile: 'title', cell: (r: Short) => r.name }]}
+      rows={many}
+      keyOf={(r) => r.id}
+    />
+  ));
+
+  it('shows one page at a time and says where you are', () => {
+    const r = paged();
+    // Both shapes render, so each row appears twice — desk table and phone card.
+    expect(r.getAllByText('Barang 1')).toHaveLength(2);
+    expect(r.queryByText('Barang 26')).toBeNull();
+    expect(r.getByText('1–25 dari 60')).toBeTruthy();
+  });
+
+  it('walks forward and back without losing the count', () => {
+    const r = paged();
+    fireEvent.click(r.getByText('Berikutnya'));
+    expect(r.getAllByText('Barang 26')).toHaveLength(2);
+    expect(r.getByText('26–50 dari 60')).toBeTruthy();
+
+    fireEvent.click(r.getByText('Sebelumnya'));
+    expect(r.getAllByText('Barang 1')).toHaveLength(2);
+  });
+
+  it('stops at both ends rather than paging into nothing', () => {
+    const r = paged();
+    expect((r.getByText('Sebelumnya') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(r.getByText('Berikutnya'));
+    fireEvent.click(r.getByText('Berikutnya'));
+    expect(r.getByText('51–60 dari 60')).toBeTruthy();
+    expect((r.getByText('Berikutnya') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('does not draw a pager for a list that fits', () => {
+    const r = render(() => (
+      <DataTable
+        pageSize={25}
+        columns={[{ key: 'name', header: 'Barang', mobile: 'title', cell: (r2: Short) => r2.name }]}
+        rows={many.slice(0, 5)}
+        keyOf={(r2) => r2.id}
+      />
+    ));
+    expect(r.queryByText('Berikutnya')).toBeNull();
+  });
+});

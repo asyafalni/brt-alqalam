@@ -4,7 +4,7 @@ import { App } from '../../App';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, StockLine, Txn } from '../../../../domain/types';
+import type { Item, Location, StockLine, Txn } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
@@ -36,10 +36,12 @@ const tx = (p: Partial<Txn>): Txn => {
     type: 'peminjaman', qtyDelta: 0, actorUserId: 'u', ...p };
 };
 
-const RAK = { locationId: 'LOC-A1', code: 'A1', name: '', zone: 'Gudang', order: 1, active: true,
-  lastCountedTs: Date.now() };
+const RAK: Location = { locationId: 'LOC-A1', code: 'A1', name: '', zone: 'Gudang', order: 1,
+  active: true, lastCountedTs: Date.now() };
 /** Never counted, so it is due — an uncounted rack is unknown, not "probably fine". */
-const UNCOUNTED = { ...RAK, locationId: 'LOC-B2', code: 'B2', lastCountedTs: undefined };
+const UNCOUNTED: Location = {
+  ...RAK, locationId: 'LOC-B2', code: 'B2', lastCountedTs: undefined,
+};
 
 function seed(items: Item[], txns: Txn[] = [], locations = [RAK]) {
   localStorage.setItem('brt.stocktake.draft.v5',

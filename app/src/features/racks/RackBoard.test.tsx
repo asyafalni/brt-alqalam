@@ -254,3 +254,21 @@ describe('RackBoard — mengelola rak', () => {
     expect(r.getByText(/pernah dicek/)).toBeTruthy();
   });
 });
+
+describe('a rack knows when it was last counted', () => {
+  it('marks a rack counted inside the rotation, and says when', () => {
+    // The point of a rotation is knowing which shelves are already done, so nobody re-counts
+    // a rack somebody walked last week.
+    seed([], [{ ...B3, lastCountedTs: NOW - 3 * DAY_MS }]);
+    const r = render(Harness);
+
+    expect(r.getByLabelText(/^Rak B3.*dicek 3 hari lalu/)).toBeTruthy();
+    expect(r.queryByLabelText(/^Cek Rak B3/)).toBeNull();   // nothing to chase
+  });
+
+  it('still offers the shortcut once it falls out of the rotation', () => {
+    seed([], [{ ...B3, lastCountedTs: NOW - 45 * DAY_MS }]);
+    const r = render(Harness);
+    expect(r.getByLabelText(/^Cek Rak B3 — dicek 45 hari lalu/)).toBeTruthy();
+  });
+});
