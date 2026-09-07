@@ -51,6 +51,15 @@ export interface Location {
    * gudang never happens.
    */
   lastCountedTs?: number;
+  /**
+   * What KIND of storage this is — an open shelf, a cabinet, a pallet, a marked patch of floor.
+   *
+   * Opaque here, exactly like `Item.artId`: the set of drawings is a fact about the UI, and a
+   * `domain/` that knows the name of a picture has to change when somebody adds one. The app
+   * validates it and falls back to reading the rack's name, so an unrecognised value degrades
+   * to a guess instead of breaking the row.
+   */
+  artId?: string;
 }
 
 /**

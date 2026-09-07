@@ -197,7 +197,9 @@ export function createCategory(name: string, existing: readonly Category[]): Cat
 }
 
 // Racks — one durable QR per rack or bin (design doc §14.2), never one per bar of soap.
-export function createLocation(code: string, zone: string, name: string, existing: readonly Location[]): Location {
+export function createLocation(
+  code: string, zone: string, name: string, existing: readonly Location[], artId?: string,
+): Location {
   const base = `LOC-${slug(code) || 'RAK'}`;
   let locationId = base;
   for (let n = 2; existing.some((l) => l.locationId === locationId); n += 1) locationId = `${base}-${n}`;
@@ -208,6 +210,7 @@ export function createLocation(code: string, zone: string, name: string, existin
     zone: zone.trim() || 'Gudang',
     order: existing.filter((l) => l.zone === (zone.trim() || 'Gudang')).length + 1,
     active: true,
+    ...(artId ? { artId } : {}),
   };
 }
 
@@ -230,6 +233,8 @@ export interface LocationEdit {
   code: string;
   name: string;
   zone: string;
+  /** What kind of storage it is. Blank means "read it from the name", which is the default. */
+  artId?: string;
 }
 
 export function editLocation(
@@ -245,6 +250,7 @@ export function editLocation(
       // Same default as `createLocation`, so a rack cannot be edited into a nameless zone that
       // then sorts on its own at the bottom of the board.
       zone: edit.zone.trim() || 'Gudang',
+      ...(edit.artId ? { artId: edit.artId } : { artId: undefined }),
     }
     : l));
 }
@@ -303,11 +309,12 @@ export function deleteLocation(locations: readonly Location[], locationId: strin
   return locations.filter((l) => l.locationId !== locationId);
 }
 
-const LOCATIONS_HEADER = 'locationId,code,name,zone,order,active';
+const LOCATIONS_HEADER = 'locationId,code,name,zone,order,active,artId';
 
 export function toLocationsCsv(locations: readonly Location[]): string {
   const rows = locations.map((l) =>
-    [l.locationId, l.code, l.name, l.zone, String(l.order), l.active ? 'TRUE' : 'FALSE'].map(cell).join(','));
+    [l.locationId, l.code, l.name, l.zone, String(l.order), l.active ? 'TRUE' : 'FALSE',
+      l.artId ?? ''].map(cell).join(','));
   return [LOCATIONS_HEADER, ...rows].join('\n') + '\n';
 }
 

@@ -206,6 +206,9 @@ export const buildLocation = (r: Record<string, string>): Location => ({
     zone: r['zone'] || 'Gudang',
     order: num(r, 'order', 0),
     active: bool(r, 'active', true),
+    // The kind of storage. Not validated against a list here: the drawings are the app's, not
+    // the domain's, and the app already falls back when it does not recognise one.
+    ...(r['artid'] ? { artId: r['artid'] } : {}),
   });
 
 export const buildItem = (r: Record<string, string>): Item => {

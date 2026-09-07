@@ -16,6 +16,7 @@ import { Button, CARD, CODE, PageHeader } from '../../components/ui';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { StockAlerts } from '../alerts/StockAlerts';
+import { RackArt, rackArtFor } from '../racks/RackArt';
 
 const ALERT_PREVIEW = 6;
 
@@ -260,7 +261,10 @@ export function Dashboard(
                       aria-label={`Buka Rak ${d.location.code}`}
                       onClick={() => onNavigate({ name: 'racks', id: d.location.locationId })}
                     >
-                      <MapPin class="h-4 w-4 shrink-0 text-slate-400" />
+                      {/* The same weight as the drawing on the reorder list beside it. Two
+                          columns of the same height read as two columns; one with pictures and
+                          one with pin glyphs reads as a main list and an afterthought. */}
+                      <RackArt art={rackArtFor(d.location)} size={30} />
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-bold text-slate-900">
                           Rak {d.location.code}

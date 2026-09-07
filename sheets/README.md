@@ -13,7 +13,7 @@ quarantines every row. Import each CSV as its own tab, named exactly as the file
 | Tab | Written by | Notes |
 | --- | --- | --- |
 | `Categories` | admin (by hand) | Free-form and editable (design doc Part XI). Seeded with the boss's 8 domains. |
-| `Locations` | admin **and** the stock-take | Racks, shelves and bins — **one QR per rack** (§14.2), never one per bar of soap. `code` is what is painted on the shelf ("B3"); `zone` groups racks into rooms. |
+| `Locations` | admin **and** the stock-take | Racks, shelves and bins — **one QR per rack** (§14.2), never one per bar of soap. `code` is what is painted on the shelf ("B3"); `zone` groups racks into rooms; `artId` is the kind of storage (`rak`, `lemari`, `laci`, `gantungan`, `palet`, `keranjang`, `peti`, `dinding`, `lantai`), and blank means "read it from the name". |
 | `Items` | admin by hand **and** the stock-take screen | The catalog: what a thing **is**. No quantity, no rack. |
 | `Stock` | the stock-take screen, and every cycle count | **How much of an item sits on which rack** — one row per (barang × rak). This is where quantity lives. |
 | `AssetInstances` | admin / label tool | Only for `trackBy: instance` durables — one row per physical unit. |

@@ -1492,3 +1492,50 @@ draft *are* somebody's afternoon in the gudang.
   column said twice, and a number repeated is a number to reconcile.
 - **The item page lists every shelf** with its own quantity, same rule.
 - **Cek rak compares against what is on THAT rack**, and writes back to that rack's line.
+
+# Part XXII — Racks are furniture (v1.12)
+
+## 89. A rack gets a picture of the STORAGE, not of the stock
+
+The rack tiles briefly borrowed the item drawings, so a rack called "Sabun & pembersih" wore
+the soap bottle. Cheap, and wrong: it said *there is a bottle here* when the tile's whole job is
+to say *this is the shelf*. Different nouns, different pictures.
+
+`RackArt` is its own set of nine storage archetypes — **rak · lemari · laci · gantungan · palet
+· keranjang · peti · dinding · lantai** — in the same brass-and-ink palette, because colour in
+this UI means status and a rack tile is already coloured by what is on it.
+
+**Which one is a fact about the rack**, so it lives on the rack: `Location.artId`, opaque in
+`domain/` for exactly the reason `Item.artId` is. It is **chosen explicitly** in the rack form,
+unlike the item drawings which are inferred and only overridable — and the asymmetry is the
+point: *a rack is named once and lives for years; an item is named fifty times in an afternoon
+and cannot afford the decision* (§0.0). The name is still read as a default, so "Lemari arsip"
+needs no choosing.
+
+## 90. The reason it was asked for
+
+> **"tujuan utamanya agar columnya balance antara dua column ini karna si item kan punya icon"**
+
+Worth recording, because it is not what the first reading suggested. Beranda's two lists sit
+side by side, and one had drawings while the other had a pin glyph — which made them read as a
+main list and an afterthought rather than as two errands of equal standing. The rack drawings
+exist to give the second column the same weight as the first.
+
+## 91. Smaller things in the same pass
+
+- **A `<select>` draws its own chevron.** The browser's arrow is a fixed size the platform
+  picks, so in a 56px field it sat as a tiny mark in a lot of white: the touch target grew and
+  the only thing signalling "this opens" did not. Still a real `<select>` — a custom listbox
+  would mean re-implementing keyboard nav, typeahead and the native phone picker, and
+  `@octanejs/floating-ui` holds every known parity gap in this stack (§62).
+- **"Rak baru" moved into the side Sheet.** Inline, the form pushed the map down the screen to
+  make room — and the map is the context you name a new rack against, since the code has to fit
+  alongside the ones already painted on the shelves.
+- **The "changing the code will not break printed stickers" note appears only when there is a
+  code to change.** On a rack that does not exist yet it was reassurance about a sticker nobody
+  has printed.
+- **A counted rack keeps the clipboard icon, tinted green, rather than swapping to a tick.**
+  Swapping the glyph made "done" look like a different kind of thing and quietly removed the
+  way to count it again — which is exactly what somebody wants after finding a mistake. Tinted
+  rather than filled, because "already counted" is the one state needing no attention at all,
+  and the badges that *do* want a walk should be the easier ones to spot.

@@ -5,6 +5,8 @@
 // carries across is the class conventions, which is what the reuse map found is actually
 // the template's value (it has no token layer at all).
 
+import { ChevronDown } from '@octanejs/lucide';
+
 // --- Card — SmartInv components/Card.tsx:17-19 -----------------------------------------
 export const CARD = 'rounded-lg p-5 bg-white shadow-sm border border-slate-200';
 /** Card with its own padding removed, for tables — Inventory.tsx:100. */
@@ -80,6 +82,40 @@ export const FIELD =
   'duration-200 focus:ring-2 focus:ring-slate-900/40 focus:border-slate-900 ' +
   'placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
 export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
+
+/**
+ * A `<select>` that matches the other fields.
+ *
+ * The browser's own arrow is drawn at a fixed size the platform picks, so in a 56px field it
+ * sits as a tiny mark floating in a lot of white — the touch target grew and the only thing
+ * signalling "this opens" did not. `appearance-none` drops it and we draw a chevron sized to
+ * the control, in the same ink as the text beside it.
+ *
+ * Still a real `<select>`. A custom listbox would mean re-implementing keyboard navigation,
+ * typeahead and the native phone picker, and `@octanejs/floating-ui` is where every known
+ * binding-parity gap in this stack lives (§62) — the wrong place to be inventive.
+ */
+export function Select(
+  { class: cls = '', children, ...rest }:
+  {
+    id?: string; value?: string; class?: string; children?: unknown;
+    'aria-label'?: string; disabled?: boolean;
+    onChange?: (e: Event) => void;
+  },
+) {
+  return (
+    <div class="relative w-full">
+      <select class={`${FIELD} appearance-none pr-11 ${cls}`} {...rest}>
+        {children}
+      </select>
+      {/* `pointer-events-none` so the chevron never eats a tap meant for the control. */}
+      <ChevronDown
+        class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
+        aria-hidden="true"
+      />
+    </div>
+  );
+}
 export const ERROR_TEXT = 'mt-1.5 text-xs text-red-500 font-medium';
 
 // --- Stat tile — Dashboard.tsx:140-152 --------------------------------------------------

@@ -27,6 +27,7 @@ import {
 import type { LocationEdit, RemovalBlock } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
+import { RACK_ART_IDS, RACK_ART_LABEL, RackArt, rackArtFor } from './RackArt';
 import { CountSheet } from './CountSheet';
 import { Sheet } from '../../components/Sheet';
 
@@ -114,14 +115,22 @@ export function RackBoard(
         }
       />
 
-      {editing === 'new' && (
+      {/* A panel, like every other create flow here. Inline, the form pushed the whole map
+          down the screen to make room for three fields — and the map is the context you name
+          a new rack against, since the code has to fit alongside the ones already painted on
+          the shelves. */}
+      <Sheet
+        open={editing === 'new'}
+        title="Rak baru"
+        description="Satu QR per rak — bukan per barang."
+        onClose={() => setEditing(null)}
+      >
         <RackForm
-          title="Rak baru"
           initial={{ code: '', name: '', zone: locations[locations.length - 1]?.zone ?? '' }}
           onSave={addRack}
           onCancel={() => setEditing(null)}
         />
-      )}
+      </Sheet>
 
       {locations.length === 0 ? (
         <div class={`${CARD} py-20 text-center`}>
@@ -170,7 +179,9 @@ export function RackBoard(
                 </span>
               </div>
 
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+              {/* 104px, up from 84: the tiles gained a drawing and a badge, and a cell that
+                  cannot fit its own code is not a smaller cell, it is a broken one. */}
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
                 {zone.racks.map((rack) => {
                   const id = rack.location.locationId;
                   const isSelected = selected === id;
@@ -200,13 +211,25 @@ export function RackBoard(
                           + (id !== '' ? `, ${countNote}` : '')
                         }
                         class={
-                          'flex min-h-touch w-full flex-col items-start justify-center rounded-xl border px-3 py-2 ' +
+                          // `pr-9` keeps the code clear of the badge pinned to the top-right.
+                          // Without it the drawing pushed "A1" underneath the clipboard and
+                          // the one thing a rack tile has to say became unreadable.
+                          'flex min-h-touch w-full flex-col items-start justify-center rounded-xl border py-2 pl-3 pr-9 ' +
                           'text-left transition-all ' + CELL[rack.status] +
                           (isSelected ? ' ring-2 ring-orange-500 ring-offset-1' : '')
                         }
                         onClick={() => setSelected(isSelected ? null : id)}
                       >
-                        <span class="text-sm font-bold uppercase tabular-nums">{rack.location.code}</span>
+                        <span class="flex items-center gap-1.5">
+                          {/* A drawing of the STORAGE, not of the stock. This briefly showed
+                              the item drawings — a rack called "Sabun & pembersih" wore the
+                              soap bottle — which said "there is a bottle here" when the tile's
+                              whole job is to say "this is the shelf". */}
+                          <RackArt art={rackArtFor(rack.location)} size={24} />
+                          <span class="text-sm font-bold uppercase tabular-nums">
+                            {rack.location.code}
+                          </span>
+                        </span>
                         <span class="text-[10px] opacity-70">
                           {rack.itemCount === 0 ? 'kosong' : `${rack.itemCount} barang`}
                         </span>
@@ -225,7 +248,13 @@ export function RackBoard(
                           type="button"
                           class={`absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
                             checked
-                              ? 'border-green-600 bg-green-500 text-white hover:bg-green-600'
+                              // Tinted, not filled. A solid green block is the loudest thing on
+                              // the board, and "already counted" is the one state that needs no
+                              // attention at all — the badges that DO want a walk should be
+                              // easier to spot than the ones that do not. Same bg-50 / text-700
+                              // triple every status pill in the app uses, with a green-500 edge
+                              // so the control boundary still clears 3:1.
+                              ? 'border-green-500 bg-green-50 text-green-700 hover:bg-green-100'
                               : 'border-slate-400 bg-white text-slate-500 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50'
                           }`}
                           aria-label={`Cek Rak ${rack.location.code} — ${countNote}`}
@@ -454,18 +483,25 @@ function rackSubtitle(location: Location, now: number): string {
  */
 function RackForm(
   { title, initial, onSave, onCancel }:
-  { title: string; initial: LocationEdit; onSave: (edit: LocationEdit) => void; onCancel: () => void },
+  { title?: string; initial: LocationEdit; onSave: (edit: LocationEdit) => void; onCancel: () => void },
 ) {
   const [code, setCode] = useState(initial.code);
   const [name, setName] = useState(initial.name);
   const [zone, setZone] = useState(initial.zone);
+  const [artId, setArtId] = useState(initial.artId);
 
-  const submit = () => { if (code.trim() !== '') onSave({ code, name, zone }); };
+  const submit = () => { if (code.trim() !== '') onSave({ code, name, zone, artId }); };
+
+  // What it will be drawn as right now: the choice if one was made, otherwise read from the
+  // name as the operator types it.
+  const art = rackArtFor({ code, name, zone, artId });
 
   return (
-    <section class={`${CARD} border-slate-900`}>
-      <h2 class="mb-3 font-bold text-slate-900">{title}</h2>
-      <div class="grid gap-3 sm:grid-cols-3">
+    // No card and no heading when it is inside a Sheet: the panel supplies both, and a second
+    // frame around a form that already fills the panel is just another box to look past.
+    <section class={title ? `${CARD} border-slate-900` : ''}>
+      {title && <h2 class="mb-3 font-bold text-slate-900">{title}</h2>}
+      <div class={`grid gap-3 ${title ? 'sm:grid-cols-3' : ''}`}>
         <div>
           <label class={LABEL} for="rack-code">Kode rak</label>
           <input
@@ -502,17 +538,57 @@ function RackForm(
         </div>
       </div>
 
+      {/* Chosen, not asked for. The guess from the name is right most of the time — "Lemari
+          arsip" is a cabinet — so this is an override, laid out as pictures because that is
+          what is being chosen. Explicit beats inferred here, unlike the item drawings, because
+          a rack is named once and lives for years; an item is named fifty times in an
+          afternoon and cannot afford the decision. */}
+      <div class="mt-4">
+        <span class={LABEL}>Jenis penyimpanan</span>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2" role="radiogroup" aria-label="Jenis penyimpanan">
+          {RACK_ART_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={art === id}
+              aria-label={RACK_ART_LABEL[id]}
+              class={`flex flex-col items-center gap-1 rounded-lg border-2 px-1 py-2 transition-colors ${
+                art === id ? 'border-slate-900 bg-slate-900/5' : 'border-slate-200 bg-white hover:border-slate-400'
+              }`}
+              onClick={() => setArtId(id)}
+            >
+              <RackArt art={id} size={30} />
+              <span class="text-[10px] leading-tight text-slate-600">{RACK_ART_LABEL[id]}</span>
+            </button>
+          ))}
+        </div>
+        {artId && (
+          <button
+            type="button"
+            class="mt-2 text-xs font-semibold text-slate-600 underline"
+            onClick={() => setArtId(undefined)}
+          >
+            Kembali ke otomatis
+          </button>
+        )}
+      </div>
+
       <div class="mt-4 flex flex-wrap items-center gap-3">
         <Button size="touch" disabled={code.trim() === ''} onClick={submit}>Simpan</Button>
         <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
           Batal
         </button>
-        {/* Said out loud because it is the thing people are most afraid of, and it is not
-            true: the QR encodes an id that never changes, so nothing already stuck to a shelf
-            stops working when the code is corrected. */}
-        <span class="ml-auto max-w-xs text-xs text-slate-400">
-          Mengubah kode tidak merusak stiker QR yang sudah dicetak.
-        </span>
+        {/* Only when there is a code to change. Said out loud there because it is the thing
+            people are most afraid of, and it is not true: the QR encodes an id that never
+            moves, so nothing already stuck to a shelf stops working when the code is
+            corrected. On a rack that does not exist yet it is reassurance about a sticker
+            nobody has printed. */}
+        {initial.code !== '' && (
+          <span class="ml-auto max-w-xs text-xs text-slate-400">
+            Mengubah kode tidak merusak stiker QR yang sudah dicetak.
+          </span>
+        )}
       </div>
     </section>
   );

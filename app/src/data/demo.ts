@@ -8,20 +8,20 @@ import { SEED_CATEGORIES } from './seedCategories';
 const DAY = 24 * 60 * 60 * 1000;
 
 export const DEMO_LOCATIONS: Location[] = [
-  { locationId: 'LOC-A1', code: 'A1', name: 'Sabun & pembersih', zone: 'Gudang Utama', order: 1, active: true, lastCountedTs: Date.now() - 3 * DAY },
-  { locationId: 'LOC-A2', code: 'A2', name: 'Kain & kanebo', zone: 'Gudang Utama', order: 2, active: true, lastCountedTs: Date.now() - 45 * DAY },
-  { locationId: 'LOC-A3', code: 'A3', name: 'Plastik & kantong', zone: 'Gudang Utama', order: 3, active: true },
-  { locationId: 'LOC-A4', code: 'A4', name: 'Tisu & pengharum', zone: 'Gudang Utama', order: 4, active: true },
-  { locationId: 'LOC-B1', code: 'B1', name: 'Alat listrik', zone: 'Gudang Utama', order: 5, active: true },
-  { locationId: 'LOC-B2', code: 'B2', name: 'Lampu & kabel', zone: 'Gudang Utama', order: 6, active: true, lastCountedTs: Date.now() - 60 * DAY },
-  { locationId: 'LOC-B3', code: 'B3', name: 'Elektronik & audio', zone: 'Gudang Utama', order: 7, active: true },
-  { locationId: 'LOC-C1', code: 'C1', name: 'Pipa & kran', zone: 'Gudang Utama', order: 8, active: true },
-  { locationId: 'LOC-C2', code: 'C2', name: 'Alat tukang', zone: 'Gudang Utama', order: 9, active: true },
-  { locationId: 'LOC-P1', code: 'P1', name: 'Pisau & talenan', zone: 'Gudang PHBI', order: 1, active: true },
-  { locationId: 'LOC-P2', code: 'P2', name: 'Terpal & tali', zone: 'Gudang PHBI', order: 2, active: true },
-  { locationId: 'LOC-P3', code: 'P3', name: 'Timbangan & wadah', zone: 'Gudang PHBI', order: 3, active: true },
-  { locationId: 'LOC-K1', code: 'K1', name: 'Alat kebersihan harian', zone: 'Ruang Marbot', order: 1, active: true, lastCountedTs: Date.now() - 1 * DAY },
-  { locationId: 'LOC-K2', code: 'K2', name: 'Stok harian', zone: 'Ruang Marbot', order: 2, active: true },
+  { locationId: 'LOC-A1', code: 'A1', name: 'Sabun & pembersih', zone: 'Gudang Utama', order: 1, active: true, lastCountedTs: Date.now() - 3 * DAY , artId: 'rak'},
+  { locationId: 'LOC-A2', code: 'A2', name: 'Kain & kanebo', zone: 'Gudang Utama', order: 2, active: true, lastCountedTs: Date.now() - 45 * DAY , artId: 'lemari'},
+  { locationId: 'LOC-A3', code: 'A3', name: 'Plastik & kantong', zone: 'Gudang Utama', order: 3, active: true , artId: 'keranjang'},
+  { locationId: 'LOC-A4', code: 'A4', name: 'Tisu & pengharum', zone: 'Gudang Utama', order: 4, active: true , artId: 'dinding'},
+  { locationId: 'LOC-B1', code: 'B1', name: 'Alat listrik', zone: 'Gudang Utama', order: 5, active: true , artId: 'laci'},
+  { locationId: 'LOC-B2', code: 'B2', name: 'Lampu & kabel', zone: 'Gudang Utama', order: 6, active: true, lastCountedTs: Date.now() - 60 * DAY , artId: 'gantungan'},
+  { locationId: 'LOC-B3', code: 'B3', name: 'Elektronik & audio', zone: 'Gudang Utama', order: 7, active: true , artId: 'lemari'},
+  { locationId: 'LOC-C1', code: 'C1', name: 'Pipa & kran', zone: 'Gudang Utama', order: 8, active: true , artId: 'rak'},
+  { locationId: 'LOC-C2', code: 'C2', name: 'Alat tukang', zone: 'Gudang Utama', order: 9, active: true , artId: 'gantungan'},
+  { locationId: 'LOC-P1', code: 'P1', name: 'Pisau & talenan', zone: 'Gudang PHBI', order: 1, active: true , artId: 'lemari'},
+  { locationId: 'LOC-P2', code: 'P2', name: 'Terpal & tali', zone: 'Gudang PHBI', order: 2, active: true , artId: 'palet'},
+  { locationId: 'LOC-P3', code: 'P3', name: 'Timbangan & wadah', zone: 'Gudang PHBI', order: 3, active: true , artId: 'keranjang'},
+  { locationId: 'LOC-K1', code: 'K1', name: 'Alat kebersihan harian', zone: 'Ruang Marbot', order: 1, active: true, lastCountedTs: Date.now() - 1 * DAY , artId: 'rak'},
+  { locationId: 'LOC-K2', code: 'K2', name: 'Stok harian', zone: 'Ruang Marbot', order: 2, active: true , artId: 'peti'},
 ];
 
 interface Seed {

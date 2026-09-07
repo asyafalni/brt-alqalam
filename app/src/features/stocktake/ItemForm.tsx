@@ -2,7 +2,7 @@ import { useRef, useState } from 'octane';
 import type { Category, Location } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
-import { CARD, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
+import { CARD, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
 import { ART_IDS, artFor, ItemArt } from '../items/ItemArt';
 
 
@@ -135,16 +135,15 @@ export function ItemForm(p: Props) {
         <div>
           <label class={LABEL} for="kategori">Kategori</label>
           <div class="flex gap-2">
-            <select
+            <Select
               id="kategori"
-              class={FIELD}
               value={p.input.categoryId}
               onChange={(e: Event) => p.onChange('categoryId', (e.target as HTMLSelectElement).value)}
             >
               {p.categories.map((c) => (
                 <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
               ))}
-            </select>
+            </Select>
             {/* Categories are free-form (Part XI). Hitting a thing that fits nowhere must not
                 stop the walk — that is exactly when a stock-take gets abandoned. */}
             <button
@@ -207,9 +206,8 @@ export function ItemForm(p: Props) {
       <div class="mb-4">
         <label class={LABEL} for="rak">Rak / tempat</label>
         <div class="flex gap-2">
-          <select
+          <Select
             id="rak"
-            class={FIELD}
             value={p.input.locationId ?? ''}
             onChange={(e: Event) => p.onChange('locationId', (e.target as HTMLSelectElement).value || undefined)}
           >
@@ -219,7 +217,7 @@ export function ItemForm(p: Props) {
                 {l.code}{l.name ? ` — ${l.name}` : ''} · {l.zone}
               </option>
             ))}
-          </select>
+          </Select>
           <button
             type="button"
             class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
