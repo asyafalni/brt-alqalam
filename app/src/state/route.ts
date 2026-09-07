@@ -14,15 +14,26 @@
  */
 export type BoardFilter = 'semua' | 'menipis' | 'habis' | 'belum-ditempatkan' | 'minus';
 export type BoardSort = 'nama' | 'stok-naik' | 'stok-turun' | 'rak';
+/**
+ * A different axis from `BoardFilter`, which is why it is its own parameter rather than two
+ * more chips: "what needs attention" and "what kind of thing is it" combine — menipis AND bisa
+ * habis is a real question, and one control cannot answer both at once.
+ *
+ * Spelled out rather than reusing the domain's `consumable`/`equipment`: `habis` alone already
+ * means "run out" in `BoardFilter`, and two parameters using one word for two things is how a
+ * URL becomes unreadable.
+ */
+export type BoardKind = 'semua' | 'bisa-habis' | 'barang-tetap';
 
 export const BOARD_FILTERS: BoardFilter[] = ['semua', 'menipis', 'habis', 'belum-ditempatkan', 'minus'];
 export const BOARD_SORTS: BoardSort[] = ['nama', 'stok-naik', 'stok-turun', 'rak'];
+export const BOARD_KINDS: BoardKind[] = ['semua', 'bisa-habis', 'barang-tetap'];
 
 export type Route =
   | { name: 'beranda' }
   | { name: 'opname' }
   | { name: 'label' }
-  | { name: 'board'; filter?: BoardFilter; category?: string; sort?: BoardSort }
+  | { name: 'board'; filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort }
   /** `id` opens straight onto one rack's panel — the stock list links to it by rack. */
   | { name: 'racks'; id?: string }
   | { name: 'pindai' }
@@ -76,11 +87,13 @@ export function parseRoute(hash: string): Route {
     // land on the unfiltered list, not on an error page about a query string.
     const filter = params.get('f') as BoardFilter | null;
     const sort = params.get('s') as BoardSort | null;
+    const kind = params.get('k') as BoardKind | null;
     const category = params.get('c');
     return {
       name: 'board',
       ...(filter && filter !== 'semua' && BOARD_FILTERS.includes(filter) ? { filter } : {}),
       ...(sort && sort !== 'nama' && BOARD_SORTS.includes(sort) ? { sort } : {}),
+      ...(kind && kind !== 'semua' && BOARD_KINDS.includes(kind) ? { kind } : {}),
       ...(category ? { category } : {}),
     };
   }
@@ -106,6 +119,7 @@ export function routeToHash(route: Route): string {
       const q = new URLSearchParams();
       if (route.filter && route.filter !== 'semua') q.set('f', route.filter);
       if (route.category) q.set('c', route.category);
+      if (route.kind && route.kind !== 'semua') q.set('k', route.kind);
       if (route.sort && route.sort !== 'nama') q.set('s', route.sort);
       const query = q.toString();
       return query === '' ? '#/board' : `#/board?${query}`;

@@ -6,7 +6,7 @@ import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import type { Item, Location, StockLine } from '../../../../domain/types';
-import type { BoardFilter, BoardSort } from '../../state/route';
+import type { BoardFilter, BoardKind, BoardSort } from '../../state/route';
 import { deriveState } from '../../../../domain/deriveState';
 import { deriveNotifications } from '../../../../domain/notifications';
 
@@ -41,7 +41,7 @@ function board(
   locations: Location[] = [A1],
   stock: StockLine[] = lines,
   onOpenRack: (id: string) => void = () => {},
-  start: { filter?: BoardFilter; category?: string; sort?: BoardSort } = {},
+  start: { filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort } = {},
 ) {
   const H = () => {
     /* The real screen keeps this in the URL. Holding it in state here means a chip click
@@ -61,6 +61,7 @@ function board(
         onOpenRack={onOpenRack}
         filter={view.filter}
         category={view.category}
+        kind={view.kind}
         sort={view.sort}
         onView={(next) => setView((prev) => ({ ...prev, ...next }))}
         inventory={{
@@ -233,5 +234,48 @@ describe('narrowing the list to the question being asked', () => {
     fireEvent.click(r.getByRole('button', { name: /Habis/ }));
     fireEvent.click(r.getByText('Reset'));
     expect(r.getAllByText('Sabun').length).toBeGreaterThan(0);
+  });
+});
+
+describe('telling what gets used up from what stays', () => {
+  const MIXED = () => catalog(
+    input({ name: 'Sabun', initialStock: 12, locationId: A1.locationId }),
+    input({ name: 'Pisau potong', kind: 'equipment', initialStock: 3, minStock: null,
+      locationId: A1.locationId }),
+  );
+
+  it('shows only consumables when asked for what can run out', () => {
+    const r = board(MIXED());
+    fireEvent.change(r.getByLabelText('Jenis barang'), { target: { value: 'bisa-habis' } });
+    expect(r.getAllByText('Sabun').length).toBeGreaterThan(0);
+    expect(r.queryAllByText('Pisau potong')).toHaveLength(0);
+  });
+
+  it('shows only durables when asked for what stays', () => {
+    const r = board(MIXED());
+    fireEvent.change(r.getByLabelText('Jenis barang'), { target: { value: 'barang-tetap' } });
+    expect(r.queryAllByText('Sabun')).toHaveLength(0);
+    expect(r.getAllByText('Pisau potong').length).toBeGreaterThan(0);
+  });
+
+  it('combines with a status chip rather than replacing it', () => {
+    // The whole reason this is a separate control: "menipis AND bisa habis" is one question,
+    // and a single chip row could only ever answer half of it.
+    const r = board(catalog(
+      input({ name: 'Sabun', initialStock: 1, minStock: 5, locationId: A1.locationId }),
+      input({ name: 'Ember', kind: 'equipment', initialStock: 1, minStock: 5,
+        locationId: A1.locationId }),
+    ));
+    fireEvent.change(r.getByLabelText('Jenis barang'), { target: { value: 'bisa-habis' } });
+    fireEvent.click(r.getByRole('button', { name: /Menipis/ }));
+    expect(r.getAllByText('Sabun').length).toBeGreaterThan(0);
+    expect(r.queryAllByText('Ember')).toHaveLength(0);
+  });
+
+  it('counts the chips within the kind on screen, not the whole gudang', () => {
+    // Otherwise a chip promises rows the filter cannot show.
+    const r = board(MIXED());
+    fireEvent.change(r.getByLabelText('Jenis barang'), { target: { value: 'barang-tetap' } });
+    expect(within(r.getByRole('button', { name: /Semua/ })).getByText('1')).toBeTruthy();
   });
 });

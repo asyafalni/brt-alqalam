@@ -161,6 +161,7 @@ export function App() {
               onOpenRack={(id) => navigate({ name: 'racks', id })}
               filter={route.filter}
               category={route.category}
+              kind={route.kind}
               sort={route.sort}
               /* Merged onto what is already in the URL, so changing the sort does not silently
                  clear the filter somebody arrived with. */
@@ -168,6 +169,7 @@ export function App() {
                 name: 'board',
                 filter: next.filter ?? route.filter,
                 category: next.category ?? route.category,
+                kind: next.kind ?? route.kind,
                 sort: next.sort ?? route.sort,
               })}
             />

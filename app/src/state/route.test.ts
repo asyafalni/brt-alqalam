@@ -125,6 +125,13 @@ describe('the stock list as a place you can be sent to', () => {
     expect(parseRoute(routeToHash(route))).toEqual(route);
   });
 
+  it('carries the kind on its own axis, alongside the filter', () => {
+    expect(parseRoute('#/board?f=menipis&k=bisa-habis'))
+      .toEqual({ name: 'board', filter: 'menipis', kind: 'bisa-habis' });
+    expect(routeToHash({ name: 'board', filter: 'menipis', kind: 'bisa-habis' }))
+      .toBe('#/board?f=menipis&k=bisa-habis');
+  });
+
   it('drops a filter it does not recognise instead of erroring', () => {
     // A stale or hand-typed link should land on the list, not on a page about a query string.
     expect(parseRoute('#/board?f=kadaluarsa')).toEqual({ name: 'board' });

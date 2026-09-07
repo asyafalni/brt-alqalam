@@ -10,25 +10,27 @@
 import { useMemo } from 'octane';
 import { MapPin, Package, TriangleAlert, X } from '@octanejs/lucide';
 import type { Category, DerivedItem, Item, Location } from '../../../../domain/types';
-import type { BoardFilter, BoardSort } from '../../state/route';
-import { BOARD_FILTERS } from '../../state/route';
+import type { BoardFilter, BoardKind, BoardSort } from '../../state/route';
+import { BOARD_FILTERS, BOARD_KINDS } from '../../state/route';
 import type { Inventory } from '../../state/useInventory';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Select, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
-import { FILTER_LABEL, SORT_LABEL, matchesFilter, sortRows } from './filters';
+import { FILTER_LABEL, KIND_LABEL, SORT_LABEL, matchesFilter, matchesKind, sortRows } from './filters';
 
 export function Board(
   { items, categories, locations, inventory, search, filter = 'semua', category = '',
-    sort = 'nama', onOpenItem, onOpenRack, onView }:
+    kind = 'semua', sort = 'nama', onOpenItem, onOpenRack, onView }:
   { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory;
     search: string;
-    filter?: BoardFilter; category?: string; sort?: BoardSort;
+    filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort;
     onOpenItem: (itemId: string) => void; onOpenRack: (locationId: string) => void;
     /** Changing a control changes the URL, so the view somebody is looking at is linkable. */
-    onView: (next: { filter?: BoardFilter; category?: string; sort?: BoardSort }) => void },
+    onView: (next: {
+      filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort;
+    }) => void },
 ) {
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
@@ -41,8 +43,11 @@ export function Board(
       .map((i) => derived.items[i.itemId])
       .filter(Boolean)
       .filter((d) => q === '' || `${d.item.name} ${d.item.unit}`.toLowerCase().includes(q))
-      .filter((d) => category === '' || d.item.categoryId === category),
-    [items, derived.items, q, category],
+      .filter((d) => category === '' || d.item.categoryId === category)
+      /* Scoping, like the category and the search — so the chip counts below describe the
+         subset actually on screen rather than the whole gudang. */
+      .filter((d) => matchesKind(d, kind)),
+    [items, derived.items, q, category, kind],
   );
 
   const rows = useMemo(
@@ -289,6 +294,21 @@ export function Board(
               </div>
 
               <div class="ml-auto flex flex-wrap items-center gap-2">
+                {/* Beside the category, not among the chips: both answer "which subset of the
+                    catalog", while the chips answer "which of them needs me". */}
+                <label class="sr-only" for="board-kind">Jenis barang</label>
+                <Select
+                  id="board-kind"
+                  wrapClass="w-40"
+                  class="min-h-11 py-0 text-sm"
+                  value={kind}
+                  onChange={(e: Event) => onView({ kind: (e.target as HTMLSelectElement).value as BoardKind })}
+                >
+                  {BOARD_KINDS.map((k) => (
+                    <option key={k} value={k}>{KIND_LABEL[k]}</option>
+                  ))}
+                </Select>
+
                 <label class="sr-only" for="board-category">Kategori</label>
                 <Select
                   id="board-category"
@@ -316,11 +336,11 @@ export function Board(
                   ))}
                 </Select>
 
-                {(filter !== 'semua' || category !== '' || sort !== 'nama') && (
+                {(filter !== 'semua' || category !== '' || kind !== 'semua' || sort !== 'nama') && (
                   <button
                     type="button"
                     class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-slate-500 underline hover:text-slate-900"
-                    onClick={() => onView({ filter: 'semua', category: '', sort: 'nama' })}
+                    onClick={() => onView({ filter: 'semua', category: '', kind: 'semua', sort: 'nama' })}
                   >
                     <X class="h-4 w-4" /> Reset
                   </button>

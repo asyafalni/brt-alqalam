@@ -5,7 +5,7 @@
 // because these are URL values first and controls second (a filtered list is a place you can
 // be sent to).
 
-import type { BoardFilter, BoardSort } from '../../state/route';
+import type { BoardFilter, BoardKind, BoardSort } from '../../state/route';
 import type { DerivedItem, Location } from '../../../../domain/types';
 
 /** The question each filter answers, in the words the control shows. */
@@ -15,6 +15,26 @@ export const FILTER_LABEL: Record<BoardFilter, string> = {
   habis: 'Habis',
   'belum-ditempatkan': 'Belum ditempatkan',
   minus: 'Minus',
+};
+
+/**
+ * The plain-language names from the item form, not "consumable"/"equipment".
+ *
+ * Part XI: the perlengkapan/peralatan split was only ever a proxy for "does this get used up",
+ * and the words that survived are the ones an operator was asked at item creation. Using
+ * different words here would make the filter look like it selects something else.
+ */
+export const KIND_LABEL: Record<BoardKind, string> = {
+  semua: 'Semua jenis',
+  'bisa-habis': 'Bisa habis',
+  'barang-tetap': 'Barang tetap',
+};
+
+/** Whether an item is the kind being asked for. `kind` drives the whole lifecycle (Part XI). */
+export const matchesKind = (d: DerivedItem, kind: BoardKind): boolean => {
+  if (kind === 'bisa-habis') return d.item.kind === 'consumable';
+  if (kind === 'barang-tetap') return d.item.kind === 'equipment';
+  return true;
 };
 
 export const SORT_LABEL: Record<BoardSort, string> = {

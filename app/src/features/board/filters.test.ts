@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { isPlaced, matchesFilter, sortRows } from './filters';
+import { isPlaced, matchesFilter, matchesKind, sortRows } from './filters';
 import type { DerivedItem, Location } from '../../../../domain/types';
 
 const row = (
   name: string, qty: number, status: DerivedItem['status'],
   byLocation: Record<string, number> = {},
+  kind: DerivedItem['item']['kind'] = 'consumable',
 ): DerivedItem => ({
   item: {
     itemId: `ITM-${name}`, barcode: `ALQ-${name}`, name, categoryId: 'CAT-K',
-    kind: 'consumable', unit: 'buah', trackBy: 'quantity', minStock: 2, active: true,
+    kind, unit: 'buah', trackBy: kind === 'equipment' ? 'instance' : 'quantity',
+    minStock: 2, active: true,
   },
   qty, byLocation, status, outstanding: 0, takenTotal: 0,
 });
@@ -43,6 +45,24 @@ describe('matchesFilter', () => {
 
   it('lets everything through when nothing is being asked', () => {
     expect(matchesFilter(row('a', 0, 'out'), 'semua')).toBe(true);
+  });
+});
+
+describe('matchesKind', () => {
+  // A different axis from the status filters: "menipis AND bisa habis" is a real question, so
+  // the two cannot share one control.
+  const sabun = row('Sabun', 5, 'available');
+  const pisau = row('Pisau', 3, 'available', {}, 'equipment');
+
+  it('separates what gets used up from what stays', () => {
+    expect(matchesKind(sabun, 'bisa-habis')).toBe(true);
+    expect(matchesKind(pisau, 'bisa-habis')).toBe(false);
+    expect(matchesKind(pisau, 'barang-tetap')).toBe(true);
+  });
+
+  it('lets everything through when nothing is being asked', () => {
+    expect(matchesKind(sabun, 'semua')).toBe(true);
+    expect(matchesKind(pisau, 'semua')).toBe(true);
   });
 });
 
