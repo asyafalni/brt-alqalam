@@ -1,0 +1,23 @@
+# Fly.io — a static site, so the machine's only job is to hand over files.
+app = 'brt-alqalam'
+primary_region = 'sin'          # Singapore: the nearest region to Indonesia.
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[http_service]
+  internal_port = 8080
+  # Every QR encodes an https:// deep link, and the camera will not open outside a secure
+  # context — so plain http is not a downgrade here, it is a broken scanner.
+  force_https = true
+
+  # Suspend rather than stop: a suspended machine resumes in about a tenth of a second, so a
+  # marbot scanning a rack label does not wait for a cold boot, and nothing runs (or is billed)
+  # in the hours nobody is in the gudang.
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'              # nginx serving ~700kB of static files needs nothing more.
