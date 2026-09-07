@@ -181,10 +181,22 @@ export function App() {
               inventory={inventory}
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
+              onRequest={(type, assetId) => navigate({ name: 'pengajuan', type, assetId })}
             />
           )}
           {route.name === 'pengajuan' && (
-            <RequestBoard draft={draft} now={now} />
+            <RequestBoard
+              draft={draft}
+              inventory={inventory}
+              now={now}
+              /* Keyed by the prefill so arriving from a second broken unit remounts the form
+                 rather than reusing the state of the first. */
+              key={route.assetId ?? 'pengajuan'}
+              prefill={route.type && route.assetId
+                ? { type: route.type, assetId: route.assetId }
+                : undefined}
+              onPrefillUsed={() => { if (route.assetId) navigate({ name: 'pengajuan' }); }}
+            />
           )}
           {route.name === 'laporan' && (
             <Report draft={draft} inventory={inventory} now={now} />

@@ -1,3 +1,5 @@
-requestId,name,itemId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note
-REQ-0001,Sapu ijuk,,2,buah,25000,Sapu yang lama sudah patah gagangnya,https://www.tokopedia.com/,diajukan,USR-DEMO,2026-09-05T08:00:00Z,,,
-REQ-0002,Sabun cuci tangan,ITM-0001,4,galon,38000,Stok tinggal sedikit menjelang Ramadhan,,dibeli,USR-DEMO,2026-09-01T08:00:00Z,USR-DEMO,2026-09-03T09:00:00Z,Dibeli di toko depan
+requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note
+REQ-0001,beli,Sapu ijuk gagang panjang,,,3,buah,27500,Gagang yang lama patah semua; tinggal satu yang bisa dipakai,https://www.tokopedia.com/,diajukan,USR-DEMO,2026-09-04T02:00:00Z,,,
+REQ-0002,beli,Sabun cuci tangan,ITM-0001,,4,galon,38000,Stok tinggal sedikit menjelang Ramadhan,,selesai,USR-DEMO,2026-09-01T08:00:00Z,USR-DEMO,2026-09-03T09:00:00Z,Dibeli di toko depan
+REQ-0003,perbaikan,Mesin potong rumput,ITM-0014,AST-0014-2,1,,185000,Tali starter putus dan businya mati; masih layak diperbaiki,,diajukan,USR-DEMO,2026-09-05T01:30:00Z,,,
+REQ-0004,beli,Pisau daging (pengganti yang hilang),ITM-0011,AST-0011-4,2,buah,95000,Dua bilah hilang setelah Qurban dan tidak ketemu sampai sekarang,,diajukan,USR-DEMO,2026-09-05T06:00:00Z,,,

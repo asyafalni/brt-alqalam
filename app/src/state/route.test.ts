@@ -89,3 +89,23 @@ describe('routeFromScan — what the camera decoded', () => {
     expect(routeFromScan('https://x.test/#/board')).toBeNull();
   });
 });
+
+describe('opening Pengajuan for one unit', () => {
+  // In the URL rather than in memory, so the trip through Aset survives a reload and the link
+  // can be sent to somebody.
+  it('carries which unit and which kind of request', () => {
+    expect(parseRoute('#/pengajuan?t=perbaikan&a=ALQ-ITM-0001-002'))
+      .toEqual({ name: 'pengajuan', type: 'perbaikan', assetId: 'ALQ-ITM-0001-002' });
+  });
+
+  it('round-trips', () => {
+    const route = { name: 'pengajuan', type: 'beli', assetId: 'ALQ-ITM-0001-007' } as const;
+    expect(parseRoute(routeToHash(route))).toEqual(route);
+  });
+
+  it('is the plain screen when the kind is missing or nonsense', () => {
+    // Half a prefill would open the form on the wrong branch, which is worse than none.
+    expect(parseRoute('#/pengajuan?a=ALQ-ITM-0001-002')).toEqual({ name: 'pengajuan' });
+    expect(parseRoute('#/pengajuan?t=hapus&a=ALQ-ITM-0001-002')).toEqual({ name: 'pengajuan' });
+  });
+});

@@ -11,7 +11,7 @@
 // whole point of the system is that the numbers can be believed.
 
 import type { AssetInstance, Category, Item, Kind, Location, MovementType, StockLine, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
-import type { PurchaseRequest, RequestStatus } from '../domain/requests';
+import type { PurchaseRequest, RequestStatus, RequestType } from '../domain/requests';
 import { parseCsv, toRecords } from './csv';
 
 export interface ParseIssue {
@@ -253,7 +253,19 @@ export const buildInstance = (r: Record<string, string>): AssetInstance => ({
     active: bool(r, 'active', true),
   });
 
-const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'dibeli', 'ditolak'];
+const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'selesai', 'ditolak'];
+const REQUEST_TYPES: RequestType[] = ['beli', 'perbaikan'];
+
+/**
+ * `selesai` was called `dibeli` before repairs existed, and rows written then are still in the
+ * sheet. Renaming a value does not travel back and rewrite history, so the old word is accepted
+ * here — at the boundary, where every other shape of legacy data is already handled — rather
+ * than leaving real rows to quarantine over a word we changed ourselves.
+ */
+const requestStatus = (r: Record<string, string>): RequestStatus =>
+  (r['status']?.trim().toLowerCase() === 'dibeli'
+    ? 'selesai'
+    : oneOf<RequestStatus>(r, 'status', REQUEST_STATUSES));
 
 /**
  * One row of the Requests tab — something somebody wants the masjid to buy.
@@ -266,15 +278,21 @@ const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'dibeli', 'ditolak'];
 export const buildRequest = (r: Record<string, string>): PurchaseRequest => {
   const out: PurchaseRequest = {
     requestId: req(r, 'requestid'),
+    // A sheet written before repairs existed has no type column, and every row in it was a
+    // purchase. Defaulting is the truth about those rows, not a guess.
+    type: r['type'] ? oneOf<RequestType>(r, 'type', REQUEST_TYPES) : 'beli',
     name: req(r, 'name'),
     qty: num(r, 'qty', 0),
-    unit: req(r, 'unit'),
+    // Blank on a repair, and correctly so: a repair is one job on one unit, so "berapa buah"
+    // has no answer to be missing. Only a purchase is required to say what it counts in.
+    unit: r['type']?.trim().toLowerCase() === 'perbaikan' ? (r['unit'] ?? '') : req(r, 'unit'),
     reason: req(r, 'reason'),
-    status: oneOf<RequestStatus>(r, 'status', REQUEST_STATUSES),
+    status: requestStatus(r),
     requestedBy: req(r, 'requestedby'),
     requestedTs: ts(r, 'requestedts'),
   };
   if (r['itemid']) out.itemId = r['itemid'];
+  if (r['assetid']) out.assetId = r['assetid'];
   if (r['price']) out.price = num(r, 'price', 0);
   if (r['url']) out.url = r['url'];
   if (r['note']) out.note = r['note'];

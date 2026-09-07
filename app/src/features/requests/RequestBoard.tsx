@@ -1,27 +1,34 @@
-// Pengajuan Pembelian — asking for something the masjid does not have yet.
+// Pengajuan — one list of everything somebody is asking money for.
 //
 // The screen exists because of §0's third problem: the takmir cannot see that BRT's assets are
 // being managed. A list of what is needed, with a reason and a price beside each line, is the
 // most direct answer to that anybody asked for — and unlike the stock screens it is written to
 // be read by somebody who does not use this app day to day.
 //
-// A request is NOT stock. It becomes stock at exactly one moment, when somebody marks it
+// Buying and repairing share it, and that is deliberate. To whoever signs off, "beli pisau baru
+// 95rb" and "servis mesin potong rumput 185rb" are the same question asked twice; splitting them
+// across two screens would mean two lists to check and a standing argument about which one a
+// thing belongs on.
+//
+// A request is NOT stock. A purchase becomes stock at exactly one moment, when somebody marks it
 // bought, and that moment is a form rather than a toggle: buying decides where it goes and, for
-// something new, what it is. Everything before that moment lives only here.
+// something new, what it is. A repair never becomes stock at all — it hands one unit back to
+// the shelf, as an appended `status_change`.
 
 import { useMemo, useState } from 'octane';
-import { Check, ExternalLink, Plus, ShoppingCart, X } from '@octanejs/lucide';
+import { Check, ExternalLink, Plus, ShoppingCart, Wrench, X } from '@octanejs/lucide';
 import {
-  addToStock, openRequests, openTotal, purchaseIntoStock, requestTotal, sortRequests,
-  validateRequest,
+  addToStock, openRequests, openTotal, purchaseIntoStock, repairDone, requestTotal, sortRequests,
 } from '../../../../domain/requests';
-import type { PurchaseRequest, RequestStatus } from '../../../../domain/requests';
+import type { PurchaseRequest, RequestStatus, RequestType } from '../../../../domain/requests';
 import type { Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
+import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, ERROR_TEXT, FIELD, LABEL, PageHeader, Select, Stat } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
+import type { RequestInput } from './RequestForm';
 import { RequestPhotos } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
@@ -33,8 +40,8 @@ const STATUS: Record<RequestStatus, { label: string; chip: string; rail: string 
     chip: 'bg-amber-50 text-amber-700 border border-amber-200',
     rail: 'bg-amber-500',
   },
-  dibeli: {
-    label: 'Sudah dibeli',
+  selesai: {
+    label: 'Selesai',
     chip: 'bg-green-50 text-green-700 border border-green-200',
     rail: 'bg-green-500',
   },
@@ -45,15 +52,50 @@ const STATUS: Record<RequestStatus, { label: string; chip: string; rail: string 
   },
 };
 
+/**
+ * The words that differ between the two kinds, in one place.
+ *
+ * They are worth getting right rather than settling on a neutral "selesai" everywhere: "sudah
+ * dibeli" and "sudah diperbaiki" are what somebody would actually say, and a screen that talks
+ * the way its readers do is read.
+ */
+const KIND: Record<RequestType, {
+  label: string; chip: string; icon: (p: { class?: string }) => unknown;
+  done: string; undone: string;
+}> = {
+  beli: {
+    label: 'Beli',
+    chip: 'bg-sky-50 text-sky-700 border border-sky-200',
+    icon: ShoppingCart,
+    done: 'Sudah dibeli',
+    undone: 'Tidak jadi dibeli',
+  },
+  perbaikan: {
+    label: 'Perbaikan',
+    chip: 'bg-orange-50 text-orange-700 border border-orange-200',
+    icon: Wrench,
+    done: 'Sudah diperbaiki',
+    undone: 'Tidak jadi diperbaiki',
+  },
+};
+
 const when = (ts: number) =>
   new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export function RequestBoard(
-  { draft, now, actor = 'USR-DEMO' }: { draft: Draft; now: number; actor?: string },
+  { draft, inventory, now, actor = 'USR-DEMO', prefill, onPrefillUsed }:
+  {
+    draft: Draft; inventory: Inventory; now: number; actor?: string;
+    /** Set when the screen was opened from a broken or lost unit on the Aset page. */
+    prefill?: { type: RequestType; assetId: string };
+    onPrefillUsed?: () => void;
+  },
 ) {
-  const { requests, setRequests, setPurchase } = draft;
+  const { requests, setRequests, setPurchase, setRepair } = draft;
 
-  const [adding, setAdding] = useState(false);
+  // The sheet opens by itself when arrived at from Aset: the click that got here already said
+  // "ajukan", and asking for it a second time is the tap §0.0 exists to remove.
+  const [adding, setAdding] = useState(prefill != null);
   const [buying, setBuying] = useState<PurchaseRequest | null>(null);
   const [rejecting, setRejecting] = useState<PurchaseRequest | null>(null);
 
@@ -61,10 +103,27 @@ export function RequestBoard(
   const open = useMemo(() => openRequests(requests), [requests]);
   const money = useMemo(() => openTotal(requests), [requests]);
 
-  function submit(input: Parameters<typeof validateRequest>[0] & { itemId?: string }) {
-    const id = `REQ-${String(requests.length + 1).padStart(4, '0')}`;
+  const instances = useMemo(
+    () => Object.values(inventory.derived.instances),
+    [inventory.derived.instances],
+  );
+
+  function closeForm() {
+    setAdding(false);
+    onPrefillUsed?.();
+  }
+
+  function submit(input: RequestInput) {
+    // Highest so far plus one, not the count: turning down a request does not remove it, so a
+    // count-based id starts colliding the moment anything is ever deleted or seeded unevenly.
+    const highest = requests.reduce((max, r) => {
+      const n = Number(/(\d+)$/.exec(r.requestId)?.[1] ?? 0);
+      return n > max ? n : max;
+    }, 0);
+    const id = `REQ-${String(highest + 1).padStart(4, '0')}`;
     setRequests((prev) => [...prev, {
       requestId: id,
+      type: input.type,
       name: input.name.trim(),
       qty: input.qty,
       unit: input.unit.trim(),
@@ -73,10 +132,11 @@ export function RequestBoard(
       requestedBy: actor,
       requestedTs: Date.now(),
       ...(input.itemId ? { itemId: input.itemId } : {}),
+      ...(input.assetId ? { assetId: input.assetId } : {}),
       ...(input.price != null ? { price: input.price } : {}),
       ...(input.url && input.url.trim() !== '' ? { url: input.url.trim() } : {}),
     }]);
-    setAdding(false);
+    closeForm();
   }
 
   /**
@@ -118,10 +178,36 @@ export function RequestBoard(
         requests: prev.requests.map((r) => (r.requestId === request.requestId
           ? {
             ...r,
-            status: 'dibeli' as const,
+            status: 'selesai' as const,
             decidedBy: actor,
             decidedTs: Date.now(),
             ...(itemId ? { itemId } : {}),
+            ...(note.trim() !== '' ? { note: note.trim() } : {}),
+          }
+          : r)),
+      };
+    });
+    setBuying(null);
+  }
+
+  /**
+   * Finishing a repair, which is the mirror of buying and not a smaller version of it.
+   *
+   * Nothing is added — the unit was always ours. What changes is its status, appended to the
+   * log so the break stays in its history. Closing the request without that would leave the
+   * register saying a thing is broken that is, by then, back on its hook.
+   */
+  function markRepaired(request: PurchaseRequest, note: string) {
+    setRepair((prev) => {
+      const txn = repairDone(request, actor, Date.now());
+      return {
+        txns: txn ? [...prev.txns, txn] : prev.txns,
+        requests: prev.requests.map((r) => (r.requestId === request.requestId
+          ? {
+            ...r,
+            status: 'selesai' as const,
+            decidedBy: actor,
+            decidedTs: Date.now(),
             ...(note.trim() !== '' ? { note: note.trim() } : {}),
           }
           : r)),
@@ -146,11 +232,11 @@ export function RequestBoard(
   return (
     <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <PageHeader
-        title="Pengajuan Pembelian"
-        subtitle="Barang yang diminta untuk dibeli — beserta alasan, perkiraan harga dan tautannya."
+        title="Pengajuan"
+        subtitle="Yang diminta untuk dibeli atau diperbaiki — beserta alasan, perkiraan biaya dan tautannya."
         action={
           <Button onClick={() => setAdding(true)}>
-            <Plus class="h-4 w-4" /> Ajukan barang
+            <Plus class="h-4 w-4" /> Ajukan
           </Button>
         }
       />
@@ -158,8 +244,8 @@ export function RequestBoard(
       <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
         <Stat value={open.length} label="Menunggu diputuskan" tint={open.length > 0 ? 'bg-amber-50 text-amber-600' : undefined} />
         <Stat
-          value={requests.filter((r) => r.status === 'dibeli').length}
-          label="Sudah dibeli"
+          value={requests.filter((r) => r.status === 'selesai').length}
+          label="Sudah selesai"
           tint="bg-green-50 text-green-600"
         />
         {/* The number a takmir meeting actually asks for, with its own honesty note attached:
@@ -182,17 +268,19 @@ export function RequestBoard(
           <ShoppingCart class="mx-auto mb-3 h-10 w-10 text-slate-300" />
           <p class="mb-1 font-semibold text-slate-700">Belum ada pengajuan.</p>
           <p class="mx-auto mb-5 max-w-md text-sm text-slate-500">
-            Kalau ada barang yang perlu dibeli — habis, rusak, atau memang belum punya —
-            ajukan di sini supaya pengurus tahu dan bisa memutuskan.
+            Kalau ada yang perlu dibeli — habis atau memang belum punya — atau ada yang rusak
+            dan masih bisa diperbaiki, ajukan di sini supaya pengurus tahu dan bisa memutuskan.
           </p>
           <Button size="touch" onClick={() => setAdding(true)}>
-            <Plus class="h-5 w-5" /> Ajukan barang
+            <Plus class="h-5 w-5" /> Ajukan
           </Button>
         </div>
       ) : (
         <ul class="space-y-3">
           {rows.map((r) => {
             const skin = STATUS[r.status];
+            const kind = KIND[r.type];
+            const KindIcon = kind.icon;
             const total = requestTotal(r);
             return (
               <li key={r.requestId} class={`${CARD} flex gap-3 p-0`}>
@@ -200,6 +288,11 @@ export function RequestBoard(
                 <div class="min-w-0 flex-1 py-4 pr-4 sm:pr-5">
                   <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <h2 class="text-base font-bold text-slate-900">{r.name}</h2>
+                    {/* Which kind comes before which state: "perbaikan" changes how every
+                        other figure on the row should be read. */}
+                    <span class={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${kind.chip}`}>
+                      <KindIcon class="h-3 w-3" /> {kind.label}
+                    </span>
                     <span class={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${skin.chip}`}>
                       {skin.label}
                     </span>
@@ -208,16 +301,30 @@ export function RequestBoard(
                     </span>
                   </div>
 
-                  <p class="mt-0.5 text-sm tabular-nums text-slate-500">
-                    {r.qty} {r.unit}
-                    {r.price != null && (
-                      <>
-                        {' · '}{rupiah(r.price)}/{r.unit}
-                        {total != null && <span class="font-semibold text-slate-900"> · {rupiah(total)}</span>}
-                      </>
-                    )}
-                    {r.itemId && <span class="text-slate-400"> · tambah stok yang sudah ada</span>}
-                  </p>
+                  {r.type === 'perbaikan' ? (
+                    <p class="mt-0.5 text-sm tabular-nums text-slate-500">
+                      {r.assetId && <span class="font-mono text-xs">{r.assetId}</span>}
+                      {total != null && (
+                        <span class="font-semibold text-slate-900">
+                          {r.assetId ? ' · ' : ''}{rupiah(total)}
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p class="mt-0.5 text-sm tabular-nums text-slate-500">
+                      {r.qty} {r.unit}
+                      {r.price != null && (
+                        <>
+                          {' · '}{rupiah(r.price)}/{r.unit}
+                          {total != null && <span class="font-semibold text-slate-900"> · {rupiah(total)}</span>}
+                        </>
+                      )}
+                      {r.itemId && <span class="text-slate-400"> · tambah stok yang sudah ada</span>}
+                      {/* A replacement says what it replaces: that is what turns the loss log
+                          into a procurement list somebody can close out. */}
+                      {r.assetId && <span class="text-slate-400"> · pengganti {r.assetId}</span>}
+                    </p>
+                  )}
 
                   {/* The reason gets its own line and its own weight. A price without a reason
                       is a number nobody can judge, which is the whole failure this screen is
@@ -246,7 +353,7 @@ export function RequestBoard(
                     {r.status === 'diajukan' && (
                       <>
                         <Button size="sm" class="min-h-11" onClick={() => setBuying(r)}>
-                          <Check class="h-4 w-4" /> Sudah dibeli
+                          <Check class="h-4 w-4" /> {kind.done}
                         </Button>
                         <Button
                           size="sm"
@@ -273,32 +380,44 @@ export function RequestBoard(
 
       <Sheet
         open={adding}
-        title="Ajukan barang"
+        title="Ajukan"
         description="Pengurus akan melihat ini di Beranda."
-        onClose={() => setAdding(false)}
+        onClose={closeForm}
       >
-        <RequestForm items={draft.items} onSubmit={submit} onCancel={() => setAdding(false)} />
+        <RequestForm
+          items={draft.items}
+          instances={instances}
+          prefill={prefill}
+          onSubmit={submit}
+          onCancel={closeForm}
+        />
       </Sheet>
 
       <Sheet
         open={buying !== null}
-        title="Tandai sudah dibeli"
+        title={buying ? `Tandai ${KIND[buying.type].done.toLowerCase()}` : ''}
         description={buying?.name}
         onClose={() => setBuying(null)}
       >
-        {buying && (
+        {buying && (buying.type === 'perbaikan' ? (
+          <RepairedForm
+            request={buying}
+            onConfirm={(note) => markRepaired(buying, note)}
+            onCancel={() => setBuying(null)}
+          />
+        ) : (
           <BoughtForm
             request={buying}
             draft={draft}
             onConfirm={(locationId, fallback, note) => markBought(buying, locationId, fallback, note)}
             onCancel={() => setBuying(null)}
           />
-        )}
+        ))}
       </Sheet>
 
       <Sheet
         open={rejecting !== null}
-        title="Tidak jadi dibeli"
+        title={rejecting ? KIND[rejecting.type].undone : ''}
         description={rejecting?.name}
         onClose={() => setRejecting(null)}
       >
@@ -430,6 +549,57 @@ function BoughtForm(
 }
 
 /** Turning one down. The note is the whole point — "tidak jadi" without a why gets re-asked. */
+/**
+ * What finishing a repair decides — which is almost nothing, and that is the point.
+ *
+ * Buying asks where the thing goes and, for something new, what it is. A repair asks none of
+ * that: the unit already has a rack, a category and a label. Adding fields here to make the two
+ * forms match would be asking questions whose answers are already recorded.
+ */
+function RepairedForm(
+  { request, onConfirm, onCancel }:
+  { request: PurchaseRequest; onConfirm: (note: string) => void; onCancel: () => void },
+) {
+  const [note, setNote] = useState('');
+  return (
+    <div>
+      <p class="rounded-lg border border-green-200 bg-green-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
+        <span class="font-semibold">{request.name}</span> akan ditandai tidak rusak lagi dan
+        kembali dihitung sebagai siap dipakai.
+        {request.assetId && <span class="block font-mono text-xs text-slate-500">{request.assetId}</span>}
+      </p>
+
+      <div class="mt-4">
+        <label class={LABEL} for="repair-note">Catatan (opsional)</label>
+        <textarea
+          id="repair-note"
+          rows={3}
+          class={`${FIELD} py-3`}
+          value={note}
+          placeholder="Diservis di bengkel Pak Yanto, ganti busi dan tali starter."
+          onInput={(e: Event) => setNote((e.target as HTMLTextAreaElement).value)}
+        />
+      </div>
+
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        {/* Not "Sudah diperbaiki": that is the word on the row button that opened this sheet,
+            and two controls with one name is how somebody clicks the wrong one. */}
+        <Button size="touch" onClick={() => onConfirm(note)}>
+          <Check class="h-5 w-5" /> Catat perbaikan selesai
+        </Button>
+        <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
+          Batal
+        </button>
+      </div>
+
+      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        Riwayat kerusakannya tetap tersimpan — yang dicatat adalah perbaikannya, bukan
+        penghapusan kejadiannya.
+      </p>
+    </div>
+  );
+}
+
 function RejectForm(
   { onConfirm, onCancel }: { onConfirm: (note: string) => void; onCancel: () => void },
 ) {

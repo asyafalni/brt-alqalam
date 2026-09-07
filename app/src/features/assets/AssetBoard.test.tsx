@@ -12,6 +12,7 @@ import type { Item, StockLine, Txn } from '../../../../domain/types';
 const NOW = Date.now();
 
 const opened = vi.fn();
+const requested = vi.fn();
 
 // The draft is owned above the screen (App), so the test supplies it the same way.
 function Harness() {
@@ -22,6 +23,7 @@ function Harness() {
       inventory={useInventory(draft, NOW)}
       search=""
       onOpenItem={opened}
+      onRequest={requested}
     />
   );
 }
@@ -118,7 +120,7 @@ describe('Aset — three questions, three answers', () => {
 
     const banner = r.getByRole('alert');
     expect(within(banner).getByText(/1 aset hilang/)).toBeTruthy();
-    expect(within(banner).getByText(/dibeli ulang/)).toBeTruthy();
+    expect(within(banner).getByText(/Ajukan penggantinya/)).toBeTruthy();
 
     // Five units exist; the lost one has left the active base for good.
     const owned = r.getByText('Masih dimiliki').closest('div')!;
@@ -185,5 +187,43 @@ describe('Aset — three questions, three answers', () => {
     expect(r.getByText('Belum ada barang berlabel.')).toBeTruthy();
     expect(r.getByText(/Label satu-satu/)).toBeTruthy();
     expect(r.queryByRole('heading', { name: 'Sedang dipinjam' })).toBeNull();
+  });
+});
+
+describe('the next step attached to each problem', () => {
+  // Until this existed, both lists said a thing was broken or gone and left the reader to
+  // remember it somewhere else. A worklist with no action on it is a list, not a worklist.
+  it('offers to ask for a repair on something broken', () => {
+    seed(ITEMS(), HISTORY);
+    const r = render(Harness);
+    fireEvent.click(r.getAllByLabelText(/Ajukan perbaikan: /)[0]);
+    expect(requested).toHaveBeenCalledWith('perbaikan', 'ALQ-ITM-0001-002');
+  });
+
+  it('offers to ask for a replacement for something lost', () => {
+    // A lost thing cannot be repaired, so the loss log offers the only step that exists.
+    seed(ITEMS(), HISTORY);
+    const r = render(Harness);
+    fireEvent.click(r.getAllByLabelText(/Ajukan pembelian pengganti: /)[0]);
+    expect(requested).toHaveBeenCalledWith('beli', 'ALQ-ITM-0002-001');
+  });
+
+  it('does not open the item as well — the button is not the row', () => {
+    seed(ITEMS(), HISTORY);
+    const r = render(Harness);
+    opened.mockClear();
+    fireEvent.click(r.getAllByLabelText(/Ajukan perbaikan: /)[0]);
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing on a loan, which resolves by being returned', () => {
+    // Asking for money because somebody has borrowed something would be nonsense; the row is
+    // already answered by the borrower's name beside it.
+    seed(ITEMS(), HISTORY);
+    const r = render(Harness);
+    const labels = r.queryAllByLabelText(/^Ajukan /).map((el) => el.getAttribute('aria-label'));
+    // ALQ-ITM-0001-001 is the one on loan.
+    expect(labels.some((l) => l?.endsWith('Pisau potong #1'))).toBe(false);
+    expect(labels.some((l) => l?.endsWith('Pisau potong #2'))).toBe(true);
   });
 });

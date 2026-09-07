@@ -201,6 +201,8 @@ describe('parseLocations', () => {
   });
 });
 
+const REQ2_HEADER = 'requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note\n';
+/** Deliberately the header from before repairs existed — those rows are still in the sheet. */
 const REQ_HEADER = 'requestId,name,itemId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note\n';
 
 describe('parseRequests', () => {
@@ -233,5 +235,29 @@ describe('parseRequests', () => {
     const r = parseRequests(REQ_HEADER
       + 'REQ-0004,Sapu,,1,buah,,,,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
     expect(r.quarantined[0].field).toBe('reason');
+  });
+
+  // The four tests above all use the pre-repair header, which is the point: those rows are
+  // still in the sheet and must keep reading.
+  it('calls a row from before repairs existed a purchase, because that is what it was', () => {
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0005,Sapu,,1,buah,,Habis,,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.ok[0].type).toBe('beli');
+  });
+
+  it('still reads the old "dibeli" status, which we renamed and it did not', () => {
+    // Renaming a value does not travel back and rewrite history. Quarantining real rows over a
+    // word we changed ourselves would be our bug reported as their data problem.
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0006,Sapu,,1,buah,,Habis,,dibeli,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].status).toBe('selesai');
+  });
+
+  it('reads a repair and the unit it is about', () => {
+    const r = parseRequests(REQ2_HEADER
+      + 'REQ-0007,perbaikan,Mesin potong rumput,ITM-9,AST-9-2,1,,185000,Tali starter putus,,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0]).toMatchObject({ type: 'perbaikan', assetId: 'AST-9-2', unit: '' });
   });
 });

@@ -23,7 +23,7 @@ export interface StoredDraft {
    * *derived* consequence of a transaction and cannot exist without one.
    */
   txns: Txn[];
-  /** Things somebody wants bought. Not stock until one is marked `dibeli`. */
+  /** Things somebody wants bought or repaired. A purchase is not stock until it is finished. */
   requests: PurchaseRequest[];
 }
 
@@ -48,6 +48,21 @@ const isTxn = (v: unknown): v is Txn =>
 
 const isRequest = (v: unknown): v is PurchaseRequest =>
   !!v && typeof v === 'object' && typeof (v as PurchaseRequest).requestId === 'string';
+
+/**
+ * Requests written before repairs existed, brought forward.
+ *
+ * Deliberately NOT a key bump. The rest of the draft is unchanged, and a new key means a
+ * migration branch that has to copy items, racks, stock and the log correctly just to reword
+ * one field — far more that can go wrong than reading the old shape honestly here. Every row
+ * written then was a purchase, and `dibeli` was what `selesai` was called, so neither is a
+ * guess about what somebody meant.
+ */
+const normaliseRequest = (r: PurchaseRequest): PurchaseRequest => ({
+  ...r,
+  type: r.type === 'perbaikan' ? 'perbaikan' : 'beli',
+  status: (r.status as string) === 'dibeli' ? 'selesai' : r.status,
+});
 
 const isStockLine = (v: unknown): v is StockLine =>
   !!v && typeof v === 'object'
@@ -87,7 +102,7 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
       locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
       stock: Array.isArray(stock) ? stock.filter(isStockLine) : [],
       txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
-      requests: Array.isArray(requests) ? requests.filter(isRequest) : [],
+      requests: Array.isArray(requests) ? requests.filter(isRequest).map(normaliseRequest) : [],
     };
   }
 

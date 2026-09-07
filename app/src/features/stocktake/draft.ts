@@ -117,7 +117,7 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId';
 const STOCK_HEADER = 'itemId,locationId,initialStock';
 const REQUESTS_HEADER =
-  'requestId,name,itemId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note';
+  'requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note';
 
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
@@ -141,8 +141,10 @@ export function toItemsCsv(items: readonly Item[]): string {
 export function toRequestsCsv(requests: readonly PurchaseRequest[]): string {
   const rows = requests.map((r) => [
     r.requestId,
+    r.type,
     r.name,
     r.itemId ?? '',
+    r.assetId ?? '',
     String(r.qty),
     r.unit,
     r.price == null ? '' : String(r.price),

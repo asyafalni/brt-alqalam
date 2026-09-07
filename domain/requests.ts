@@ -1,16 +1,30 @@
-// Pengajuan Pembelian — asking for something the masjid does not have yet.
+// Pengajuan — asking for money to be spent, on one of two things.
 //
-// WHY THIS IS NOT AN ITEM. A request is a thing somebody WANTS; an item is a thing the masjid
+// **BELI**: something the masjid does not have. **PERBAIKAN**: something it has, broken.
+//
+// One screen and one tab for both, because they are the same act from the takmir's side —
+// somebody is asking for a decision about spending — and splitting them would mean two lists to
+// check, two badges to notice, and a standing question about which one a thing belongs on. What
+// differs between them is what the request POINTS AT and what happens when it is done, and both
+// of those are handled by the `type` field rather than by a second screen.
+//
+// WHY A BUY IS NOT AN ITEM. A request is a thing somebody WANTS; an item is a thing the masjid
 // OWNS. Modelling the first as a zero-quantity second would put things on the stock list that
 // are not in the gudang, which is precisely the confusion §0 says the register exists to end —
 // "nobody knows what we own" is not improved by a catalog that also contains what we do not.
 //
-// It becomes stock at exactly one moment: when somebody marks it bought. Until then it lives in
-// its own tab and its own screen, and the stock list never sees it.
-//
 // Pure. No I/O, no framework.
 
-import type { Item, StockLine } from './types';
+import type { InstanceStatus, Item, StockLine, Txn } from './types';
+
+/**
+ * What is being asked for.
+ *
+ * The two need different words at almost every point on screen — "sudah dibeli" against "sudah
+ * diperbaiki", a rack against a bench — but they are the same request underneath, and the words
+ * are a rendering concern rather than a modelling one.
+ */
+export type RequestType = 'beli' | 'perbaikan';
 
 /**
  * Three states, and deliberately not four.
@@ -18,14 +32,20 @@ import type { Item, StockLine } from './types';
  * An approval step ("disetujui") is the obvious fourth, and it is left out on purpose: every
  * state is a decision somebody has to make and then remember to record, and §0.0's test asks
  * whether a feature removes work or adds it. What the boss asked for is to be told what is
- * needed and to close the loop when it arrives. `dibeli` and `ditolak` close it; an approval
+ * needed and to close the loop when it arrives. `selesai` and `ditolak` close it; an approval
  * that is never recorded would leave every request sitting in `diajukan` forever, which is
  * worse than not having the state.
+ *
+ * `selesai`, not `dibeli`: the same state means "bought" for one type and "repaired" for the
+ * other, and a value that names only half of what it represents lies in the sheet where nobody
+ * can see the label that would have corrected it.
  */
-export type RequestStatus = 'diajukan' | 'dibeli' | 'ditolak';
+export type RequestStatus = 'diajukan' | 'selesai' | 'ditolak';
 
 export interface PurchaseRequest {
   requestId: string;
+  /** Buy something new, or repair something broken. */
+  type: RequestType;
   /**
    * What is being asked for, in the requester's words. Free text, because the whole point is
    * that it may not be in the catalog — and forcing a catalog pick first would mean creating
@@ -37,6 +57,19 @@ export interface PurchaseRequest {
    * stock rather than creating a second catalog row with the same name.
    */
   itemId?: string;
+  /**
+   * The physical unit this request is *about*, when there is one.
+   *
+   * On a `perbaikan` it is the thing being repaired — "the timbangan" is not repairable,
+   * "Timbangan gantung #2" is, and it is that unit whose status has to come back to
+   * `available` when the work is done (Part IV: rusak is a repair queue).
+   *
+   * On a `beli` it is the unit being *replaced*: a lost knife is Part IV's "tandai ganti", and
+   * recording which one it was turns the loss log from a list of regrets into a procurement
+   * list somebody can close out. It is never the thing that gets the new stock — the new knife
+   * is a new unit — only the reason this request exists.
+   */
+  assetId?: string;
   qty: number;
   unit: string;
   /** Estimated price per unit, in rupiah. Optional — "berapa" is often the thing being asked. */
@@ -55,9 +88,16 @@ export interface PurchaseRequest {
   note?: string;
 }
 
-/** What a request would cost in total, when a price was given. */
-export const requestTotal = (r: PurchaseRequest): number | null =>
-  (r.price == null ? null : r.price * r.qty);
+/**
+ * What a request would cost in total, when a price was given.
+ *
+ * A repair is quoted as one job, not per unit, so its price IS its total — multiplying a
+ * workshop's quote by a quantity would invent money nobody asked for.
+ */
+export const requestTotal = (r: PurchaseRequest): number | null => {
+  if (r.price == null) return null;
+  return r.type === 'perbaikan' ? r.price : r.price * r.qty;
+};
 
 /** Everything still waiting on somebody. This is the number the admin badge shows. */
 export const openRequests = (requests: readonly PurchaseRequest[]): PurchaseRequest[] =>
@@ -96,14 +136,30 @@ export interface RequestProblem { field: keyof PurchaseRequest; message: string 
  * conversation — more work than typing the reason cost in the first place.
  */
 export function validateRequest(r: {
+  type?: RequestType;
   name: string; qty: number; unit: string; reason: string; price?: number; url?: string;
+  assetId?: string;
 }): RequestProblem[] {
   const problems: RequestProblem[] = [];
+  const repair = r.type === 'perbaikan';
+
   if (r.name.trim() === '') problems.push({ field: 'name', message: 'Nama barang belum diisi' });
-  if (r.reason.trim() === '') problems.push({ field: 'reason', message: 'Alasannya belum diisi' });
-  if (r.unit.trim() === '') problems.push({ field: 'unit', message: 'Satuan belum diisi' });
-  if (!Number.isFinite(r.qty) || r.qty <= 0) {
-    problems.push({ field: 'qty', message: 'Jumlah harus lebih dari 0' });
+  if (r.reason.trim() === '') {
+    problems.push({
+      field: 'reason',
+      message: repair ? 'Kerusakannya belum dijelaskan' : 'Alasannya belum diisi',
+    });
+  }
+  // A repair names one unit, so quantity and unit are not its shape — asking for them would be
+  // asking a question with no answer ("berapa buah perbaikan?").
+  if (!repair) {
+    if (r.unit.trim() === '') problems.push({ field: 'unit', message: 'Satuan belum diisi' });
+    if (!Number.isFinite(r.qty) || r.qty <= 0) {
+      problems.push({ field: 'qty', message: 'Jumlah harus lebih dari 0' });
+    }
+  }
+  if (repair && !r.assetId) {
+    problems.push({ field: 'assetId', message: 'Pilih dulu unit mana yang rusak' });
   }
   if (r.price != null && (!Number.isFinite(r.price) || r.price < 0)) {
     problems.push({ field: 'price', message: 'Harga tidak boleh kurang dari 0' });
@@ -153,6 +209,36 @@ export function purchaseIntoStock(
       active: true,
     },
     add: { locationId, qty: request.qty },
+  };
+}
+
+/**
+ * Finishing a repair puts the unit back on the shelf.
+ *
+ * This is the whole reason a repair request knows which unit it is about. Marking the request
+ * done without returning the asset to `available` would leave it sitting in the repair queue
+ * forever — the register would say a thing is broken that is, by then, hanging back on its
+ * hook, which is worse than not tracking the repair at all.
+ *
+ * An appended `status_change`, never an edit: the instance's state is derived from the log
+ * (WORKING-AGREEMENT), so a repair is a new fact about the unit rather than a correction of an
+ * old one. The break stays in its history, which is what makes "this one keeps breaking"
+ * answerable later.
+ */
+export function repairDone(
+  request: PurchaseRequest, actorUserId: string, ts: number, toStatus: InstanceStatus = 'available',
+): Txn | null {
+  if (request.type !== 'perbaikan' || !request.assetId) return null;
+  return {
+    txnId: `REP-${request.requestId}`,
+    clientTxnId: `repair-${request.requestId}`,
+    ts,
+    type: 'status_change',
+    assetId: request.assetId,
+    qtyDelta: 0,
+    actorUserId,
+    toStatus,
+    note: `Selesai diperbaiki (${request.requestId})`,
   };
 }
 

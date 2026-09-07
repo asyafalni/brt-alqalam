@@ -173,18 +173,24 @@ function demoTxns(items: Item[], stock: StockLine[]): Txn[] {
 }
 
 /**
- * A few purchase requests, in every state the screen can show.
+ * A few requests, in every shape and state the screen can show.
  *
- * One of them names an existing item and one does not, because those are the two shapes that
- * behave differently when bought — a restock adds to a line, something new creates the item.
- * A demo that only showed the easy one would leave the branch untested by eye.
+ * Both kinds are here, and the repairs and the replacement deliberately point at the units the
+ * demo log actually breaks and loses — a repair request against an assetId that is not in the
+ * repair queue would look right on this screen and be nonsense on Aset, which is exactly the
+ * kind of demo that teaches somebody the wrong thing about the model.
  */
 function demoRequests(items: Item[]): PurchaseRequest[] {
   const sabun = items.find((i) => i.name === 'Sabun cuci tangan');
+  // Exact names, matching `demoTxns` above: these requests point at the very units that log
+  // breaks and loses, and a prefix guess that missed would silently drop the repair.
+  const pisau = items.find((i) => i.name === 'Pisau potong');
+  const bor = items.find((i) => i.name === 'Obeng set');
   const now = Date.now();
   return [
     {
       requestId: 'REQ-0001',
+      type: 'beli',
       name: 'Sapu ijuk besar',
       qty: 2,
       unit: 'buah',
@@ -197,6 +203,7 @@ function demoRequests(items: Item[]): PurchaseRequest[] {
     },
     {
       requestId: 'REQ-0002',
+      type: 'beli',
       name: 'Karpet sajadah 5 meter',
       qty: 3,
       unit: 'roll',
@@ -207,13 +214,14 @@ function demoRequests(items: Item[]): PurchaseRequest[] {
     },
     ...(sabun ? [{
       requestId: 'REQ-0003',
+      type: 'beli' as const,
       name: sabun.name,
       itemId: sabun.itemId,
       qty: 4,
       unit: sabun.unit,
       price: 38_000,
       reason: 'Stok menipis menjelang Ramadhan.',
-      status: 'dibeli' as const,
+      status: 'selesai' as const,
       requestedBy: 'USR-DEMO',
       requestedTs: now - 20 * DAY,
       decidedBy: 'USR-DEMO',
@@ -222,6 +230,7 @@ function demoRequests(items: Item[]): PurchaseRequest[] {
     }] : []),
     {
       requestId: 'REQ-0004',
+      type: 'beli',
       name: 'Mesin cuci karpet',
       qty: 1,
       unit: 'unit',
@@ -234,6 +243,56 @@ function demoRequests(items: Item[]): PurchaseRequest[] {
       decidedTs: now - 35 * DAY,
       note: 'Belum masuk anggaran tahun ini. Tetap sewa dulu.',
     },
+    // A repair, against the unit the log above actually breaks.
+    ...(bor ? [{
+      requestId: 'REQ-0005',
+      type: 'perbaikan' as const,
+      name: `${bor.name} #2`,
+      itemId: bor.itemId,
+      assetId: `${bor.barcode}-002`,
+      qty: 1,
+      unit: '',
+      price: 85_000,
+      reason: 'Mata obeng aus dan chucknya oblak. Motornya masih bagus, sayang kalau dibuang.',
+      status: 'diajukan' as const,
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 3 * DAY,
+    }] : []),
+    // A replacement for something lost — the owner's own example: knives go missing after
+    // Qurban. This is what turns the loss log into a list somebody can close out.
+    ...(pisau ? [{
+      requestId: 'REQ-0006',
+      type: 'beli' as const,
+      name: `${pisau.name} (pengganti yang hilang)`,
+      itemId: pisau.itemId,
+      assetId: `${pisau.barcode}-007`,
+      qty: 2,
+      unit: pisau.unit,
+      price: 95_000,
+      reason: 'Dua bilah tidak kembali setelah qurban dan sampai sekarang tidak ketemu.',
+      status: 'diajukan' as const,
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 1 * DAY,
+    }] : []),
+    // A repair turned down — the unit stays in the repair queue, which is the honest outcome
+    // and the reason "tidak jadi" is not the same as "dibuang".
+    ...(pisau ? [{
+      requestId: 'REQ-0007',
+      type: 'perbaikan' as const,
+      name: `${pisau.name} #3`,
+      itemId: pisau.itemId,
+      assetId: `${pisau.barcode}-003`,
+      qty: 1,
+      unit: '',
+      price: 60_000,
+      reason: 'Gagangnya retak sampai ke pangkal.',
+      status: 'ditolak' as const,
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 15 * DAY,
+      decidedBy: 'USR-DEMO',
+      decidedTs: now - 14 * DAY,
+      note: 'Biaya perbaikannya hampir sama dengan beli baru. Ajukan beli saja.',
+    }] : []),
   ];
 }
 

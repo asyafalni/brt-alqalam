@@ -17,7 +17,12 @@ export type Route =
   | { name: 'item'; id: string }
   | { name: 'laporan' }
   | { name: 'aset' }
-  | { name: 'pengajuan' }
+  /**
+   * `type` + `assetId` open the form already filled in for one unit — the link a broken or
+   * lost asset offers. Carried in the URL rather than in memory so the trip through Aset
+   * survives a reload, and so the link can be sent to somebody.
+   */
+  | { name: 'pengajuan'; type?: 'beli' | 'perbaikan'; assetId?: string }
   | { name: 'scan'; target: 'item' | 'asset' | 'location'; id: string }
   | { name: 'scan-empty' };
 
@@ -46,7 +51,14 @@ export function parseRoute(hash: string): Route {
   if (path === '/label') return { name: 'label' };
   if (path === '/laporan') return { name: 'laporan' };
   if (path === '/aset') return { name: 'aset' };
-  if (path === '/pengajuan') return { name: 'pengajuan' };
+  if (path === '/pengajuan') {
+    const asset = params.get('a');
+    const type = params.get('t');
+    if (asset && (type === 'beli' || type === 'perbaikan')) {
+      return { name: 'pengajuan', type, assetId: asset };
+    }
+    return { name: 'pengajuan' };
+  }
   if (path === '/board') return { name: 'board' };
   if (path === '/racks') {
     const id = params.get('r');
@@ -61,7 +73,9 @@ export function routeToHash(route: Route): string {
     case 'label': return '#/label';
     case 'laporan': return '#/laporan';
     case 'aset': return '#/aset';
-    case 'pengajuan': return '#/pengajuan';
+    case 'pengajuan': return route.assetId && route.type
+      ? `#/pengajuan?t=${route.type}&a=${encodeURIComponent(route.assetId)}`
+      : '#/pengajuan';
     case 'board': return '#/board';
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';

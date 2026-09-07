@@ -4,7 +4,7 @@ import { App } from '../../App';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, StockLine } from '../../../../domain/types';
+import type { Item, StockLine, Txn } from '../../../../domain/types';
 import type { PurchaseRequest } from '../../../../domain/requests';
 
 const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
@@ -28,14 +28,14 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
 });
 
 const req = (p: Partial<PurchaseRequest> = {}): PurchaseRequest => ({
-  requestId: 'REQ-0001', name: 'Sapu ijuk', qty: 2, unit: 'buah',
+  requestId: 'REQ-0001', type: 'beli', name: 'Sapu ijuk', qty: 2, unit: 'buah',
   reason: 'Yang lama patah', status: 'diajukan',
   requestedBy: 'USR-DEMO', requestedTs: Date.now() - 1000, ...p,
 });
 
-function seed(items: Item[], requests: PurchaseRequest[] = []) {
+function seed(items: Item[], requests: PurchaseRequest[] = [], txns: Txn[] = []) {
   localStorage.setItem('brt.stocktake.draft.v6', JSON.stringify({
-    items, categories: SEED_CATEGORIES, locations: [A1], stock: lines, txns: [], requests,
+    items, categories: SEED_CATEGORIES, locations: [A1], stock: lines, txns, requests,
   }));
 }
 const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
@@ -43,7 +43,7 @@ const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!)
 beforeEach(() => { localStorage.clear(); at('#/pengajuan'); });
 afterEach(() => { cleanup(); at('#/'); });
 
-describe('Pengajuan Pembelian', () => {
+describe('Pengajuan', () => {
   it('says what to do when nothing has been asked for yet', () => {
     seed(catalog(input()));
     expect(render(App).getByText(/Belum ada pengajuan/)).toBeTruthy();
@@ -76,9 +76,9 @@ describe('Pengajuan Pembelian', () => {
     seed(catalog(input()));
     const r = render(App);
 
-    fireEvent.click(r.getAllByText('Ajukan barang')[0]);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
     type(r.getByLabelText('Nama barang'), 'Sapu');
-    fireEvent.click(r.getByText('Ajukan'));
+    fireEvent.click(r.getByText('Kirim pengajuan'));
 
     expect(r.getByText('Alasannya belum diisi')).toBeTruthy();
     expect(stored().requests).toEqual([]);
@@ -88,12 +88,12 @@ describe('Pengajuan Pembelian', () => {
     seed(catalog(input()));
     const r = render(App);
 
-    fireEvent.click(r.getAllByText('Ajukan barang')[0]);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
     type(r.getByLabelText('Nama barang'), 'Sapu ijuk');
     type(r.getByLabelText('Jumlah'), '3');
     type(r.getByLabelText('Kenapa perlu dibeli?'), 'Gagangnya patah');
     type(r.getByLabelText(/Perkiraan harga/), '27500');
-    fireEvent.click(r.getByText('Ajukan'));
+    fireEvent.click(r.getByText('Kirim pengajuan'));
 
     expect(stored().requests[0]).toMatchObject({
       name: 'Sapu ijuk', qty: 3, reason: 'Gagangnya patah', price: 27500, status: 'diajukan',
@@ -115,7 +115,7 @@ describe('a request becomes stock only when it is bought', () => {
     expect(created).toBeTruthy();
     expect(after.stock.find((l: StockLine) => l.itemId === created.itemId))
       .toMatchObject({ locationId: A1.locationId, initialStock: 2 });
-    expect(after.requests[0].status).toBe('dibeli');
+    expect(after.requests[0].status).toBe('selesai');
   });
 
   it('adds to the existing item when the request was a restock', () => {
@@ -153,5 +153,119 @@ describe('a request becomes stock only when it is bought', () => {
     type(r.getByLabelText('Alasannya'), 'Belum masuk anggaran');
     fireEvent.click(r.getByText('Tandai tidak jadi'));
     expect(stored().requests[0]).toMatchObject({ status: 'ditolak', note: 'Belum masuk anggaran' });
+  });
+});
+
+describe('one page for both, and the repair half of it', () => {
+  // Three knives, so ALQ-ITM-0001-002 exists to be broken.
+  const KNIVES = () => catalog(input({
+    name: 'Pisau potong', categoryId: 'CAT-PHBI', unit: 'buah',
+    kind: 'equipment', initialStock: 3, minStock: null,
+  }));
+
+  const broke = (assetId: string): Txn[] => [
+    { txnId: 'T1', clientTxnId: 'C1', ts: Date.now() - 20_000, type: 'peminjaman',
+      assetId, qtyDelta: 0, actorUserId: 'USR-A', recipient: 'Pos Potong 1' },
+    { txnId: 'T2', clientTxnId: 'C2', ts: Date.now() - 10_000, type: 'pengembalian',
+      assetId, qtyDelta: 0, actorUserId: 'USR-A', condition: 'rusak', note: 'Gagang retak' },
+  ];
+
+  it('records a repair against the unit that is broken', () => {
+    seed(KNIVES(), [], broke('ALQ-ITM-0001-002'));
+    const r = render(App);
+
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
+    fireEvent.click(r.getByText('Perbaiki'));
+    fireEvent.change(r.getByLabelText('Unit yang rusak'), { target: { value: 'ALQ-ITM-0001-002' } });
+    type(r.getByLabelText('Rusaknya bagaimana?'), 'Gagangnya retak sampai pangkal');
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+
+    expect(stored().requests[0]).toMatchObject({
+      type: 'perbaikan', assetId: 'ALQ-ITM-0001-002', status: 'diajukan',
+    });
+  });
+
+  it('does not ask a repair how many, because that question has no answer', () => {
+    seed(KNIVES(), [], broke('ALQ-ITM-0001-002'));
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
+    fireEvent.click(r.getByText('Perbaiki'));
+    expect(r.queryByLabelText('Jumlah')).toBeNull();
+    expect(r.queryByLabelText('Satuan')).toBeNull();
+  });
+
+  it('will not take a repair that does not say which unit', () => {
+    seed(KNIVES(), [], broke('ALQ-ITM-0001-002'));
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
+    fireEvent.click(r.getByText('Perbaiki'));
+    type(r.getByLabelText('Rusaknya bagaimana?'), 'Retak');
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+    expect(r.getByText('Pilih dulu unit mana yang rusak')).toBeTruthy();
+    expect(stored().requests).toEqual([]);
+  });
+
+  it('hands the unit back to the shelf when the repair is finished', () => {
+    // The whole reason a repair knows which unit it is about. Closing the request without
+    // this leaves the register calling a thing broken that is back on its hook.
+    seed(KNIVES(), [req({
+      type: 'perbaikan', name: 'Pisau potong #2', assetId: 'ALQ-ITM-0001-002',
+      qty: 1, unit: '', reason: 'Gagang retak',
+    })], broke('ALQ-ITM-0001-002'));
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Sudah diperbaiki' }));
+    fireEvent.click(r.getByText('Catat perbaikan selesai'));
+
+    const after = stored();
+    expect(after.requests[0].status).toBe('selesai');
+    expect(after.txns.at(-1)).toMatchObject({
+      type: 'status_change', assetId: 'ALQ-ITM-0001-002', toStatus: 'available',
+    });
+  });
+
+  it('adds no stock for a repair — the unit was always ours', () => {
+    seed(KNIVES(), [req({
+      type: 'perbaikan', name: 'Pisau potong #2', assetId: 'ALQ-ITM-0001-002',
+      qty: 1, unit: '', reason: 'Gagang retak',
+    })], broke('ALQ-ITM-0001-002'));
+    const before = stored();
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Sudah diperbaiki' }));
+    fireEvent.click(r.getByText('Catat perbaikan selesai'));
+
+    expect(stored().stock).toEqual(before.stock);
+    expect(stored().items).toHaveLength(before.items.length);
+  });
+
+  it('opens ready-filled when it was reached from a broken unit', () => {
+    // The click on Aset already said "ajukan"; asking again is the tap §0.0 exists to remove.
+    seed(KNIVES(), [], broke('ALQ-ITM-0001-002'));
+    at('#/pengajuan?t=perbaikan&a=ALQ-ITM-0001-002');
+    const r = render(App);
+    expect((r.getByLabelText('Unit yang rusak') as HTMLSelectElement).value)
+      .toBe('ALQ-ITM-0001-002');
+  });
+
+  it('lets a lost unit be replaced, and records what the replacement replaces', () => {
+    // A lost thing cannot be repaired. The link from the loss log is a purchase, and it says
+    // which unit it stands in for so the loss log can be closed out rather than just read.
+    seed(KNIVES(), [], [
+      { txnId: 'T1', clientTxnId: 'C1', ts: Date.now() - 20_000, type: 'peminjaman',
+        assetId: 'ALQ-ITM-0001-003', qtyDelta: 0, actorUserId: 'USR-A', recipient: 'Pos 2' },
+      { txnId: 'T2', clientTxnId: 'C2', ts: Date.now() - 10_000, type: 'pengembalian',
+        assetId: 'ALQ-ITM-0001-003', qtyDelta: 0, actorUserId: 'USR-A', condition: 'hilang' },
+    ]);
+    at('#/pengajuan?t=beli&a=ALQ-ITM-0001-003');
+    const r = render(App);
+
+    type(r.getByLabelText('Nama barang'), 'Pisau potong pengganti');
+    type(r.getByLabelText('Kenapa perlu dibeli?'), 'Hilang setelah qurban');
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+
+    expect(stored().requests[0]).toMatchObject({
+      type: 'beli', assetId: 'ALQ-ITM-0001-003', name: 'Pisau potong pengganti',
+    });
   });
 });

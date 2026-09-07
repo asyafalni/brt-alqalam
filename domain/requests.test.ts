@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addToStock, openRequests, openTotal, purchaseIntoStock, requestTotal, sortRequests,
+  addToStock, openRequests, openTotal, purchaseIntoStock, repairDone, requestTotal, sortRequests,
   validateRequest,
 } from './requests';
 import type { PurchaseRequest } from './requests';
 import type { StockLine } from './types';
 
 const req = (p: Partial<PurchaseRequest> = {}): PurchaseRequest => ({
-  requestId: 'REQ-0001', name: 'Sapu ijuk', qty: 2, unit: 'buah',
+  requestId: 'REQ-0001', type: 'beli', name: 'Sapu ijuk', qty: 2, unit: 'buah',
   reason: 'Yang lama patah', status: 'diajukan',
   requestedBy: 'USR-1', requestedTs: 1_000, ...p,
 });
@@ -28,7 +28,7 @@ describe('openTotal', () => {
   it('adds up only what is still waiting', () => {
     const total = openTotal([
       req({ requestId: 'A', price: 10_000, qty: 2 }),
-      req({ requestId: 'B', price: 5_000, qty: 1, status: 'dibeli' }),
+      req({ requestId: 'B', price: 5_000, qty: 1, status: 'selesai' }),
     ]);
     expect(total).toEqual({ total: 20_000, priced: 1, unpriced: 0 });
   });
@@ -46,6 +46,8 @@ describe('openTotal', () => {
 
 describe('validateRequest', () => {
   const good = { name: 'Sapu', qty: 2, unit: 'buah', reason: 'Yang lama patah' };
+  const repair = { type: 'perbaikan' as const, name: 'Mesin potong rumput', qty: 1, unit: '',
+    reason: 'Tali starter putus', assetId: 'AST-0007' };
 
   it('accepts a complete request', () => {
     expect(validateRequest(good)).toEqual([]);
@@ -69,6 +71,53 @@ describe('validateRequest', () => {
 
   it('treats a blank link as no link at all', () => {
     expect(validateRequest({ ...good, url: '   ' })).toEqual([]);
+  });
+
+  it('does not ask a repair how many or in what unit', () => {
+    // "Berapa buah perbaikan?" is a question with no answer. A repair is one job on one unit.
+    expect(validateRequest(repair)).toEqual([]);
+  });
+
+  it('refuses a repair that does not say which unit is broken', () => {
+    // Without it there is nothing to hand back to the shelf when the work is done.
+    expect(validateRequest({ ...repair, assetId: undefined }).map((p) => p.field))
+      .toEqual(['assetId']);
+  });
+
+  it('asks a repair what is broken, in those words', () => {
+    expect(validateRequest({ ...repair, reason: ' ' })[0].message)
+      .toBe('Kerusakannya belum dijelaskan');
+  });
+});
+
+describe('what a repair costs', () => {
+  it('is the quote itself, not the quote times a quantity', () => {
+    // A workshop quotes one job. Multiplying it by a qty invents money nobody asked for.
+    expect(requestTotal(req({ type: 'perbaikan', price: 150_000, qty: 3 }))).toBe(150_000);
+  });
+});
+
+describe('finishing a repair', () => {
+  const repair = req({ requestId: 'REQ-9', type: 'perbaikan', assetId: 'AST-0007' });
+
+  it('hands the unit back to the shelf', () => {
+    // Marking the request done without this would leave the register saying a thing is broken
+    // that is, by then, hanging back on its hook.
+    const txn = repairDone(repair, 'USR-1', 5_000);
+    expect(txn).toMatchObject({ type: 'status_change', assetId: 'AST-0007', toStatus: 'available' });
+  });
+
+  it('appends rather than edits, so the break stays in the history', () => {
+    // Which is what makes "this one keeps breaking" answerable later.
+    expect(repairDone(repair, 'USR-1', 5_000)?.qtyDelta).toBe(0);
+  });
+
+  it('can retire a unit the workshop could not save', () => {
+    expect(repairDone(repair, 'USR-1', 5_000, 'retired')?.toStatus).toBe('retired');
+  });
+
+  it('has nothing to do for a purchase', () => {
+    expect(repairDone(req({ type: 'beli' }), 'USR-1', 5_000)).toBeNull();
   });
 });
 
@@ -130,7 +179,7 @@ describe('openRequests', () => {
   it('is only what is still waiting on somebody', () => {
     const open = openRequests([
       req({ requestId: 'A' }),
-      req({ requestId: 'B', status: 'dibeli' }),
+      req({ requestId: 'B', status: 'selesai' }),
       req({ requestId: 'C', status: 'ditolak' }),
     ]);
     expect(open.map((r) => r.requestId)).toEqual(['A']);

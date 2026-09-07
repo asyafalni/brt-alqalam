@@ -11,7 +11,8 @@
 // Lumping them into one "problem" bucket would hide that they demand different actions.
 
 import { useMemo } from 'octane';
-import { CircleCheck, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
+import { CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
+import type { RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -24,16 +25,35 @@ import { artFor, ItemArt } from '../items/ItemArt';
 /**
  * Desktop column shaping, in the only place a caller can reach it: `DataTable` takes no
  * widths, and a `w-full` auto table spreads three columns evenly across a 1440px card, which
- * reads as three stripes of dead space. Shrinking the last column (always Status) to its pill
- * hands the slack to the text column beside it, where long text actually wants to go.
+ * reads as three stripes of dead space. Shrinking the trailing columns — a status pill, and
+ * where there is one, a button — hands the slack to the text column beside them, where long
+ * text actually wants to go.
+ *
+ * Two variants rather than one, because the rule has to reach one column further when a
+ * section offers an action: applied blindly, the wider rule would squeeze "Dipegang" on the
+ * loans table, which is the one column there that genuinely wants room.
+ *
  * Literal class strings — an interpolated arbitrary variant generates no CSS.
  */
 const TABLE_SHAPE =
   '[&_th:last-child]:w-px [&_td:last-child]:w-px [&_td:last-child]:whitespace-nowrap';
+const TABLE_SHAPE_ACTION =
+  `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, search, onOpenItem }:
-  { draft: Draft; inventory: Inventory; search: string; onOpenItem: (id: string) => void },
+  { draft, inventory, search, onOpenItem, onRequest }:
+  {
+    draft: Draft; inventory: Inventory; search: string; onOpenItem: (id: string) => void;
+    /**
+     * The bridge from "this is broken" to somebody doing something about it.
+     *
+     * Both lists below were, until now, read-only: they said a thing was broken or gone and
+     * left the reader to remember it somewhere else. The repair queue and the loss log are
+     * only worth keeping if there is a next step attached to each row, and the next step is
+     * always the same one — ask for money, to fix it or to replace it.
+     */
+    onRequest: (type: RequestType, assetId: string) => void;
+  },
 ) {
   const all = useMemo(
     () => Object.values(inventory.derived.instances),
@@ -86,6 +106,7 @@ export function AssetBoard(
     itemOf,
     draft,
     onOpenItem,
+    onRequest,
     noteFor,
   };
 
@@ -117,7 +138,8 @@ export function AssetBoard(
                 {groups.lost.length} aset hilang — perlu penggantian.
               </p>
               <p class="mt-0.5 text-pretty text-sm leading-relaxed text-slate-600">
-                Sudah tidak dihitung sebagai milik kita. Catat untuk dibeli ulang.
+                Sudah tidak dihitung sebagai milik kita. Ajukan penggantinya lewat tombol di
+                tiap baris supaya tercatat, bukan hanya diingat.
               </p>
             </div>
           </div>
@@ -145,6 +167,7 @@ export function AssetBoard(
         empty="Tidak ada yang rusak."
         emptyHint="Antrean perbaikan kosong."
         showNote
+        action={{ type: 'perbaikan', label: 'Ajukan perbaikan', short: 'Perbaiki', icon: Wrench }}
       />
 
       <Section
@@ -158,6 +181,7 @@ export function AssetBoard(
         holderHeader="Terakhir dipegang"
         showHolder
         showNote
+        action={{ type: 'beli', label: 'Ajukan pembelian pengganti', short: 'Beli pengganti', icon: ShoppingCart }}
       />
     </div>
   );
@@ -166,7 +190,7 @@ export function AssetBoard(
 function Section(
   {
     title, subtitle, icon: Icon, rows, empty, emptyHint, itemOf, draft, onOpenItem,
-    showHolder, showNote, holderHeader = 'Dipegang', noteFor,
+    showHolder, showNote, holderHeader = 'Dipegang', noteFor, onRequest, action,
   }: {
     title: string; subtitle: string; icon: (p: { class?: string }) => unknown;
     rows: DerivedInstance[]; empty: string; emptyHint: string;
@@ -174,6 +198,12 @@ function Section(
     draft: Draft; onOpenItem: (id: string) => void;
     showHolder?: boolean; showNote?: boolean; holderHeader?: string;
     noteFor: (d: DerivedInstance) => string | undefined;
+    onRequest: (type: RequestType, assetId: string) => void;
+    /** The next step this list offers. "Dipinjam" has none — it resolves by being returned. */
+    action?: {
+      type: RequestType; label: string; short: string;
+      icon: (p: { class?: string }) => unknown;
+    };
   },
 ) {
   const columns: Column<DerivedInstance>[] = [
@@ -228,6 +258,31 @@ function Section(
         return <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>;
       },
     },
+    ...(action ? [{
+      key: 'action',
+      // Deliberately headerless: a column of buttons needs no word above it, and "Aksi" would
+      // be the widest thing in the narrowest column.
+      header: '',
+      mobile: 'meta' as const,
+      align: 'right' as const,
+      cell: (d: DerivedInstance) => {
+        const ActionIcon = action.icon;
+        return (
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+            aria-label={`${action.label}: ${d.instance.label}`}
+            /* The row itself opens the item, so this must not also do that. */
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              onRequest(action.type, d.instance.assetId);
+            }}
+          >
+            <ActionIcon class="h-4 w-4" /> {action.short}
+          </button>
+        );
+      },
+    }] : []),
   ];
 
   return (
@@ -247,7 +302,7 @@ function Section(
         </div>
       </div>
 
-      <div class={TABLE_SHAPE}>
+      <div class={action ? TABLE_SHAPE_ACTION : TABLE_SHAPE}>
         <DataTable
           columns={columns}
           rows={rows}
