@@ -61,10 +61,24 @@ function revokeDevice() {
  * duplicate would silently attribute one person's actions to another. This refuses rather
  * than allowing it, which is what the spec's "pilih Password lain" screen means.
  */
+var ROLES = ['admin_utama', 'admin', 'anggota'];
+
 function setUserPin() {
   var NAME = 'Budi';                                 // ← edit me
   var ROLE = 'anggota';                              //    admin_utama | admin | anggota
   var PIN = '1234';                                  //    4-8 digits
+
+  /* Checked, because an unchecked typo here fails SILENTLY and much later: `Admin` or
+     `admin utama` would be stored happily, and `requireAdmin` — which compares against these
+     exact strings — would then refuse that person forever with nothing to explain why. */
+  if (ROLES.indexOf(ROLE) === -1) {
+    Logger.log('REFUSED: role "' + ROLE + '" is not one of ' + ROLES.join(', '));
+    return;
+  }
+  if (!/^[0-9]{4,8}$/.test(String(PIN))) {
+    Logger.log('REFUSED: PIN must be 4-8 digits.');
+    return;
+  }
 
   var props = PropertiesService.getScriptProperties();
   var users = JSON.parse(props.getProperty('USERS') || '[]');
