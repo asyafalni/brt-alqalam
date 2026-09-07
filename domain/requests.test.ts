@@ -180,7 +180,7 @@ describe('openRequests', () => {
     const open = openRequests([
       req({ requestId: 'A' }),
       req({ requestId: 'B', status: 'selesai' }),
-      req({ requestId: 'C', status: 'ditolak' }),
+      req({ requestId: 'C', status: 'dibatalkan' }),
     ]);
     expect(open.map((r) => r.requestId)).toEqual(['A']);
   });

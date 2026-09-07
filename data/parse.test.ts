@@ -245,6 +245,15 @@ describe('parseRequests', () => {
     expect(r.ok[0].type).toBe('beli');
   });
 
+  it('still reads the old statuses, which we renamed and the sheet did not', () => {
+    // Quarantining real rows over words we changed ourselves would be our bug reported as
+    // their data problem.
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0008,Sapu,,1,buah,,Habis,,ditolak,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].status).toBe('dibatalkan');
+  });
+
   it('still reads the old "dibeli" status, which we renamed and it did not', () => {
     // Renaming a value does not travel back and rewrite history. Quarantining real rows over a
     // word we changed ourselves would be our bug reported as their data problem.

@@ -60,21 +60,25 @@ function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: (src: string) => v
 }
 
 /**
- * The row's version: what is already there, and nothing else.
+ * ONE tile at the head of a request row: the first photo if there is one, or the drawing the
+ * item would have had.
  *
- * Tapping one opens it full size — reading a photo is reading the row. Changing them is
- * Ubah's job, so this renders nothing at all when there are none rather than holding a slot
- * open for a control that no longer lives here.
+ * A row of every thumbnail was a second list inside a list. One tile does the job a picture is
+ * actually for here — telling rows apart at a glance — and a `+n` badge says there is more
+ * without spending the width. Tapping opens it full size; changing photos is Ubah's job.
  *
- * `refreshKey` is bumped by the board when the form closes: the strip and the form keep
- * separate copies of the list, and without it a photo added while editing would not appear on
- * the row behind until a reload.
+ * The drawing fallback matters more than it looks: without it a request with no photo had a
+ * ragged empty gutter beside one that did, and half the list lost its left edge.
+ *
+ * `refreshKey` is bumped by the board when the form closes, since this and the form keep
+ * separate copies of the list.
  */
-export function RequestPhotoStrip(
-  { requestId, name, refreshKey = 0 }:
-  { requestId: string; name: string; refreshKey?: number },
+export function RequestThumb(
+  { requestId, name, fallback, refreshKey = 0 }:
+  { requestId: string; name: string; fallback: unknown; refreshKey?: number },
 ) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
+  const [src, setSrc] = useState('');
   const [open, setOpen] = useState('');
 
   useEffect(() => {
@@ -83,13 +87,48 @@ export function RequestPhotoStrip(
     return () => { alive = false; };
   }, [requestId, refreshKey]);
 
-  if (photos.length === 0) return null;
+  const first = photos[0];
+  useEffect(() => {
+    if (!first) { setSrc(''); return; }
+    let url = '';
+    let alive = true;
+    store.url(first.photoId).then((u) => {
+      // The row can unmount mid-await; revoking immediately is the only way this does not
+      // leak a blob per abandoned render.
+      if (!alive) { store.revoke(u); return; }
+      url = u;
+      setSrc(u);
+    }).catch(() => undefined);
+    return () => { alive = false; if (url) store.revoke(url); };
+  }, [first?.photoId]);
+
+  if (!first) {
+    return (
+      <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+        {fallback}
+      </div>
+    );
+  }
 
   return (
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      {photos.map((p) => <Thumb key={p.photoId} photo={p} onOpen={setOpen} />)}
+    <>
+      <button
+        type="button"
+        class="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+        aria-label={`Lihat foto ${name}`}
+        onClick={() => src && setOpen(src)}
+      >
+        {src
+          ? <img src={src} alt="" class="h-full w-full object-cover" />
+          : <span class="flex h-full w-full items-center justify-center text-slate-300"><ImageOff class="h-4 w-4" /></span>}
+        {photos.length > 1 && (
+          <span class="absolute bottom-0 right-0 rounded-tl-md bg-slate-900/80 px-1.5 text-[10px] font-bold text-white">
+            +{photos.length - 1}
+          </span>
+        )}
+      </button>
       {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
-    </div>
+    </>
   );
 }
 

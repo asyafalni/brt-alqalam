@@ -253,19 +253,22 @@ export const buildInstance = (r: Record<string, string>): AssetInstance => ({
     active: bool(r, 'active', true),
   });
 
-const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'selesai', 'ditolak'];
+const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'selesai', 'dibatalkan'];
+
+/** What each renamed status used to be called, so rows written then still read. */
+const LEGACY_STATUS: Record<string, RequestStatus> = { dibeli: 'selesai', ditolak: 'dibatalkan' };
 const REQUEST_TYPES: RequestType[] = ['beli', 'perbaikan'];
 
 /**
- * `selesai` was called `dibeli` before repairs existed, and rows written then are still in the
- * sheet. Renaming a value does not travel back and rewrite history, so the old word is accepted
- * here — at the boundary, where every other shape of legacy data is already handled — rather
- * than leaving real rows to quarantine over a word we changed ourselves.
+ * `selesai` was called `dibeli` before repairs existed, and `dibatalkan` was `ditolak`. Rows
+ * written then are still in the sheet. Renaming a value does not travel back and rewrite
+ * history, so the old words are accepted here — at the boundary, where every other shape of
+ * legacy data is already handled — rather than leaving real rows to quarantine over words we
+ * changed ourselves.
  */
 const requestStatus = (r: Record<string, string>): RequestStatus =>
-  (r['status']?.trim().toLowerCase() === 'dibeli'
-    ? 'selesai'
-    : oneOf<RequestStatus>(r, 'status', REQUEST_STATUSES));
+  LEGACY_STATUS[r['status']?.trim().toLowerCase() ?? '']
+  ?? oneOf<RequestStatus>(r, 'status', REQUEST_STATUSES);
 
 /**
  * One row of the Requests tab — something somebody wants the masjid to buy.

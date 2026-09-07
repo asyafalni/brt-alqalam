@@ -29,7 +29,8 @@ import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
-import { discardPhotos, RequestPhotoStrip } from './RequestPhotos';
+import { artFor, ItemArt } from '../items/ItemArt';
+import { discardPhotos, RequestThumb } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
 export const rupiah = (n: number): string => `Rp${n.toLocaleString('id-ID')}`;
@@ -45,8 +46,8 @@ const STATUS: Record<RequestStatus, { label: string; chip: string; rail: string 
     chip: 'bg-green-50 text-green-700 border border-green-200',
     rail: 'bg-green-500',
   },
-  ditolak: {
-    label: 'Tidak jadi',
+  dibatalkan: {
+    label: 'Dibatalkan',
     chip: 'bg-slate-100 text-slate-600 border border-slate-300',
     rail: 'bg-slate-400',
   },
@@ -68,19 +69,33 @@ const KIND: Record<RequestType, {
     chip: 'bg-sky-50 text-sky-700 border border-sky-200',
     icon: ShoppingCart,
     done: 'Sudah dibeli',
-    undone: 'Tidak jadi dibeli',
+    undone: 'Batalkan pembelian',
   },
   perbaikan: {
     label: 'Perbaikan',
     chip: 'bg-orange-50 text-orange-700 border border-orange-200',
     icon: Wrench,
     done: 'Sudah diperbaiki',
-    undone: 'Tidak jadi diperbaiki',
+    undone: 'Batalkan perbaikan',
   },
 };
 
 const when = (ts: number) =>
   new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+/**
+ * Row actions as icons, right-aligned.
+ *
+ * Four labelled buttons wrapped to their own line and made every card twice as tall as the
+ * thing it was describing — on a list somebody scrolls to find one row, that is a lot of
+ * furniture. The label moves to `aria-label` and `title`, so it is still there for a screen
+ * reader and for a hover; the icons are conventional enough (tick, cross, pencil) to carry
+ * the meaning at a glance.
+ */
+const ICON_BTN =
+  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors';
+const ICON_SECONDARY = `${ICON_BTN} border-slate-400 text-slate-600 hover:border-slate-900 hover:bg-slate-100 hover:text-slate-900`;
+const ICON_PRIMARY = `${ICON_BTN} border-slate-900 bg-slate-900 text-white hover:bg-slate-800`;
 
 export function RequestBoard(
   { draft, inventory, now, actor = 'USR-DEMO', prefill, onPrefillUsed }:
@@ -140,6 +155,26 @@ export function RequestBoard(
     }, 0);
     return `REQ-${String(highest + 1).padStart(4, '0')}`;
   }, [requests]);
+
+  /**
+   * The drawing a request wears when it has no photo.
+   *
+   * A restock borrows its item's, so the row looks like the same thing it will become. A new
+   * thing has only the words somebody typed, which is exactly what `artFor` resolves from —
+   * unit first, then name — so "3 roll karpet" gets a roll without anybody choosing one.
+   */
+  function artOf(r: PurchaseRequest) {
+    const item = r.itemId ? draft.items.find((i) => i.itemId === r.itemId) : undefined;
+    if (item) {
+      const category = draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '';
+      return artFor(item, category);
+    }
+    return artFor({
+      name: r.name,
+      unit: r.unit,
+      kind: r.type === 'perbaikan' ? 'equipment' : 'consumable',
+    });
+  }
 
   function closeForm() {
     setAdding(false);
@@ -284,7 +319,7 @@ export function RequestBoard(
     setRequests((prev) => prev.map((r) => (r.requestId === request.requestId
       ? {
         ...r,
-        status: 'ditolak' as const,
+        status: 'dibatalkan' as const,
         decidedBy: actor,
         decidedTs: Date.now(),
         ...(note.trim() !== '' ? { note: note.trim() } : {}),
@@ -349,7 +384,16 @@ export function RequestBoard(
             return (
               <li key={r.requestId} class={`${CARD} flex gap-3 p-0`}>
                 <span class={`w-1.5 shrink-0 rounded-l-lg ${skin.rail}`} aria-hidden="true" />
-                <div class="min-w-0 flex-1 py-4 pr-4 sm:pr-5">
+                {/* Wraps below `sm`, where a fixed action column would squeeze the text into
+                    a two-word ribbon. */}
+                <div class="flex min-w-0 flex-1 flex-wrap items-start gap-3 py-4 pr-4 sm:flex-nowrap sm:pr-5">
+                  <RequestThumb
+                    requestId={r.requestId}
+                    name={r.name}
+                    refreshKey={photoVersion}
+                    fallback={<ItemArt art={artOf(r)} size={36} />}
+                  />
+                <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <h2 class="text-base font-bold text-slate-900">{r.name}</h2>
                     {/* Which kind comes before which state: "perbaikan" changes how every
@@ -360,11 +404,11 @@ export function RequestBoard(
                     <span class={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${skin.chip}`}>
                       {skin.label}
                     </span>
-                    <span class="ml-auto text-xs text-slate-400 tabular-nums">
-                      {when(r.requestedTs)}
-                    </span>
                   </div>
 
+                  {/* The date sits here rather than hanging off the right: it is part of
+                      what this request IS, and pinned opposite the title it read as a column
+                      heading for the actions underneath it. */}
                   {r.type === 'perbaikan' ? (
                     <p class="mt-0.5 text-sm tabular-nums text-slate-500">
                       {r.assetId && <span class="font-mono text-xs">{r.assetId}</span>}
@@ -373,6 +417,7 @@ export function RequestBoard(
                           {r.assetId ? ' · ' : ''}{rupiah(total)}
                         </span>
                       )}
+                      <span class="text-slate-400"> · {when(r.requestedTs)}</span>
                     </p>
                   ) : (
                     <p class="mt-0.5 text-sm tabular-nums text-slate-500">
@@ -387,6 +432,7 @@ export function RequestBoard(
                       {/* A replacement says what it replaces: that is what turns the loss log
                           into a procurement list somebody can close out. */}
                       {r.assetId && <span class="text-slate-400"> · pengganti {r.assetId}</span>}
+                      <span class="text-slate-400"> · {when(r.requestedTs)}</span>
                     </p>
                   )}
 
@@ -395,62 +441,66 @@ export function RequestBoard(
                       meant to prevent. */}
                   <p class="mt-2 text-sm leading-relaxed text-slate-700">{r.reason}</p>
 
-                  <RequestPhotoStrip
-                    requestId={r.requestId}
-                    name={r.name}
-                    refreshKey={photoVersion}
-                  />
-
                   {r.note && (
                     <p class="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
                       <span class="font-semibold">Catatan:</span> {r.note}
                     </p>
                   )}
 
-                  <div class="mt-3 flex flex-wrap items-center gap-2">
-                    {r.url && (
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        class="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  {r.status !== 'diajukan' && r.decidedTs && (
+                    <p class="mt-2 text-xs text-slate-400">Diputuskan {when(r.decidedTs)}</p>
+                  )}
+                </div>
+
+                <div class="flex shrink-0 items-center gap-1.5 sm:ml-auto">
+                  {r.url && (
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      class={ICON_SECONDARY}
+                      aria-label="Lihat tautan"
+                      title="Lihat tautan"
+                    >
+                      <ExternalLink class="h-4 w-4" />
+                    </a>
+                  )}
+                  {r.status === 'diajukan' && (
+                    <>
+                      <button
+                        type="button"
+                        class={ICON_PRIMARY}
+                        aria-label={kind.done}
+                        title={kind.done}
+                        onClick={() => setBuying(r)}
                       >
-                        <ExternalLink class="h-4 w-4" /> Lihat tautan
-                      </a>
-                    )}
-                    {r.status === 'diajukan' && (
-                      <>
-                        <Button size="sm" class="min-h-11" onClick={() => setBuying(r)}>
-                          <Check class="h-4 w-4" /> {kind.done}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          class="min-h-11"
-                          onClick={() => setRejecting(r)}
-                        >
-                          <X class="h-4 w-4" /> Tidak jadi
-                        </Button>
-                        {/* Last, after the pair: the two decisions belong beside each other,
-                            and putting an edit between them separates a yes from its no.
-                            Only while it is still open — once decided, a request is the record
-                            of what was decided, and editing it rewrites what was approved. */}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          class="min-h-11"
-                          onClick={() => setEditing(r)}
-                        >
-                          <Pencil class="h-4 w-4" /> Ubah
-                        </Button>
-                      </>
-                    )}
-                    {r.status !== 'diajukan' && r.decidedTs && (
-                      <span class="text-xs text-slate-400">
-                        Diputuskan {when(r.decidedTs)}
-                      </span>
-                    )}
-                  </div>
+                        <Check class="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        class={ICON_SECONDARY}
+                        aria-label="Batalkan"
+                        title="Batalkan"
+                        onClick={() => setRejecting(r)}
+                      >
+                        <X class="h-4 w-4" />
+                      </button>
+                      {/* Last, after the pair: the two decisions belong beside each other, and
+                          an edit between them separates a yes from its no. Only while it is
+                          still open — once decided, a request is the record of what was
+                          decided, and editing it rewrites what was approved. */}
+                      <button
+                        type="button"
+                        class={ICON_SECONDARY}
+                        aria-label="Ubah"
+                        title="Ubah"
+                        onClick={() => setEditing(r)}
+                      >
+                        <Pencil class="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
                 </div>
               </li>
             );
@@ -723,7 +773,7 @@ function RejectForm(
 
       <div class="mt-5 flex flex-wrap items-center gap-3">
         <Button size="touch" variant="danger" disabled={note.trim() === ''} onClick={() => onConfirm(note)}>
-          Tandai tidak jadi
+          Batalkan pengajuan
         </Button>
         <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
           Batal

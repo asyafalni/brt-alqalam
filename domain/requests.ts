@@ -38,9 +38,11 @@ export type RequestType = 'beli' | 'perbaikan';
  *
  * `selesai`, not `dibeli`: the same state means "bought" for one type and "repaired" for the
  * other, and a value that names only half of what it represents lies in the sheet where nobody
- * can see the label that would have corrected it.
+ * can see the label that would have corrected it. `dibatalkan`, not `ditolak`, for the same
+ * reason from the other side — most of these are dropped rather than refused, and "rejected"
+ * puts a verdict on a decision that was usually just a change of mind.
  */
-export type RequestStatus = 'diajukan' | 'selesai' | 'ditolak';
+export type RequestStatus = 'diajukan' | 'selesai' | 'dibatalkan';
 
 export interface PurchaseRequest {
   requestId: string;

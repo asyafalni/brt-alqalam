@@ -56,7 +56,9 @@ describe('Pengajuan', () => {
     expect(r.getByText('Sapu ijuk')).toBeTruthy();
     expect(r.getByText('Yang lama patah')).toBeTruthy();
     expect(r.getByText(/Rp27\.500\/buah/)).toBeTruthy();
-    expect((r.getByText('Lihat tautan').closest('a') as HTMLAnchorElement).href)
+    // The row's actions are icons now, so the label lives in `aria-label` — still there for a
+    // screen reader, and still the thing to query.
+    expect((r.getByLabelText('Lihat tautan') as HTMLAnchorElement).href)
       .toBe('https://toko.example/sapu');
   });
 
@@ -147,12 +149,12 @@ describe('a request becomes stock only when it is bought', () => {
     seed(catalog(input()), [req()]);
     const r = render(App);
 
-    fireEvent.click(r.getByText('Tidak jadi'));
-    expect((r.getByText('Tandai tidak jadi') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(r.getByRole('button', { name: 'Batalkan' }));
+    expect((r.getByText('Batalkan pengajuan') as HTMLButtonElement).disabled).toBe(true);
 
     type(r.getByLabelText('Alasannya'), 'Belum masuk anggaran');
-    fireEvent.click(r.getByText('Tandai tidak jadi'));
-    expect(stored().requests[0]).toMatchObject({ status: 'ditolak', note: 'Belum masuk anggaran' });
+    fireEvent.click(r.getByText('Batalkan pengajuan'));
+    expect(stored().requests[0]).toMatchObject({ status: 'dibatalkan', note: 'Belum masuk anggaran' });
   });
 });
 
