@@ -185,13 +185,18 @@ export const SHEET_FORMATS: SheetFormat[] = [
     id: 'tag',
     name: 'Tag barang',
     purpose: 'Stiker kecil untuk ditempel langsung di barang.',
-    columns: 4, rows: 10, width: 48.5, height: 25.4, layout: 'row',
+    columns: 4, rows: 10, width: 48, height: 25.4, layout: 'row',
   },
   {
     id: 'rak',
     name: 'Label rak',
     purpose: 'Ukuran umum untuk ditempel di rak — terbaca dari dekat.',
-    columns: 3, rows: 8, width: 70, height: 37, layout: 'row',
+    // 63.5 × 38.1 is Avery L7160 / 5160, 21 to a page: one of the commonest sticker sheets
+    // sold anywhere, so this size can be bought rather than cut by hand. It replaced an
+    // invented 70×37 at 3 across, which needed 210mm of a 194mm page — the third column and
+    // the eighth row fell off the paper, and "24 per lembar A4" was a promise the printer
+    // could not keep.
+    columns: 3, rows: 7, width: 63.5, height: 38.1, layout: 'row',
   },
   {
     /* `board`, its own layout. As a `row` the QR claimed the full height — 66 of the 99mm —
@@ -201,7 +206,10 @@ export const SHEET_FORMATS: SheetFormat[] = [
     id: 'jumbo',
     name: 'Rak jumbo',
     purpose: 'Papan rak besar — terbaca dari ujung gudang.',
-    columns: 2, rows: 4, width: 99, height: 70, layout: 'board',
+    // 95 × 68, not 99 × 70: two of the wider one came to 198mm on a 194mm page, so the right
+    // -hand column ran off the sheet. Four millimetres is nothing on a board this size and the
+    // difference between eight labels and a reprint.
+    columns: 2, rows: 4, width: 95, height: 68, layout: 'board',
   },
   /* The two below are PORTRAIT, and that is the whole reason they exist. On a 99×70 landscape
      board the QR is bounded by the HEIGHT — giving it the full width would take it from 57mm

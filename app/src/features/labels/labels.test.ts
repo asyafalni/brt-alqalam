@@ -161,14 +161,38 @@ describe('sheet arithmetic', () => {
   const besar = SHEET_FORMATS.find((f) => f.id === 'rak')!;
 
   it('knows how many fit on a page', () => {
-    expect(perSheet(besar)).toBe(24);
+    // 21, not 24: `Label rak` is Avery L7160 (63.5 × 38.1, 3 × 7) now. The old 3 × 8 of 70 × 37
+    // needed 210 × 296mm of a 194 × 281mm page and simply did not fit.
+    expect(perSheet(besar)).toBe(21);
     expect(perSheet(SHEET_FORMATS.find((f) => f.id === 'tag')!)).toBe(40);
   });
 
   it('rounds up — a part-full page is still a page of stickers', () => {
     expect(sheetCount(0, besar)).toBe(0);
     expect(sheetCount(1, besar)).toBe(1);
-    expect(sheetCount(24, besar)).toBe(1);
-    expect(sheetCount(25, besar)).toBe(2);
+    expect(sheetCount(21, besar)).toBe(1);
+    expect(sheetCount(22, besar)).toBe(2);
+  });
+});
+
+describe('every format actually fits on A4', () => {
+  // The defect this pins: `Label rak` claimed 3 columns of 70mm and 8 rows of 37mm — 210 × 296mm
+  // on a page with 194 × 281mm of printable area. The preview flowed happily; the printer would
+  // have dropped a column and a row, and "24 per lembar A4" was a promise it could not keep.
+  // Caught by arithmetic, which is the only way to catch it without wasting a sheet of stickers.
+  const PAGE_W = 210 - 8 * 2;   // @page { size: A4; margin: 8mm }
+  const PAGE_H = 297 - 8 * 2;
+
+  for (const f of SHEET_FORMATS) {
+    it(`${f.name} fits the printable area`, () => {
+      expect(f.width * f.columns).toBeLessThanOrEqual(PAGE_W);
+      expect(f.height * f.rows).toBeLessThanOrEqual(PAGE_H);
+    });
+  }
+
+  it('says how many fit, and means it', () => {
+    // `perSheet` is what the sheet counter and the slicing both use, so a format that lies
+    // about its grid lies about how much paper somebody is about to use.
+    for (const f of SHEET_FORMATS) expect(perSheet(f)).toBe(f.columns * f.rows);
   });
 });
