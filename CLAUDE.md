@@ -1088,8 +1088,11 @@ every API spec >= 2025-04-10; `/v1/tokens/verify` never existed. "Just ask Clerk
 integration). Apps Script then verifies natively with `Utilities.computeHmacSignature`, with
 algorithm pinning, constant-time compare, and `exp`/`nbf`/`iss`/`azp` checks — no RSA maths, no
 network call. Trade: a symmetric key means the gateway can also *mint* tokens.
-⚠️ **UNCONFIRMED: whether JWT templates require a paid Clerk plan.** This bears directly on the
-owner's "keep the free version" constraint — a 2-minute dashboard check, and the first spike.
+✅ **CONFIRMED FREE 2026-09-07.** JWT Templates are available on Clerk's **Hobby** (free) plan —
+"New template" is clickable, no upgrade prompt. This was the single blocking unknown in the whole
+gateway design: with no RSA verification in Apps Script and no Clerk endpoint that verifies a
+session JWT, a custom HS256 template was the only remaining path, and if it had been paid-only
+the admin auth would have needed redesigning around Google sign-in. It did not.
 *(Rejected fallback: `jsrsasign` went end-of-support 14 Aug 2026, all npm versions deprecated.)*
 
 ### 65.4 Other constraints now known

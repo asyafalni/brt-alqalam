@@ -34,6 +34,10 @@ design — it is **three things only a human can find out**, plus the build.
 - **The scanner works on a real phone** (2026-09-07, against https://brt-alqalam.fly.dev). Camera
   opens over HTTPS, a QR decodes, the deep link resolves, and a movement is recorded. §15.4 had
   flagged this as needing an explicit device test; it has now had one.
+- **Clerk JWT Templates are free** (2026-09-07): available on the Hobby plan, no upgrade prompt.
+  The gateway can therefore verify Clerk with a custom HS256 key and `Utilities.computeHmacSignature`
+  — the only path left, since Apps Script has no RSA verification and Clerk retired every endpoint
+  that verified a session JWT. Nothing about admin auth needs redesigning.
 - **Android is the platform that matters** (owner, 2026-09-07): the marbot rarely use iOS. The
   scanner is already built that way — native `BarcodeDetector` first, jsQR `import()`ed only in
   the branch after it, so the 130kB fallback never downloads on an Android phone. The iPhone test

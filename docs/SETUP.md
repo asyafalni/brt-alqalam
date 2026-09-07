@@ -84,7 +84,11 @@ the gateway maintains: stock levels, low-stock, and status *counts* only.
 
 1. **Create an application** (e.g. `BRT Inventaris`). Email + password sign-in is enough; only
    admins ever sign in.
-2. **⚠️ THE ONE BLOCKING CHECK — JWT Templates.**
+2. **✅ RESOLVED 2026-09-07 — JWT Templates are on the free plan.** "New template" is clickable
+   on **Hobby**, so the HS256 path below is the one we take and nothing needs redesigning.
+   *(Original wording kept, because it explains why this mattered.)*
+
+   **⚠️ THE ONE BLOCKING CHECK — JWT Templates.**
    Go to **Configure → JWT Templates** and see whether **"New template"** is available or shows
    an upgrade prompt.
    - **Available** → create a template with a **custom HS256 signing key**. This is the only way
@@ -238,7 +242,7 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 - [x] **Stage 0** — run `cd app && npm run dev`, walk the gudang *(nothing to prepare)*
 - [ ] **Stage 1** — create the spreadsheet, import the four tabs from `sheets/`, **don't publish**
 - [ ] **Stage 1** — send me the spreadsheet ID
-- [ ] **Stage 2** — ⚠️ **check Clerk → Configure → JWT Templates** *(blocks the gateway)*
+- [x] **Stage 2** — ~~check Clerk → Configure → JWT Templates~~ **available on the free plan**
 - [ ] **Stage 2** — create the app, the three roles, and the user records
 - [ ] **Stage 2** — send me the publishable key (`pk_...`); keep `sk_...` for Stage 3
 - [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
