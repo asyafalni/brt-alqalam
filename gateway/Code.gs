@@ -163,6 +163,12 @@ function handleAppend(body) {
         type: String(entry.type || ''),
         itemId: entry.itemId || '',
         assetId: entry.assetId || '',
+        /* WHICH SHELF it came off. Adding the column to `TXN_COLUMNS` was not enough — the row
+           is built from this literal, so a field missing here is written as blank however wide
+           the sheet is. It was, and every movement landed on the unplaced pile: the register
+           would have reported that nothing was ever taken from any rack, while looking correct
+           on every screen. Found by appending a real row and reading it back. */
+        locationId: entry.locationId || '',
         qtyDelta: Number(entry.qtyDelta || 0),
         recipient: entry.recipient || '',
         actorUserId: session.userId,
@@ -171,6 +177,12 @@ function handleAppend(body) {
         toStatus: entry.toStatus || '',
         reversesTxnId: entry.reversesTxnId || '',
       };
+      /* Fails loudly rather than writing a blank: `TXN_COLUMNS` and this literal are two lists
+         that must agree, and the last time they drifted the result was a silently empty column
+         nobody noticed for a week. */
+      for (var c = 0; c < TXN_COLUMNS.length; c++) {
+        if (!(TXN_COLUMNS[c] in txn)) return fail('column_not_built', { column: TXN_COLUMNS[c] });
+      }
       rows.push(TXN_COLUMNS.map(function (c) { return txn[c]; }));
       appended.push(txn);
     }
