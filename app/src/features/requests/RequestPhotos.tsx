@@ -18,18 +18,19 @@
 // ceiling and the quota handling are already solved here.
 
 import { useEffect, useRef, useState } from 'octane';
-import { Camera, ImageOff, X } from '@octanejs/lucide';
+import { Camera, ImageOff } from '@octanejs/lucide';
 import { MAX_PHOTOS_PER_ITEM, canAddPhoto } from '../../../../domain/photos';
 import type { ItemPhoto } from '../../../../domain/photos';
 import { PhotoStoreError } from '../../../../data/photoStore';
 import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
+import { PhotoViewer } from '../../components/PhotoViewer';
 
 /* One store for the whole app, created once — a fresh IndexedDB connection per rendered row
    would open one per request on a screen that lists all of them. */
 const store = createIndexedDbPhotoStore();
 
 /** One thumbnail. Owns its object URL and revokes it; an unrevoked URL pins the blob. */
-function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: (src: string) => void }) {
+function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: () => void }) {
   const [src, setSrc] = useState('');
 
   useEffect(() => {
@@ -50,7 +51,7 @@ function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: (src: string) => v
       type="button"
       class="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
       aria-label={photo.caption || 'Lihat foto'}
-      onClick={() => src && onOpen(src)}
+      onClick={onOpen}
     >
       {src
         ? <img src={src} alt={photo.caption ?? ''} class="h-full w-full object-cover" />
@@ -79,7 +80,7 @@ export function RequestThumb(
 ) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [src, setSrc] = useState('');
-  const [open, setOpen] = useState('');
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -116,7 +117,7 @@ export function RequestThumb(
         type="button"
         class="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
         aria-label={`Lihat foto ${name}`}
-        onClick={() => src && setOpen(src)}
+        onClick={() => setOpen(true)}
       >
         {src
           ? <img src={src} alt="" class="h-full w-full object-cover" />
@@ -127,7 +128,17 @@ export function RequestThumb(
           </span>
         )}
       </button>
-      {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
+      {/* Opens on the tile's own photo and walks the rest — the `+n` badge promises there are
+          more, and until this existed the promise went nowhere. */}
+      {open && (
+        <PhotoViewer
+          photos={photos}
+          startAt={0}
+          name={name}
+          store={store}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -151,7 +162,7 @@ export async function discardPhotos(ownerId: string): Promise<void> {
 
 export function RequestPhotos({ requestId, name }: { requestId: string; name: string }) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
-  const [open, setOpen] = useState('');
+  const [open, setOpen] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement | null>(null);
@@ -161,13 +172,6 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
     .catch((e: unknown) => setError(e instanceof PhotoStoreError ? e.message : 'Foto tidak bisa dibuka.'));
 
   useEffect(() => { void reload(); }, [requestId]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(''); };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
-  }, [open]);
 
   const add = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -202,7 +206,7 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
       />
 
       <div class="flex flex-wrap items-center gap-2">
-        {photos.map((p) => <Thumb key={p.photoId} photo={p} onOpen={setOpen} />)}
+        {photos.map((p, i) => <Thumb key={p.photoId} photo={p} onOpen={() => setOpen(i)} />)}
         {canAddPhoto(photos, MAX_PHOTOS_PER_ITEM) && (
           <button
             type="button"
@@ -227,34 +231,16 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
         tersinkron.
       </p>
 
-      {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
+      {open >= 0 && (
+        <PhotoViewer
+          photos={photos}
+          startAt={open}
+          name={name}
+          store={store}
+          onClose={() => setOpen(-1)}
+        />
+      )}
     </div>
   );
 }
 
-/** Full-bleed viewer, shared by the strip and the manager. */
-function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
-  return (
-    <div
-      class="fixed inset-0 z-[60] flex flex-col bg-black/90 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Foto ${name}`}
-      onClick={onClose}
-    >
-      <div class="flex shrink-0 justify-end">
-        <button
-          type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25"
-          aria-label="Tutup"
-          onClick={onClose}
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-      <div class="flex min-h-0 flex-1 items-center justify-center pt-2">
-        <img src={src} alt={name} class="max-h-full max-w-full rounded-lg object-contain" />
-      </div>
-    </div>
-  );
-}

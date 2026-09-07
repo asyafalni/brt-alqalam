@@ -13,6 +13,19 @@
 
 import { useEffect } from 'octane';
 
+/**
+ * Every dialog currently open.
+ *
+ * Dialogs nest for real now — the photo viewer opens inside the request form's sheet — and both
+ * listen for Escape on the window, so one press closed the viewer AND the form under it.
+ *
+ * Which one is on top is decided by DOM CONTAINMENT, not by mount order: effects run
+ * child-before-parent, so the inner dialog registers FIRST and any order-based answer is
+ * exactly backwards. A dialog is on top when no other open dialog lives inside it — true
+ * however the two were mounted, and true again if they are ever mounted the other way round.
+ */
+const openDialogs: { current: HTMLElement | null }[] = [];
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), '
   + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -28,6 +41,15 @@ export function useDialog(
   useEffect(() => {
     if (!open) return;
 
+    openDialogs.push(panel);
+    const topmost = () => {
+      const me = panel.current;
+      if (!me) return false;
+      return !openDialogs.some((other) => other !== panel
+        && other.current
+        && me.contains(other.current));
+    };
+
     const returnTo = document.activeElement as HTMLElement | null;
 
     // Focus the panel itself rather than its first control: reading the title before landing
@@ -40,6 +62,7 @@ export function useDialog(
     document.body.style.overflow = 'hidden';
 
     const onKey = (e: KeyboardEvent) => {
+      if (!topmost()) return;
       if (e.key === 'Escape') { onClose(); return; }
       if (e.key !== 'Tab' || !panel.current) return;
 
@@ -61,6 +84,8 @@ export function useDialog(
 
     addEventListener('keydown', onKey);
     return () => {
+      const at = openDialogs.indexOf(panel);
+      if (at !== -1) openDialogs.splice(at, 1);
       if (focusFrame) cancelAnimationFrame(focusFrame);
       removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;

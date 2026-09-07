@@ -17,6 +17,7 @@ import { Camera, ImageOff, Trash2, X } from '@octanejs/lucide';
 import { canAddPhoto, MAX_PHOTOS_PER_ITEM, photoBudget } from '../../../../domain/photos';
 import type { ItemPhoto } from '../../../../domain/photos';
 import { PhotoStoreError } from '../../../../data/photoStore';
+import { PhotoViewer } from '../../components/PhotoViewer';
 import type { PhotoStore } from '../../../../data/photoStore';
 import { Button, CARD } from '../../components/ui';
 
@@ -64,8 +65,9 @@ export function ItemPhotos(
   { itemId, itemName, store }: { itemId: string; itemName: string; store: PhotoStore },
 ) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
-  const [open, setOpen] = useState<ItemPhoto | null>(null);
-  const [openSrc, setOpenSrc] = useState('');
+  /** Which photo the viewer is on, or -1 when it is shut. An index, not the photo itself, so
+      paging is the viewer's job and deleting one does not strand it on a row that is gone. */
+  const [open, setOpen] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement | null>(null);
@@ -75,27 +77,6 @@ export function ItemPhotos(
     .catch((e: unknown) => setError(e instanceof PhotoStoreError ? e.message : 'Foto tidak bisa dibuka.'));
 
   useEffect(() => { void reload(); }, [itemId, store]);
-
-  // The viewer's own URL, separate from the thumbnails' so closing it frees the full image.
-  useEffect(() => {
-    if (!open) { setOpenSrc(''); return; }
-    let url = '';
-    let alive = true;
-    store.url(open.photoId).then((u) => {
-      if (!alive) { store.revoke(u); return; }
-      url = u; setOpenSrc(u);
-    }).catch(() => undefined);
-    return () => { alive = false; if (url) store.revoke(url); };
-  }, [open, store]);
-
-  // Escape closes the viewer. Without it the only way out on a tablet is the X, and on a
-  // desktop the reflex is the key.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(null); };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
-  }, [open]);
 
   const add = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -118,7 +99,7 @@ export function ItemPhotos(
   };
 
   const remove = async (photo: ItemPhoto) => {
-    setOpen(null);
+    setOpen(-1);
     try { await store.remove(photo.photoId); } catch { /* reload tells the truth either way */ }
     await reload();
   };
@@ -161,13 +142,13 @@ export function ItemPhotos(
       ) : (
         <>
           <div class="custom-scrollbar flex gap-2 overflow-x-auto pb-1">
-            {photos.map((p) => (
+            {photos.map((p, i) => (
               <Thumb
                 key={p.photoId}
                 photo={p}
                 store={store}
-                active={open?.photoId === p.photoId}
-                onOpen={() => setOpen(p)}
+                active={open >= 0 && photos[open]?.photoId === p.photoId}
+                onOpen={() => setOpen(i)}
               />
             ))}
             {room && (
@@ -204,49 +185,25 @@ export function ItemPhotos(
         lain sampai gateway terpasang.
       </p>
 
-      {open && (
-        <div
-          class="fixed inset-0 z-50 flex flex-col bg-black/90 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Foto ${itemName}`}
-          onClick={() => setOpen(null)}
-        >
-          <div class="flex shrink-0 items-center justify-between gap-3 text-white">
-            <p class="min-w-0 truncate text-sm font-semibold">{itemName}</p>
-            <div class="flex shrink-0 gap-2">
-              <button
-                type="button"
-                class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-red-500"
-                aria-label="Hapus foto"
-                onClick={(e: Event) => { e.stopPropagation(); void remove(open); }}
-              >
-                <Trash2 class="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25"
-                aria-label="Tutup"
-                onClick={() => setOpen(null)}
-              >
-                <X class="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-          <div class="flex min-h-0 flex-1 items-center justify-center pt-4">
-            {openSrc && (
-              <img
-                src={openSrc}
-                alt={open.caption ?? itemName}
-                class="max-h-full max-w-full rounded-lg object-contain"
-                onClick={(e: Event) => e.stopPropagation()}
-              />
-            )}
-          </div>
-          <p class="shrink-0 pt-3 text-center text-xs text-white/60 tabular-nums">
-            {open.width}×{open.height} · {kb(open.bytes)}
-          </p>
-        </div>
+      {open >= 0 && (
+        <PhotoViewer
+          photos={photos}
+          startAt={open}
+          name={itemName}
+          store={store}
+          onClose={() => setOpen(-1)}
+          actions={(photo: ItemPhoto) => (
+            <button
+              type="button"
+              class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-red-500"
+              aria-label="Hapus foto"
+              onClick={(e: Event) => { e.stopPropagation(); void remove(photo); }}
+            >
+              <Trash2 class="h-5 w-5" />
+            </button>
+          )}
+          caption={(photo: ItemPhoto) => `${photo.width}×${photo.height} · ${kb(photo.bytes)}`}
+        />
       )}
     </section>
   );
