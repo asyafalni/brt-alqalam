@@ -6,7 +6,7 @@
 // green arrow on it.
 
 import { useMemo } from 'octane';
-import { CircleCheck, MapPin, Package, TriangleAlert } from '@octanejs/lucide';
+import { CircleCheck, MapPin, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
 import { racksToCount } from '../../../../domain/cycleCount';
 import type { Route } from '../../state/route';
@@ -40,7 +40,19 @@ export function Dashboard(
   const needWalk = racksNeedingAttention(racks);
   const dueCount = useMemo(() => racksToCount(locations, now).length, [locations, now]);
 
-  const nothingWrong = inventory.notifications.length === 0 && counts.out === 0;
+  // Broken and lost were invisible from here, so the only screen anyone opens first said
+  // nothing about the two states that need a person to act. Both are derived from the log.
+  const assets = useMemo(() => {
+    const all = Object.values(inventory.derived.instances);
+    return {
+      broken: all.filter((d) => d.status === 'broken').length,
+      lost: all.filter((d) => d.status === 'lost').length,
+      out: all.filter((d) => d.status === 'out').length,
+    };
+  }, [inventory.derived]);
+
+  const nothingWrong =
+    inventory.notifications.length === 0 && counts.out === 0 && assets.broken === 0 && assets.lost === 0;
 
   if (items.length === 0) {
     return (
@@ -71,15 +83,28 @@ export function Dashboard(
       {/* Tappable, because a count nobody can act on is just anxiety. Each chip goes straight
           to the screen that fixes it. Hidden entirely when there is nothing to act on — an
           empty row of zeroes trains people to ignore the whole area. */}
-      {(counts.out > 0 || counts.low > 0 || needWalk > 0 || counts.unplaced > 0) && (
+      {(counts.out > 0 || counts.low > 0 || assets.broken > 0 || assets.lost > 0
+        || needWalk > 0 || counts.unplaced > 0) && (
         // One scrolling row, not a wrapping block: wrapped, four chips took three rows and
         // pushed everything below the fold on a phone; scrolled, they cost one.
-        <div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+        // A labelled group, not a bare row of buttons: a screen reader otherwise announces
+        // four unrelated controls with no idea what connects them.
+        <div
+          role="group"
+          aria-label="Perlu diurus"
+          class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
           {counts.out > 0 && (
             <Chip tone="red" label={`${counts.out} habis`} onClick={() => onNavigate({ name: 'board' })} />
           )}
           {counts.low > 0 && (
             <Chip tone="amber" label={`${counts.low} menipis`} onClick={() => onNavigate({ name: 'board' })} />
+          )}
+          {assets.broken > 0 && (
+            <Chip tone="orange" label={`${assets.broken} rusak`} onClick={() => onNavigate({ name: 'aset' })} />
+          )}
+          {assets.lost > 0 && (
+            <Chip tone="rose" label={`${assets.lost} hilang`} onClick={() => onNavigate({ name: 'aset' })} />
           )}
           {needWalk > 0 && (
             <Chip tone="slate" label={`${needWalk} rak perlu didatangi`} onClick={() => onNavigate({ name: 'racks' })} />
@@ -101,7 +126,7 @@ export function Dashboard(
             <p class="font-bold text-slate-900">
               {nothingWrong
                 ? 'Semua aman.'
-                : `${inventory.notifications.length + counts.out} hal perlu diurus.`}
+                : `${inventory.notifications.length + counts.out + assets.broken + assets.lost} hal perlu diurus.`}
             </p>
             {/* The chips above already itemise it. Repeating the same list here was noise —
                 the verdict's job is the one-line answer, not a second copy of the detail. */}
@@ -159,7 +184,7 @@ export function Dashboard(
         </section>
       )}
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Action
           icon={MapPin}
           title="Peta Rak"
@@ -167,6 +192,14 @@ export function Dashboard(
             ? 'Belum ada rak. Tambahkan saat mencatat barang.'
             : `${locations.length} rak · ${needWalk} perlu didatangi${dueCount ? ` · ${dueCount} belum dicek` : ''}`}
           onClick={() => onNavigate({ name: 'racks' })}
+        />
+        <Action
+          icon={Wrench}
+          title="Aset"
+          body={assets.broken + assets.lost === 0
+            ? `${assets.out} dipinjam · tidak ada yang rusak atau hilang.`
+            : `${assets.out} dipinjam · ${assets.broken} rusak · ${assets.lost} hilang.`}
+          onClick={() => onNavigate({ name: 'aset' })}
         />
         <Action
           icon={Package}
@@ -181,9 +214,14 @@ export function Dashboard(
   );
 }
 
+// Literal class strings — Tailwind never sees an interpolated one. The families match the
+// status language exactly: rusak is orange, hilang is a deeper rose, because they are
+// different outcomes needing different actions and must never read as the same thing.
 const CHIP_TONE = {
   red: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
   amber: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+  orange: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
+  rose: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100',
   slate: 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50',
 } as const;
 

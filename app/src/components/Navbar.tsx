@@ -14,18 +14,25 @@ interface Props {
   onToggleSidebar: () => void;
   onShowAlerts: () => void;
   onScan: () => void;
+  /** Alerts on screens that live only in the drawer on a phone. */
+  drawerAlerts: number;
 }
 
 export function Navbar(p: Props) {
   return (
     <header class="no-print sticky top-0 z-40 flex h-20 shrink-0 items-center justify-between gap-4 border-b border-slate-200/50 bg-white/80 px-4 backdrop-blur-md md:px-8">
+      {/* Aset, Laporan and Cetak Label live only in the drawer on a phone, so a problem on
+          one of them would otherwise be invisible until someone happened to open it. */}
       <button
         type="button"
-        class="rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform active:scale-90 md:hidden"
+        class="relative rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform active:scale-90 md:hidden"
         onClick={p.onToggleSidebar}
-        aria-label="Buka menu"
+        aria-label={p.drawerAlerts > 0 ? `Buka menu — ${p.drawerAlerts} perlu diurus` : 'Buka menu'}
       >
         <Menu class="h-5 w-5" />
+        {p.drawerAlerts > 0 && (
+          <span class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-orange-500" />
+        )}
       </button>
 
       <div class="hidden w-72 items-center gap-3 rounded-[20px] border border-white bg-white/60 px-5 py-3 shadow-sm backdrop-blur-md focus-within:border-slate-900/40 focus-within:ring-4 focus-within:ring-slate-900/5 sm:flex md:w-96">

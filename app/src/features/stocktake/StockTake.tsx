@@ -1,13 +1,18 @@
 // Layout ported from SmartInv's Inventory page: page header + primary action
 // (Inventory.tsx:90-98), stat tiles (Dashboard.tsx:140-152), and the table-in-a-flush-Card
 // with right-aligned row actions (Inventory.tsx:100-205). Reuse map §5.
+//
+// The list is a <DataTable>: on a phone the old <table> pushed the Aksi column past the right
+// edge, so Ubah and Hapus existed only for whoever thought to scroll sideways. DataTable keeps
+// a real table on a desk and stacks the same rows as cards below `sm`, actions included.
 
 import { useMemo, useState } from 'octane';
 import { Package, Pencil, Trash2 } from '@octanejs/lucide';
 import type { Category, Item, Location } from '../../../../domain/types';
-import { SEED_CATEGORIES } from '../../data/seedCategories';
 import type { Draft } from '../../state/useDraft';
-import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat, TD, TH } from '../../components/ui';
+import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
+import type { Column } from '../../components/DataTable';
 import {
   createCategory, createItem, createLocation, filterItems, instancesFor, isBlocking, summarise,
   toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, updateItem, validate,
@@ -98,6 +103,128 @@ export function StockTake(
   }
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
+  const rackCode = (id?: string) =>
+    (id ? locations.find((l) => l.locationId === id)?.code ?? id : null);
+
+  // Newest first: the thing just counted is the thing most likely to need a correction.
+  const rows = useMemo(() => [...visible].reverse(), [visible]);
+
+  // Only Barang may grow; every other cell is `whitespace-nowrap`, so an auto-layout table
+  // hands its slack to the one column that can use it instead of spreading four columns
+  // across a 1440px screen.
+  const columns: Column<Item>[] = [
+    {
+      key: 'barang',
+      header: 'Barang',
+      mobile: 'title',
+      cell: (i) => {
+        const Icon = itemIcon(i, categoryName(i.categoryId));
+        return (
+          <div class="flex min-w-0 items-center gap-3">
+            <Icon class="h-5 w-5 shrink-0 text-slate-400" />
+            <div class="min-w-0 max-w-[24rem]">
+              <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
+              <p class={`${CODE} truncate`}>{i.barcode}</p>
+            </div>
+            {/* A row cannot carry its own background through DataTable, so the row being
+                edited says so in words — which reads better anyway than a faint tint. */}
+            {editingId === i.itemId && (
+              <span class="shrink-0 whitespace-nowrap rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                sedang diubah
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'kategori',
+      header: 'Kategori',
+      mobile: 'meta',
+      cell: (i) => (
+        <span class="flex items-baseline gap-2 whitespace-nowrap">
+          <span class="max-w-[12rem] truncate text-sm text-slate-500">{categoryName(i.categoryId)}</span>
+          <span class="text-[10px] uppercase tracking-wider text-slate-400">
+            {i.kind === 'consumable' ? 'bisa habis' : 'barang tetap'}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'rak',
+      header: 'Rak',
+      mobile: 'meta',
+      cell: (i) => {
+        const code = rackCode(i.locationId);
+        return code
+          ? <span class="whitespace-nowrap text-sm font-medium text-slate-600">{code}</span>
+          : <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>;
+      },
+    },
+    {
+      key: 'jumlah',
+      header: 'Jumlah',
+      align: 'right',
+      mobile: 'trailing',
+      cell: (i) => (
+        <div class="whitespace-nowrap text-right">
+          <span class="text-sm font-bold tabular-nums text-slate-900">{i.initialStock}</span>{' '}
+          <span class="text-xs text-slate-400">{i.unit}</span>
+          {i.minStock != null && <p class="text-[10px] text-slate-400">min {i.minStock}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'aksi',
+      header: 'Aksi',
+      align: 'right',
+      // Trailing, not a meta line: on a phone these sit beside the name where a thumb already
+      // is. 44px targets, and the delete still costs two deliberate taps.
+      mobile: 'trailing',
+      cell: (i) => (pendingDelete === i.itemId ? (
+        <div class="flex flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:justify-end">
+          <Button
+            size="sm"
+            variant="danger"
+            class="min-h-[44px] whitespace-nowrap"
+            onClick={() => remove(i)}
+            aria-label={`Ya, hapus ${i.name}`}
+          >
+            Ya, hapus
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="min-h-[44px]"
+            onClick={() => setPendingDelete(null)}
+          >
+            Batal
+          </Button>
+        </div>
+      ) : (
+        <div class="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-600 active:bg-sky-100"
+            onClick={() => startEdit(i)}
+            aria-label={`Ubah ${i.name}`}
+            title="Ubah"
+          >
+            <Pencil class="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+            onClick={() => setPendingDelete(i.itemId)}
+            aria-label={`Hapus ${i.name}`}
+            title="Hapus"
+          >
+            <Trash2 class="h-5 w-5" />
+          </button>
+        </div>
+      )),
+    },
+  ];
 
   return (
     <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
@@ -106,14 +233,17 @@ export function StockTake(
         subtitle="Keliling gudang, catat setiap barang yang ditemukan. Tersimpan otomatis di perangkat ini."
         action={
           confirmReset ? (
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <span class="text-sm font-semibold text-slate-700">Hapus semua {items.length} barang?</span>
-              <Button variant="danger" onClick={reset}>Ya, hapus</Button>
-              <Button variant="secondary" onClick={() => setConfirmReset(false)}>Batal</Button>
+              <Button variant="danger" class="min-h-[44px]" onClick={reset}>Ya, hapus</Button>
+              <Button variant="secondary" class="min-h-[44px]" onClick={() => setConfirmReset(false)}>
+                Batal
+              </Button>
             </div>
           ) : (
             <Button
               variant="secondary"
+              class="min-h-[44px]"
               disabled={items.length === 0}
               onClick={() => setConfirmReset(true)}
             >
@@ -129,24 +259,28 @@ export function StockTake(
         <Stat value={totals.units} label="Unit dihitung" tint="bg-green-50 text-green-600" />
       </div>
 
-      <ItemForm
-        input={input}
-        categories={categories}
-        locations={locations}
-        problems={problems}
-        showProblems={showProblems}
-        editing={editingId != null}
-        onChange={change}
-        onAddCategory={addCategory}
-        onAddLocation={addLocation}
-        onSubmit={submit}
-        onCancelEdit={cancelEdit}
-      />
+      {/* The form card carries its own trailing margin, which doubles up against this page's
+          vertical rhythm. Neutralised here rather than in the shared component. */}
+      <div class="[&>section]:mb-0">
+        <ItemForm
+          input={input}
+          categories={categories}
+          locations={locations}
+          problems={problems}
+          showProblems={showProblems}
+          editing={editingId != null}
+          onChange={change}
+          onAddCategory={addCategory}
+          onAddLocation={addLocation}
+          onSubmit={submit}
+          onCancelEdit={cancelEdit}
+        />
+      </div>
 
       <ExportPanel items={items} categories={categories} locations={locations} labelCount={labelCount} />
 
       <div class={CARD_FLUSH}>
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
           <h2 class="text-sm font-bold text-slate-900">
             Sudah dicatat
             {search.trim() !== '' && (
@@ -158,114 +292,32 @@ export function StockTake(
           </span>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full text-left">
-            <thead class="border-b border-slate-100 bg-slate-50">
-              <tr>
-                <th class={TH}>Barang</th>
-                <th class={TH}>Kategori</th>
-                <th class={`${TH} text-right`}>Jumlah</th>
-                <th class={`${TH} text-right`}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 bg-white">
-              {items.length === 0 || visible.length === 0 ? (
-                <tr>
-                  <td colspan={4} class="px-6 py-20 text-center">
-                    <Package class="mx-auto mb-3 h-10 w-10 text-slate-300 opacity-40" />
-                    <p class="italic text-slate-400">
-                      {items.length === 0
-                        ? 'Belum ada barang. Mulai dari rak paling dekat pintu.'
-                        : `Tidak ada yang cocok dengan "${search}".`}
+        <DataTable
+          columns={columns}
+          rows={rows}
+          keyOf={(i) => i.itemId}
+          empty={(
+            <div class="px-6 py-16 text-center">
+              <Package class="mx-auto mb-4 h-10 w-10 text-slate-300" />
+              {items.length === 0 ? (
+                <>
+                  <p class="text-base font-bold text-slate-600">Belum ada barang</p>
+                  <p class="mx-auto mt-1 max-w-sm text-sm text-slate-400">
+                    Mulai dari rak paling dekat pintu.
+                  </p>
+                  <div class="mt-5">
+                    <Button variant="secondary" size="touch" onClick={draft.loadDemo}>Muat contoh data</Button>
+                    <p class="mt-2 text-xs text-slate-400">
+                      Untuk mencoba tampilan. Kosongkan lagi sebelum opname sungguhan.
                     </p>
-                    {items.length === 0 && (
-                      <div class="mt-4">
-                        <Button variant="secondary" size="sm" onClick={draft.loadDemo}>
-                          Muat contoh data
-                        </Button>
-                        <p class="mt-2 text-xs text-slate-400">
-                          Untuk mencoba tampilan. Kosongkan lagi sebelum opname sungguhan.
-                        </p>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                  </div>
+                </>
               ) : (
-                [...visible].reverse().map((i) => (
-                  <tr
-                    key={i.itemId}
-                    class={`transition-colors hover:bg-slate-50/50 ${editingId === i.itemId ? 'bg-sky-50/50' : ''}`}
-                  >
-                    <td class={TD}>
-                      <div class="flex items-center gap-3">
-                        {(() => {
-                          const Icon = itemIcon(i, categoryName(i.categoryId));
-                          return <Icon class="h-5 w-5 shrink-0 text-slate-400" />;
-                        })()}
-                        <div class="min-w-0">
-                          <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
-                          <p class={CODE}>{i.barcode}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td class={`${TD} text-sm text-slate-500`}>
-                      {categoryName(i.categoryId)}
-                      <span class="ml-2 text-[10px] uppercase tracking-wider text-slate-400">
-                        {i.kind === 'consumable' ? 'bisa habis' : 'barang tetap'}
-                      </span>
-                      <p class="mt-0.5 text-[11px] text-slate-400">
-                        {i.locationId
-                          ? locations.find((l) => l.locationId === i.locationId)?.code ?? i.locationId
-                          : 'belum ditempatkan'}
-                      </p>
-                    </td>
-                    <td class={`${TD} text-right`}>
-                      <span class="text-sm font-bold tabular-nums text-slate-900">{i.initialStock}</span>{' '}
-                      <span class="text-xs text-slate-400">{i.unit}</span>
-                      {i.minStock != null && (
-                        <p class="text-[10px] text-slate-400">min {i.minStock}</p>
-                      )}
-                    </td>
-                    <td class={`${TD} text-right`}>
-                      {pendingDelete === i.itemId ? (
-                        <div class="flex items-center justify-end gap-2">
-                          <Button size="sm" variant="danger" onClick={() => remove(i)}
-                            aria-label={`Ya, hapus ${i.name}`}>
-                            Ya, hapus
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setPendingDelete(null)}>
-                            Batal
-                          </Button>
-                        </div>
-                      ) : (
-                        <div class="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-500"
-                            onClick={() => startEdit(i)}
-                            aria-label={`Ubah ${i.name}`}
-                            title="Ubah"
-                          >
-                            <Pencil class="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                            onClick={() => setPendingDelete(i.itemId)}
-                            aria-label={`Hapus ${i.name}`}
-                            title="Hapus"
-                          >
-                            <Trash2 class="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                <p class="italic text-slate-400">Tidak ada yang cocok dengan "{search}".</p>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        />
       </div>
     </div>
   );
@@ -317,7 +369,7 @@ function ExportPanel(
               <p class="text-sm font-bold text-slate-900">{f.tab}</p>
               <p class="text-xs text-slate-500">{f.rows} baris · {f.note}</p>
             </div>
-            <Button size="md" onClick={() => download(f.tab, f.csv())}>Unduh</Button>
+            <Button size="touch" class="shrink-0" onClick={() => download(f.tab, f.csv())}>Unduh</Button>
           </li>
         ))}
       </ul>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@octanejs/testing-library';
+import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { App } from '../../App';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createItem, createLocation } from '../stocktake/draft';
@@ -96,7 +96,10 @@ describe('getting there', () => {
     at('#/board');
     const r = render(App);
 
-    fireEvent.click(r.getByLabelText('Buka Pisau dapur'));
+    // The board renders both shapes at once (see DataTable) and CSS picks one, so the row
+    // exists twice in the DOM. Scope to the desk table rather than relaxing the assertion.
+    const table = r.container.querySelector('table')!;
+    fireEvent.click(within(table).getByLabelText('Buka Pisau dapur'));
     expect(location.hash).toBe('#/barang?i=ITM-0002');
     expect(r.getByRole('heading', { name: 'Pisau dapur' })).toBeTruthy();
   });

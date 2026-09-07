@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@octanejs/testing-library';
+import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { StockTake } from './StockTake';
 import { useState } from 'octane';
 import { useDraft } from '../../state/useDraft';
@@ -17,6 +17,13 @@ function Harness() {
 const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
 
 type R = ReturnType<typeof render>;
+
+// The list renders twice on purpose — a real <table> on a desk and stacked cards below `sm`
+// (components/DataTable.tsx), so the Aksi column can no longer fall off the right edge of a
+// phone. Row queries therefore name the shape they mean; `phone` is the one a marbot sees.
+const desk = (r: R) => within(r.container.querySelector('table')!);
+// Not just any <ul> — the export panel renders one first.
+const phone = (r: R) => within(r.container.querySelector('ul[class~="sm:hidden"]')!);
 
 function addItem(r: R, name: string, qty: string) {
   type(r.getByLabelText('Nama barang'), name);
@@ -38,9 +45,11 @@ describe('StockTake — walking the gudang', () => {
   it('adds an item and shows it in the list', () => {
     const r = render(Harness);
     addItem(r, 'Sabun cuci tangan', '12');
-    expect(r.getByText('Sabun cuci tangan')).toBeTruthy();
-    expect(r.getByText('ALQ-ITM-0001')).toBeTruthy();   // the code cell — unique to the row
-    expect(r.getByText('bisa habis')).toBeTruthy();
+    expect(desk(r).getByText('Sabun cuci tangan')).toBeTruthy();
+    expect(desk(r).getByText('ALQ-ITM-0001')).toBeTruthy();   // the code cell — unique to the row
+    expect(desk(r).getByText('bisa habis')).toBeTruthy();
+    // …and the same row reaches the phone, which is where the walk actually happens.
+    expect(phone(r).getByText('Sabun cuci tangan')).toBeTruthy();
     expect(r.queryByText(/Belum ada barang/)).toBeNull();
   });
 
@@ -83,7 +92,7 @@ describe('StockTake — walking the gudang', () => {
     const first = render(Harness);
     addItem(first, 'Terpal', '3');
     cleanup();
-    expect(render(Harness).getByText('Terpal')).toBeTruthy();
+    expect(desk(render(Harness)).getByText('Terpal')).toBeTruthy();
   });
 });
 
@@ -119,13 +128,13 @@ describe('editing a row mid-walk', () => {
   it('loads the row back into the form and saves in place', () => {
     const r = render(Harness);
     addItem(r, 'Sabun', '5');
-    fireEvent.click(r.getByLabelText('Ubah Sabun'));
+    fireEvent.click(desk(r).getByLabelText('Ubah Sabun'));
 
     expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('Sabun');
     type(r.getByLabelText('Nama barang'), 'Sabun cair');
     fireEvent.click(r.getByText('Simpan perubahan'));
 
-    expect(r.getByText('Sabun cair')).toBeTruthy();
+    expect(desk(r).getByText('Sabun cair')).toBeTruthy();
     expect(stored().items).toHaveLength(1);
     expect(stored().items[0].itemId).toBe('ITM-0001'); // id survives — it may be on a label
   });
@@ -133,7 +142,7 @@ describe('editing a row mid-walk', () => {
   it('does not warn that the row being edited duplicates itself', () => {
     const r = render(Harness);
     addItem(r, 'Sapu', '2');
-    fireEvent.click(r.getByLabelText('Ubah Sapu'));
+    fireEvent.click(desk(r).getByLabelText('Ubah Sapu'));
     fireEvent.click(r.getByText('Simpan perubahan'));
     expect(r.queryByText(/tetap tambah/)).toBeNull();
   });
@@ -141,10 +150,10 @@ describe('editing a row mid-walk', () => {
   it('can be cancelled without changing anything', () => {
     const r = render(Harness);
     addItem(r, 'Sapu', '2');
-    fireEvent.click(r.getByLabelText('Ubah Sapu'));
+    fireEvent.click(desk(r).getByLabelText('Ubah Sapu'));
     type(r.getByLabelText('Nama barang'), 'Bukan sapu');
     fireEvent.click(r.getByText('Batal'));
-    expect(r.getByText('Sapu')).toBeTruthy();
+    expect(desk(r).getByText('Sapu')).toBeTruthy();
     expect(r.queryByText('Bukan sapu')).toBeNull();
   });
 
@@ -152,14 +161,35 @@ describe('editing a row mid-walk', () => {
     const r = render(Harness);
     addItem(r, 'Kanebo', '5');
 
-    fireEvent.click(r.getByLabelText('Hapus Kanebo'));
-    expect(r.getByText('Kanebo')).toBeTruthy();          // still there after one tap
-    fireEvent.click(r.getByText('Batal'));
-    expect(r.getByText('Kanebo')).toBeTruthy();          // and after backing out
+    fireEvent.click(desk(r).getByLabelText('Hapus Kanebo'));
+    expect(desk(r).getByText('Kanebo')).toBeTruthy();          // still there after one tap
+    fireEvent.click(desk(r).getByText('Batal'));
+    expect(desk(r).getByText('Kanebo')).toBeTruthy();          // and after backing out
 
-    fireEvent.click(r.getByLabelText('Hapus Kanebo'));
-    fireEvent.click(r.getByLabelText('Ya, hapus Kanebo'));
+    fireEvent.click(desk(r).getByLabelText('Hapus Kanebo'));
+    fireEvent.click(desk(r).getByLabelText('Ya, hapus Kanebo'));
     expect(r.queryByText('Kanebo')).toBeNull();
+  });
+
+  it('the same two taps work from the phone card, where the column used to be cut off', () => {
+    const r = render(Harness);
+    addItem(r, 'Kanebo', '5');
+
+    fireEvent.click(phone(r).getByLabelText('Hapus Kanebo'));
+    expect(phone(r).getByText('Kanebo')).toBeTruthy();         // one tap deletes nothing
+    fireEvent.click(phone(r).getByText('Batal'));
+    expect(phone(r).getByText('Kanebo')).toBeTruthy();
+
+    fireEvent.click(phone(r).getByLabelText('Hapus Kanebo'));
+    fireEvent.click(phone(r).getByLabelText('Ya, hapus Kanebo'));
+    expect(r.queryByText('Kanebo')).toBeNull();
+  });
+
+  it('Ubah is reachable from the phone card too', () => {
+    const r = render(Harness);
+    addItem(r, 'Sapu ijuk', '2');
+    fireEvent.click(phone(r).getByLabelText('Ubah Sapu ijuk'));
+    expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('Sapu ijuk');
   });
 
   it('emptying the whole list also takes two taps', () => {
@@ -202,7 +232,7 @@ describe('categories are free-form', () => {
     const r = render(Harness);
     addItem(r, 'Sabun', '1');
     fireEvent.click(r.getByLabelText('Tambah kategori baru'));
-    fireEvent.click(r.getByLabelText('Hapus Sabun'));
+    fireEvent.click(desk(r).getByLabelText('Hapus Sabun'));
     fireEvent.click(r.getByText('Kosongkan'));
     expect(r.getByText(/Hapus semua/)).toBeTruthy();
   });

@@ -115,6 +115,7 @@ export function App() {
           onToggleSidebar={() => setCollapsed(!collapsed)}
           onShowAlerts={() => navigate({ name: 'board' })}
           onScan={() => go({ name: 'pindai' })}
+          drawerAlerts={assetIssues}
         />
 
         {/* pb-24 on mobile keeps the last row clear of the bottom bar. */}

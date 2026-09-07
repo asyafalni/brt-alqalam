@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@octanejs/testing-library';
+import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { App } from './App';
 import { SEED_CATEGORIES } from './data/seedCategories';
 import { createItem } from './features/stocktake/draft';
@@ -20,6 +20,11 @@ function seed(...inputs: DraftInput[]) {
 }
 
 const at = (hash: string) => { location.hash = hash; };
+
+// Every list screen renders both shapes at once — a real table on a desk, stacked cards below
+// `sm` (see components/DataTable) — and CSS picks one, so a row exists twice in the DOM.
+// Scope to the desk table rather than relaxing the assertion.
+const desk = (r: ReturnType<typeof render>) => within(r.container.querySelector('table')!);
 
 beforeEach(() => { localStorage.clear(); at('#/opname'); });
 afterEach(() => { cleanup(); at('#/opname'); });
@@ -118,8 +123,8 @@ describe('the board renders derived state, not stored numbers', () => {
     seed(input({ name: 'Sabun', initialStock: 12, minStock: 5 }));
     at('#/board');
     const r = render(App);
-    expect(r.getByText('Sabun')).toBeTruthy();
-    expect(r.getByText('Tersedia')).toBeTruthy();
+    expect(desk(r).getByText('Sabun')).toBeTruthy();
+    expect(desk(r).getByText('Tersedia')).toBeTruthy();
   });
 
   it('raises Notifikasi Stok for anything at or below its minimum', () => {
@@ -131,9 +136,10 @@ describe('the board renders derived state, not stored numbers', () => {
     const r = render(App);
 
     expect(r.getByText('Notifikasi Stok')).toBeTruthy();
-    // Kanebo appears in the alert rail AND the stock table — both are correct.
-    expect(r.getAllByText('Kanebo')).toHaveLength(2);
-    expect(r.getByText('Menipis')).toBeTruthy();
+    // Kanebo appears in the alert rail AND the stock list — both are correct. The list itself
+    // renders twice (desk table + phone cards), so three in the DOM is the honest count.
+    expect(r.getAllByText('Kanebo')).toHaveLength(3);
+    expect(desk(r).getByText('Menipis')).toBeTruthy();
     expect(r.queryByText('Semua stok aman.')).toBeNull();
   });
 
@@ -144,7 +150,7 @@ describe('the board renders derived state, not stored numbers', () => {
 
     // The alert card is always present; what matters is that it reports nothing to act on.
     expect(r.getByText('Semua stok aman.')).toBeTruthy();
-    expect(r.getByText('Habis')).toBeTruthy();   // still reported as out of stock
+    expect(desk(r).getByText('Habis')).toBeTruthy();   // still reported as out of stock
   });
 
   it('is honest that there is no gateway yet', () => {
@@ -164,7 +170,7 @@ describe('the navbar search filters the screen you are on', () => {
     const r = render(App);
 
     type(r.getByLabelText('Cari barang'), 'sabun');
-    expect(r.getByText('Sabun cuci')).toBeTruthy();
+    expect(desk(r).getByText('Sabun cuci')).toBeTruthy();
     expect(r.queryByText('Pisau dapur')).toBeNull();
 
     type(r.getByLabelText('Cari barang'), 'zzz');
@@ -177,7 +183,7 @@ describe('the navbar search filters the screen you are on', () => {
     const r = render(App);
 
     type(r.getByLabelText('Cari barang'), 'pisau');
-    expect(r.getByText('Pisau dapur')).toBeTruthy();
+    expect(desk(r).getByText('Pisau dapur')).toBeTruthy();
     expect(r.queryByText('Sabun cuci')).toBeNull();
   });
 });

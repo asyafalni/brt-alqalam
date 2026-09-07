@@ -42,11 +42,11 @@ export function ItemForm(p: Props) {
   }
 
   return (
-    <section class={`${CARD} mb-6 p-5 ${p.editing ? 'border-primary' : ''}`}>
+    <section class={`${CARD} mb-6 p-5 ${p.editing ? 'border-slate-900' : ''}`}>
       {p.editing && (
-        <p class="mb-4 flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3 font-semibold">
+        <p class="mb-4 flex items-center justify-between rounded-xl bg-slate-900/5 px-4 py-3 font-semibold text-slate-900">
           <span>Mengubah barang</span>
-          <button type="button" class="font-semibold text-primary underline" onClick={p.onCancelEdit}>
+          <button type="button" class="font-semibold text-slate-900 underline" onClick={p.onCancelEdit}>
             Batal
           </button>
         </p>
@@ -85,7 +85,7 @@ export function ItemForm(p: Props) {
                 stop the walk — that is exactly when a stock-take gets abandoned. */}
             <button
               type="button"
-              class="min-h-touch w-touch shrink-0 rounded-xl border-2 border-border text-2xl font-bold"
+              class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
               onClick={() => setNewCategory('')}
               aria-label="Tambah kategori baru"
               title="Tambah kategori baru"
@@ -105,14 +105,14 @@ export function ItemForm(p: Props) {
               />
               <button
                 type="button"
-                class="min-h-touch shrink-0 rounded-xl bg-primary px-4 font-semibold text-primary-foreground"
+                class="min-h-touch shrink-0 rounded-lg bg-slate-900 px-4 font-semibold text-slate-50 hover:bg-slate-800"
                 onClick={commitCategory}
               >
                 Simpan
               </button>
               <button
                 type="button"
-                class="min-h-touch shrink-0 rounded-xl border-2 border-border px-4 font-semibold"
+                class="min-h-touch shrink-0 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => setNewCategory(null)}
               >
                 Batal
@@ -254,18 +254,18 @@ export function ItemForm(p: Props) {
           {p.input.minStock == null ? (
             <button
               type="button"
-              class={`${FIELD} flex items-center justify-between text-left text-muted-foreground`}
+              class={`${FIELD} flex items-center justify-between text-left text-slate-400`}
               onClick={() => p.onChange('minStock', 0)}
             >
               <span>Tidak ada minimum ( - )</span>
-              <span class="text-sm font-semibold text-primary">Atur</span>
+              <span class="text-sm font-semibold text-slate-900">Atur</span>
             </button>
           ) : (
             <div class="flex gap-2">
               <Stepper id="minimum" value={p.input.minStock} onChange={(v) => p.onChange('minStock', v)} />
               <button
                 type="button"
-                class="min-h-touch shrink-0 rounded-xl border-2 border-border px-4 font-semibold"
+                class="min-h-touch shrink-0 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => p.onChange('minStock', null)}
                 title="Tanpa minimum"
               >
@@ -279,7 +279,7 @@ export function ItemForm(p: Props) {
 
       <button
         type="button"
-        class="min-h-touch w-full rounded-xl bg-primary text-xl font-bold text-primary-foreground"
+        class="min-h-touch w-full rounded-lg bg-slate-900 text-xl font-bold text-slate-50 hover:bg-slate-800"
         onClick={p.onSubmit}
       >
         {p.editing ? 'Simpan perubahan' : 'Tambah barang'}
@@ -290,7 +290,7 @@ export function ItemForm(p: Props) {
 
 function Problem({ problem }: { problem?: { message: string } }) {
   if (!problem) return null;
-  return <p class="mt-1.5 text-sm font-medium text-destructive">{problem.message}</p>;
+  return <p class="mt-1.5 text-sm font-medium text-red-600">{problem.message}</p>;
 }
 
 function Choice(
@@ -301,13 +301,13 @@ function Choice(
       type="button"
       aria-pressed={active}
       class={
-        'min-h-touch rounded-xl border-2 px-4 py-3 text-left ' +
-        (active ? 'border-primary bg-primary/10' : 'border-border')
+        'min-h-touch rounded-lg border px-4 py-3 text-left transition-colors ' +
+        (active ? 'border-slate-900 bg-slate-900/5' : 'border-slate-200 bg-white hover:bg-slate-50')
       }
       onClick={onPick}
     >
       <span class="block font-bold">{title}</span>
-      <span class="block text-sm text-muted-foreground">{hint}</span>
+      <span class="block text-sm text-slate-500">{hint}</span>
     </button>
   );
 }
@@ -318,7 +318,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
     <div class="flex items-stretch gap-2">
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-xl border-2 border-border text-2xl font-bold"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(-1)}
         aria-label="Kurangi"
       >
@@ -336,7 +336,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
       />
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-xl border-2 border-border text-2xl font-bold"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-200 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(1)}
         aria-label="Tambah"
       >
