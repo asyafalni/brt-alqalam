@@ -164,9 +164,15 @@ export interface SheetFormat {
 }
 
 /**
- * Four sizes, named by the job rather than by the millimetre. Somebody choosing a label is
+ * Six sizes, named by the JOB rather than by the millimetre. Somebody choosing a label is
  * deciding "is this going on a keyring or on a shelf?", not "is this 30mm or 70mm?" — so the
  * job is the label and the measurement is the fine print.
+ *
+ * The two poster sizes broke that rule when they arrived ("Papan rak ¼ A4", "Papan zona A5"):
+ * a quarter of A4 is an arithmetic problem, not a job, and the paper size was already printed
+ * beside the name. They are named by what they are for and how far away they are read from —
+ * a poster ON a rack, a board for a ZONE — which is also the difference that decides which one
+ * somebody wants.
  */
 export const SHEET_FORMATS: SheetFormat[] = [
   {
@@ -203,16 +209,16 @@ export const SHEET_FORMATS: SheetFormat[] = [
      width becomes the limit instead, and the code can be as large as the paper allows. */
   {
     id: 'papan4',
-    name: 'Papan rak ¼ A4',
-    purpose: 'Empat per lembar — QR besar untuk tiap rak, hemat kertas.',
+    name: 'Poster rak',
+    purpose: 'Ditempel di tiap rak — QR besar, dipindai dari beberapa langkah.',
     columns: 2, rows: 2, width: 95, height: 135, layout: 'poster',
   },
   {
     // The biggest worth printing. A whole A4 per rack was tried and is too much paper for one
     // shelf — the code was already unmistakable at half that.
     id: 'papan',
-    name: 'Papan zona A5',
-    purpose: 'Setengah A4 — dipindai dan dibaca dari seberang gudang.',
+    name: 'Papan zona',
+    purpose: 'Penanda lorong atau zona — terbaca dari seberang gudang.',
     columns: 1, rows: 2, width: 190, height: 135, layout: 'poster',
   },
 ];
