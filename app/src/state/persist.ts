@@ -8,6 +8,7 @@
 // in a gudang — we would rather start empty and say so than crash.
 
 import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
+import type { PurchaseRequest } from '../../../domain/requests';
 import { linesFromLegacy } from '../../../domain/stock';
 
 export interface StoredDraft {
@@ -22,9 +23,12 @@ export interface StoredDraft {
    * *derived* consequence of a transaction and cannot exist without one.
    */
   txns: Txn[];
+  /** Things somebody wants bought. Not stock until one is marked `dibeli`. */
+  requests: PurchaseRequest[];
 }
 
-const KEY = 'brt.stocktake.draft.v5';
+const KEY = 'brt.stocktake.draft.v6';
+const KEY_V5 = 'brt.stocktake.draft.v5'; // before purchase requests existed
 const KEY_V4 = 'brt.stocktake.draft.v5'; // quantity and one rack still on the item
 const KEY_V3 = 'brt.stocktake.draft.v3'; // items + categories + locations, before the log
 const KEY_V2 = 'brt.stocktake.draft.v2'; // items + categories, before racks existed
@@ -41,6 +45,9 @@ const isLocation = (v: unknown): v is Location =>
 
 const isTxn = (v: unknown): v is Txn =>
   !!v && typeof v === 'object' && typeof (v as Txn).txnId === 'string';
+
+const isRequest = (v: unknown): v is PurchaseRequest =>
+  !!v && typeof v === 'object' && typeof (v as PurchaseRequest).requestId === 'string';
 
 const isStockLine = (v: unknown): v is StockLine =>
   !!v && typeof v === 'object'
@@ -69,7 +76,23 @@ function readJson(key: string): unknown {
 export function loadDraft(fallbackCategories: Category[]): StoredDraft {
   // Migrations exist so a half-finished walk survives a schema change. Losing someone's
   // afternoon in the gudang to a version bump would be unforgivable.
-  const v5 = readJson(KEY);
+  const v6 = readJson(KEY);
+  if (v6 && typeof v6 === 'object') {
+    const { items, categories, locations, stock, txns, requests } = v6 as Partial<StoredDraft>;
+    return {
+      items: Array.isArray(items) ? items.filter(isItem) : [],
+      categories: Array.isArray(categories) && categories.some(isCategory)
+        ? categories.filter(isCategory)
+        : fallbackCategories,
+      locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
+      stock: Array.isArray(stock) ? stock.filter(isStockLine) : [],
+      txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
+      requests: Array.isArray(requests) ? requests.filter(isRequest) : [],
+    };
+  }
+
+  // Before purchase requests existed. Nothing to carry — there simply were none.
+  const v5 = readJson(KEY_V5);
   if (v5 && typeof v5 === 'object') {
     const { items, categories, locations, stock, txns } = v5 as Partial<StoredDraft>;
     return {
@@ -80,6 +103,7 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
       locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
       stock: Array.isArray(stock) ? stock.filter(isStockLine) : [],
       txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
+      requests: [],
     };
   }
 
@@ -99,6 +123,7 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
       locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
       stock: linesFromLegacy(legacy),
       txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
+      requests: [],
     };
   }
 
@@ -115,6 +140,7 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
         : fallbackCategories,
       locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
       txns: [],
+      requests: [],
     };
   }
 
@@ -131,6 +157,7 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
         : fallbackCategories,
       locations: [],
       txns: [],
+      requests: [],
     };
   }
 
@@ -144,10 +171,13 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
       locations: [],
       stock: linesFromLegacy(legacy),
       txns: [],
+      requests: [],
     };
   }
 
-  return { items: [], categories: fallbackCategories, locations: [], stock: [], txns: [] };
+  return {
+    items: [], categories: fallbackCategories, locations: [], stock: [], txns: [], requests: [],
+  };
 }
 
 export function saveDraft(draft: StoredDraft): void {
@@ -161,6 +191,7 @@ export function saveDraft(draft: StoredDraft): void {
 export function clearDraft(): void {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(KEY_V5);
     localStorage.removeItem(KEY_V4);
     localStorage.removeItem(KEY_V3);
     localStorage.removeItem(KEY_V2);

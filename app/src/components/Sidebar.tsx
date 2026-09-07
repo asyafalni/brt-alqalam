@@ -8,7 +8,7 @@
 //    @octanejs/motion is not a dependency yet, and its `layoutId` is single-element FLIP rather
 //    than a full projection tree (OCTANE-FINDINGS.md). Static appearance is identical.
 
-import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, Wrench } from '@octanejs/lucide';
+import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 import { Logo } from './Logo';
 
@@ -22,6 +22,7 @@ interface Props {
   alertCount: number;
   rackCount: number;
   assetIssues: number;
+  requestCount: number;
   onNavigate: (route: Route) => void;
   onClose: () => void;
 }
@@ -33,6 +34,11 @@ export function Sidebar(p: Props) {
     { name: 'Peta Rak', icon: MapPin, route: { name: 'racks' }, badge: p.rackCount },
     { name: 'Stok', icon: Package, route: { name: 'board' }, badge: p.alertCount },
     { name: 'Aset', icon: Wrench, route: { name: 'aset' }, badge: p.assetIssues },
+    // The badge IS the notification, for now. A push to the admin's phone is a gateway job
+    // (§35), and until that exists the honest version is putting the count where they already
+    // look — silently holding requests until somebody thinks to check would be worse than not
+    // having the screen.
+    { name: 'Pengajuan', icon: ShoppingCart, route: { name: 'pengajuan' }, badge: p.requestCount },
     { name: 'Cetak Label', icon: QrCode, route: { name: 'label' }, badge: p.itemCount },
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
   ];

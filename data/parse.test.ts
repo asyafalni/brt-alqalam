@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseCsv, toRecords } from './csv';
-import { parseItems, parseStock, parseTxns, parseInstances, parseLocations, describeIssues } from './parse';
+import { parseItems, parseStock, parseRequests, parseTxns, parseInstances, parseLocations, describeIssues } from './parse';
 
 describe('parseCsv', () => {
   it('handles quotes, embedded commas and newlines', () => {
@@ -198,5 +198,40 @@ describe('parseLocations', () => {
     const r = parseLocations(HEADER + 'LOC-A1,,Rak sabun,Gudang Utama,1,TRUE');
     expect(r.ok).toHaveLength(0);
     expect(r.quarantined[0]).toMatchObject({ field: 'code' });
+  });
+});
+
+const REQ_HEADER = 'requestId,name,itemId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note\n';
+
+describe('parseRequests', () => {
+  it('reads a request with everything filled in', () => {
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0001,Sapu ijuk,,2,buah,25000,Yang lama patah,https://toko.example/sapu,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0]).toMatchObject({
+      requestId: 'REQ-0001', name: 'Sapu ijuk', qty: 2, price: 25000,
+      reason: 'Yang lama patah', status: 'diajukan',
+    });
+    expect(r.ok[0].requestedTs).toBe(Date.parse('2026-09-06T10:00:00Z'));
+  });
+
+  it('leaves price and link absent rather than zero when they were not known', () => {
+    // "Berapa harganya" and "beli di mana" are usually the questions being asked, not answers.
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0002,Kanebo,,3,buah,,Habis,,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.ok[0].price).toBeUndefined();
+    expect(r.ok[0].url).toBeUndefined();
+  });
+
+  it('rejects a status that is not in the model', () => {
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0003,Sapu,,1,buah,,Alasan,,menunggu,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined[0].field).toBe('status');
+  });
+
+  it('quarantines a request with no reason — nobody can act on it', () => {
+    const r = parseRequests(REQ_HEADER
+      + 'REQ-0004,Sapu,,1,buah,,,,diajukan,USR-1,2026-09-06T10:00:00Z,,,');
+    expect(r.quarantined[0].field).toBe('reason');
   });
 });

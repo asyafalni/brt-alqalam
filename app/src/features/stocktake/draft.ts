@@ -11,6 +11,7 @@ import type {
   AssetInstance, Category, Item, Kind, Location, StockLine, TrackBy,
 } from '../../../../domain/types';
 import { linesAt, setLine, totalFor } from '../../../../domain/stock';
+import type { PurchaseRequest } from '../../../../domain/requests';
 
 /**
  * What the operator actually fills in. Everything else is derived.
@@ -115,6 +116,8 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 
 const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId';
 const STOCK_HEADER = 'itemId,locationId,initialStock';
+const REQUESTS_HEADER =
+  'requestId,name,itemId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note';
 
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
@@ -132,6 +135,27 @@ export function toItemsCsv(items: readonly Item[]): string {
     i.artId ?? '',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';
+}
+
+/** Purchase requests. Not stock: a request is what we WANT, an item is what we OWN. */
+export function toRequestsCsv(requests: readonly PurchaseRequest[]): string {
+  const rows = requests.map((r) => [
+    r.requestId,
+    r.name,
+    r.itemId ?? '',
+    String(r.qty),
+    r.unit,
+    r.price == null ? '' : String(r.price),
+    r.reason,
+    r.url ?? '',
+    r.status,
+    r.requestedBy,
+    new Date(r.requestedTs).toISOString(),
+    r.decidedBy ?? '',
+    r.decidedTs == null ? '' : new Date(r.decidedTs).toISOString(),
+    r.note ?? '',
+  ].map(cell).join(','));
+  return [REQUESTS_HEADER, ...rows].join('\n') + '\n';
 }
 
 /** One row per (barang × rak). A blank locationId is the unplaced pile, not a missing value. */

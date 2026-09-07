@@ -17,6 +17,7 @@ export type Route =
   | { name: 'item'; id: string }
   | { name: 'laporan' }
   | { name: 'aset' }
+  | { name: 'pengajuan' }
   | { name: 'scan'; target: 'item' | 'asset' | 'location'; id: string }
   | { name: 'scan-empty' };
 
@@ -45,6 +46,7 @@ export function parseRoute(hash: string): Route {
   if (path === '/label') return { name: 'label' };
   if (path === '/laporan') return { name: 'laporan' };
   if (path === '/aset') return { name: 'aset' };
+  if (path === '/pengajuan') return { name: 'pengajuan' };
   if (path === '/board') return { name: 'board' };
   if (path === '/racks') {
     const id = params.get('r');
@@ -59,6 +61,7 @@ export function routeToHash(route: Route): string {
     case 'label': return '#/label';
     case 'laporan': return '#/laporan';
     case 'aset': return '#/aset';
+    case 'pengajuan': return '#/pengajuan';
     case 'board': return '#/board';
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';

@@ -14,7 +14,7 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
 const B3: Location = createLocation('B3', 'Gudang Utama', 'Rak sabun', []);
 
 function seed(items: Item[], locations: Location[] = [B3]) {
-  localStorage.setItem('brt.stocktake.draft.v5',
+  localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns: [] }));
 }
 

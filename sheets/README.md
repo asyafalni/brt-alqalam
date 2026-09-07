@@ -2,7 +2,7 @@
 
 **Do not hand-type these headers.** They must match `data/parse.ts` exactly; a mismatch
 quarantines every row. Import each CSV as its own tab, named exactly as the filename
-(`Categories`, `Locations`, `Items`, `Stock`, `AssetInstances`, `Transactions`).
+(`Categories`, `Locations`, `Items`, `Stock`, `AssetInstances`, `Transactions`, `Requests`).
 
 > In Google Sheets: **File → Import → Upload → Insert new sheet(s)**, then rename the tab to the
 > filename. Repeat per file. Delete the example rows once you have real data — they are marked
@@ -18,6 +18,7 @@ quarantines every row. Import each CSV as its own tab, named exactly as the file
 | `Stock` | the stock-take screen, and every cycle count | **How much of an item sits on which rack** — one row per (barang × rak). This is where quantity lives. |
 | `AssetInstances` | admin / label tool | Only for `trackBy: instance` durables — one row per physical unit. |
 | `Transactions` | **the gateway only** | Append-only event log. **Never edit or delete a row here** — corrections are `reversal` rows. |
+| `Requests` | the Pengajuan screen | Things somebody wants the masjid to **buy**. Not stock: a request is what we WANT, an item is what we OWN, and a catalog containing both would undo the thing this register exists to fix. A request becomes stock at exactly one moment — when it is marked `dibeli`. `status` is `diajukan` / `dibeli` / `ditolak`; `price` is per unit, in rupiah; `itemId` is set only when it is a restock of something already in the catalog. |
 
 ### Why `Stock` is a separate tab
 

@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'octane';
 import { Download, Package, Pencil, Trash2 } from '@octanejs/lucide';
 import type { Category, Item, Location, StockLine } from '../../../../domain/types';
+import type { PurchaseRequest } from '../../../../domain/requests';
 import type { Draft } from '../../state/useDraft';
 import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
@@ -16,7 +17,8 @@ import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import {
   createCategory, createEntry, createLocation, filterItems, instancesFor, isBlocking, summarise,
-  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, toStockCsv, updateEntry,
+  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, toRequestsCsv, toStockCsv,
+  updateEntry,
   validate,
 } from './draft';
 import { removeItem as removeStockFor, removeLine, totalFor } from '../../../../domain/stock';
@@ -347,6 +349,7 @@ export function StockTake(
           categories={categories}
           locations={locations}
           stock={stock}
+          requests={draft.requests}
           labelCount={labelCount}
         />
       </Sheet>
@@ -404,9 +407,9 @@ export function StockTake(
  * files are listed with their row counts and taken one at a time.
  */
 function ExportPanel(
-  { items, categories, locations, stock, labelCount }:
+  { items, categories, locations, stock, requests, labelCount }:
   { items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[];
-    labelCount: number },
+    requests: PurchaseRequest[]; labelCount: number },
 ) {
   if (items.length === 0) return null;
   const acquiredTs = Date.now();
@@ -417,6 +420,9 @@ function ExportPanel(
     { tab: 'Categories', rows: categories.length, note: 'daftar kategori', csv: () => toCategoriesCsv(categories) },
     // Its own tab, because quantity is per (barang × rak) now — see sheets/README.md.
     { tab: 'Stock', rows: stock.length, note: 'jumlah per rak', csv: () => toStockCsv(stock) },
+    ...(requests.length > 0
+      ? [{ tab: 'Requests', rows: requests.length, note: 'pengajuan pembelian', csv: () => toRequestsCsv(requests) }]
+      : []),
     ...(locations.length > 0
       ? [{ tab: 'Locations', rows: locations.length, note: 'rak & tempat', csv: () => toLocationsCsv(locations) }]
       : []),

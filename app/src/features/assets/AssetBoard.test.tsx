@@ -59,7 +59,7 @@ const txn = (assetId: string, p: Partial<Txn> & Pick<Txn, 'type'>): Txn => {
 };
 
 function seed(items: Item[], txns: Txn[] = []) {
-  localStorage.setItem('brt.stocktake.draft.v5',
+  localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [], stock: lines, txns }));
 }
 

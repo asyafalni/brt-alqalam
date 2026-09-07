@@ -17,6 +17,7 @@ import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { StockAlerts } from '../alerts/StockAlerts';
 import { RackArt, rackArtFor } from '../racks/RackArt';
+import { openRequests } from '../../../../domain/requests';
 
 const ALERT_PREVIEW = 6;
 
@@ -52,6 +53,9 @@ export function Dashboard(
   const needWalk = racksNeedingAttention(racks);
   const due = useMemo(() => racksToCount(locations, now), [locations, now]);
   const dueCount = due.length;
+  // A request nobody looks at is a request nobody answers, so it joins the row of things
+  // waiting on a person.
+  const openRequestCount = openRequests(draft.requests).length;
 
   // Broken and lost were invisible from here, so the only screen anyone opens first said
   // nothing about the two states that need a person to act. Both are derived from the log.
@@ -107,7 +111,7 @@ export function Dashboard(
           to the screen that fixes it. Hidden entirely when there is nothing to act on — an
           empty row of zeroes trains people to ignore the whole area. */}
       {(counts.out > 0 || counts.low > 0 || counts.negative > 0 || assets.broken > 0
-        || assets.lost > 0 || needWalk > 0 || counts.unplaced > 0) && (
+        || assets.lost > 0 || needWalk > 0 || counts.unplaced > 0 || openRequestCount > 0) && (
         // One scrolling row, not a wrapping block: wrapped, four chips took three rows and
         // pushed everything below the fold on a phone; scrolled, they cost one.
         // A labelled group, not a bare row of buttons: a screen reader otherwise announces
@@ -137,6 +141,14 @@ export function Dashboard(
           )}
           {needWalk > 0 && (
             <Chip tone="slate" count={needWalk} label="rak perlu didatangi" onClick={() => onNavigate({ name: 'racks' })} />
+          )}
+          {openRequestCount > 0 && (
+            <Chip
+              tone="slate"
+              count={openRequestCount}
+              label="pengajuan menunggu"
+              onClick={() => onNavigate({ name: 'pengajuan' })}
+            />
           )}
           {counts.unplaced > 0 && (
             <Chip tone="slate" count={counts.unplaced} label="belum ditempatkan" onClick={() => onNavigate({ name: 'racks' })} />

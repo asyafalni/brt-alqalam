@@ -11,6 +11,7 @@
 // whole point of the system is that the numbers can be believed.
 
 import type { AssetInstance, Category, Item, Kind, Location, MovementType, StockLine, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
+import type { PurchaseRequest, RequestStatus } from '../domain/requests';
 import { parseCsv, toRecords } from './csv';
 
 export interface ParseIssue {
@@ -252,6 +253,36 @@ export const buildInstance = (r: Record<string, string>): AssetInstance => ({
     active: bool(r, 'active', true),
   });
 
+const REQUEST_STATUSES: RequestStatus[] = ['diajukan', 'dibeli', 'ditolak'];
+
+/**
+ * One row of the Requests tab — something somebody wants the masjid to buy.
+ *
+ * `price` and `url` are optional because "berapa harganya" and "beli di mana" are often the
+ * questions being asked rather than answers already known. `reason` is not optional here for
+ * the same reason it is not optional in the form: a request nobody can judge is one somebody
+ * has to chase.
+ */
+export const buildRequest = (r: Record<string, string>): PurchaseRequest => {
+  const out: PurchaseRequest = {
+    requestId: req(r, 'requestid'),
+    name: req(r, 'name'),
+    qty: num(r, 'qty', 0),
+    unit: req(r, 'unit'),
+    reason: req(r, 'reason'),
+    status: oneOf<RequestStatus>(r, 'status', REQUEST_STATUSES),
+    requestedBy: req(r, 'requestedby'),
+    requestedTs: ts(r, 'requestedts'),
+  };
+  if (r['itemid']) out.itemId = r['itemid'];
+  if (r['price']) out.price = num(r, 'price', 0);
+  if (r['url']) out.url = r['url'];
+  if (r['note']) out.note = r['note'];
+  if (r['decidedby']) out.decidedBy = r['decidedby'];
+  if (r['decidedts']) out.decidedTs = ts(r, 'decidedts');
+  return out;
+};
+
 export const buildTxn = (r: Record<string, string>): Txn => {
     const t: Txn = {
       txnId: req(r, 'txnid'),
@@ -293,5 +324,7 @@ export const parseCategories = (csv: string): ParseResult<Category> => parseRows
 export const parseLocations = (csv: string): ParseResult<Location> => parseRows(csv, buildLocation);
 export const parseItems = (csv: string): ParseResult<Item> => parseRows(csv, buildItem);
 export const parseStock = (csv: string): ParseResult<StockLine> => parseRows(csv, buildStockLine);
+export const parseRequests = (csv: string): ParseResult<PurchaseRequest> =>
+  parseRows(csv, buildRequest);
 export const parseInstances = (csv: string): ParseResult<AssetInstance> => parseRows(csv, buildInstance);
 export const parseTxns = (csv: string): ParseResult<Txn> => parseRows(csv, buildTxn);

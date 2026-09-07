@@ -44,7 +44,7 @@ const UNCOUNTED: Location = {
 };
 
 function seed(items: Item[], txns: Txn[] = [], locations = [RAK]) {
-  localStorage.setItem('brt.stocktake.draft.v5',
+  localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns }));
 }
 const at = (hash: string) => { location.hash = hash; };

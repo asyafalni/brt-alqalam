@@ -28,7 +28,7 @@ const buildCatalog = (inputs: DraftInput[]): Item[] => {
 };
 function seed(...inputs: DraftInput[]) {
   const items = buildCatalog(inputs);
-  localStorage.setItem('brt.stocktake.draft.v5',
+  localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [], stock: lines, txns: [] }));
   return items;
 }

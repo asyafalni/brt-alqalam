@@ -29,7 +29,7 @@ const buildCatalog = (inputs: DraftInput[]): Item[] => {
 const catalog = (...inputs: DraftInput[]): Item[] => buildCatalog(inputs);
 
 function seed(items: Item[], locations: Location[] = [A1]) {
-  localStorage.setItem('brt.stocktake.draft.v5',
+  localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns: [] }));
 }
 const at = (hash: string) => { location.hash = hash; };

@@ -3,6 +3,7 @@
 // that quietly invents its own contents is worse than an empty one.
 
 import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
+import type { PurchaseRequest } from '../../../domain/requests';
 import { SEED_CATEGORIES } from './seedCategories';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -171,8 +172,74 @@ function demoTxns(items: Item[], stock: StockLine[]): Txn[] {
   return txns.sort((a, b) => a.ts - b.ts);
 }
 
+/**
+ * A few purchase requests, in every state the screen can show.
+ *
+ * One of them names an existing item and one does not, because those are the two shapes that
+ * behave differently when bought — a restock adds to a line, something new creates the item.
+ * A demo that only showed the easy one would leave the branch untested by eye.
+ */
+function demoRequests(items: Item[]): PurchaseRequest[] {
+  const sabun = items.find((i) => i.name === 'Sabun cuci tangan');
+  const now = Date.now();
+  return [
+    {
+      requestId: 'REQ-0001',
+      name: 'Sapu ijuk besar',
+      qty: 2,
+      unit: 'buah',
+      price: 27_500,
+      reason: 'Gagang sapu yang lama patah, tinggal satu yang bisa dipakai.',
+      url: 'https://www.tokopedia.com/',
+      status: 'diajukan',
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 2 * DAY,
+    },
+    {
+      requestId: 'REQ-0002',
+      name: 'Karpet sajadah 5 meter',
+      qty: 3,
+      unit: 'roll',
+      reason: 'Untuk shaf tambahan saat Ramadhan. Harga belum dicek.',
+      status: 'diajukan',
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 5 * DAY,
+    },
+    ...(sabun ? [{
+      requestId: 'REQ-0003',
+      name: sabun.name,
+      itemId: sabun.itemId,
+      qty: 4,
+      unit: sabun.unit,
+      price: 38_000,
+      reason: 'Stok menipis menjelang Ramadhan.',
+      status: 'dibeli' as const,
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 20 * DAY,
+      decidedBy: 'USR-DEMO',
+      decidedTs: now - 18 * DAY,
+      note: 'Dibeli di toko depan masjid.',
+    }] : []),
+    {
+      requestId: 'REQ-0004',
+      name: 'Mesin cuci karpet',
+      qty: 1,
+      unit: 'unit',
+      price: 4_200_000,
+      reason: 'Supaya tidak perlu menyewa tiap tahun.',
+      status: 'ditolak',
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - 40 * DAY,
+      decidedBy: 'USR-DEMO',
+      decidedTs: now - 35 * DAY,
+      note: 'Belum masuk anggaran tahun ini. Tetap sewa dulu.',
+    },
+  ];
+}
+
 export function demoDraft(): {
   items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[]; txns: Txn[];
+  requests: PurchaseRequest[];
 } {
   const stock: StockLine[] = [];
   const items: Item[] = SEEDS.map((s, n) => {
@@ -199,5 +266,6 @@ export function demoDraft(): {
   return {
     items, categories: SEED_CATEGORIES, locations: DEMO_LOCATIONS, stock,
     txns: demoTxns(items, stock),
+    requests: demoRequests(items),
   };
 }

@@ -32,7 +32,7 @@ function addItem(r: R, name: string, qty: string) {
   fireEvent.click(r.getByText('Tambah barang'));
 }
 
-const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v5')!);
+const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());

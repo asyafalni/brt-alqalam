@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'octane';
 import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
+import type { PurchaseRequest } from '../../../domain/requests';
 import { SEED_CATEGORIES } from '../data/seedCategories';
 import { clearDraft, loadDraft, saveDraft } from './persist';
 import { demoDraft } from '../data/demo';
@@ -11,10 +12,21 @@ export interface Draft {
   /** How much of each item sits on which rack — quantity lives here, not on the item. */
   stock: StockLine[];
   txns: Txn[];
+  /** Things somebody wants bought. Not stock until one is marked `dibeli`. */
+  requests: PurchaseRequest[];
   setItems: (update: (prev: Item[]) => Item[]) => void;
   setCategories: (update: (prev: Category[]) => Category[]) => void;
   setLocations: (update: (prev: Location[]) => Location[]) => void;
   setStock: (update: (prev: StockLine[]) => StockLine[]) => void;
+  setRequests: (update: (prev: PurchaseRequest[]) => PurchaseRequest[]) => void;
+  /**
+   * Items, stock and requests in one write. Buying a request touches all three, and three
+   * separate setters would land as three renders with a half-updated catalog in between.
+   */
+  setPurchase: (
+    update: (prev: { items: Item[]; stock: StockLine[]; requests: PurchaseRequest[] }) =>
+    { items: Item[]; stock: StockLine[]; requests: PurchaseRequest[] },
+  ) => void;
   /** Both at once, so adding an item and shelving it cannot land as two renders. */
   setCatalog: (update: (prev: { items: Item[]; stock: StockLine[] }) =>
     { items: Item[]; stock: StockLine[] }) => void;
@@ -40,14 +52,22 @@ export function useDraft(): Draft {
     locations: state.locations,
     stock: state.stock,
     txns: state.txns,
+    requests: state.requests,
     setItems: (update) => setState((prev) => ({ ...prev, items: update(prev.items) })),
     setCategories: (update) => setState((prev) => ({ ...prev, categories: update(prev.categories) })),
     setLocations: (update) => setState((prev) => ({ ...prev, locations: update(prev.locations) })),
     setStock: (update) => setState((prev) => ({ ...prev, stock: update(prev.stock) })),
+    setRequests: (update) => setState((prev) => ({ ...prev, requests: update(prev.requests) })),
+    setPurchase: (update) => setState((prev) => ({
+      ...prev,
+      ...update({ items: prev.items, stock: prev.stock, requests: prev.requests }),
+    })),
     setCatalog: (update) => setState((prev) => ({ ...prev, ...update({ items: prev.items, stock: prev.stock }) })),
     reset: () => {
       clearDraft();
-      setState({ items: [], categories: SEED_CATEGORIES, locations: [], stock: [], txns: [] });
+      setState({
+        items: [], categories: SEED_CATEGORIES, locations: [], stock: [], txns: [], requests: [],
+      });
     },
     loadDemo: () => setState(demoDraft()),
   };

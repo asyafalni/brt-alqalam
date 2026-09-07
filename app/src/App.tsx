@@ -6,10 +6,12 @@ import { BottomNav } from './components/BottomNav';
 import { Card } from './components/ui';
 import { Sheet } from './components/Sheet';
 import { StockAlerts } from './features/alerts/StockAlerts';
+import { openRequests } from '../../domain/requests';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
 import { Report } from './features/report/Report';
+import { RequestBoard } from './features/requests/RequestBoard';
 import { AssetBoard } from './features/assets/AssetBoard';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
@@ -107,6 +109,7 @@ export function App() {
         itemCount={draft.items.length}
         alertCount={inventory.notifications.length}
         rackCount={draft.locations.length}
+        requestCount={openRequests(draft.requests).length}
         assetIssues={assetIssues}
         onNavigate={navigate}
         onClose={() => setCollapsed(true)}
@@ -179,6 +182,9 @@ export function App() {
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
             />
+          )}
+          {route.name === 'pengajuan' && (
+            <RequestBoard draft={draft} now={now} />
           )}
           {route.name === 'laporan' && (
             <Report draft={draft} inventory={inventory} now={now} />

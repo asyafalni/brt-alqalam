@@ -1563,3 +1563,52 @@ model means: a zone cannot exist without racks, so emptying it *is* deleting it.
 delete would have to either orphan the racks or refuse. Renaming onto an existing zone therefore
 **merges**, the form warns before it happens, and the panel says all of this in plain Indonesian
 because "how do I delete a zone" is the obvious next question and the answer is not a button.
+
+# Part XXIII — Pengajuan Pembelian (v1.13)
+
+## 93. A request is not an item
+
+New screen: things somebody wants the masjid to **buy**, with the four fields the boss named —
+**alasan, perkiraan harga, foto, tautan toko** — plus the three you cannot buy without (what,
+how many, in what unit).
+
+**It is its own entity and its own sheet tab, not a zero-quantity item.** Modelling a want as an
+owned-thing-with-none-left would put rows on the stock list that are not in the gudang, which is
+precisely the confusion §0 says the register exists to end: *"nobody knows what we own"* is not
+improved by a catalog that also contains what we do not.
+
+**Three states, deliberately not four.** `diajukan · dibeli · ditolak`. An approval step is the
+obvious fourth and is left out: every state is a decision somebody must make *and remember to
+record*, and an approval nobody records leaves every request stuck in `diajukan` forever — worse
+than not having the state (§0.0).
+
+## 94. The moment it becomes stock
+
+Marking a request bought is a **form, not a toggle**, because buying decides two things the
+request could not know: which rack it goes on, and — for something new — what it is (category,
+kind). Asking there rather than later is what stops a new item existing with no category, which
+is an item that sits in "Lain-lain" forever.
+
+Two shapes, and the difference is load-bearing:
+- **A restock names an existing item** and *adds to that item's line* on the chosen rack. One
+  more catalog row called "Sabun cuci tangan" is exactly the mess this register exists to clear.
+- **Something new creates the item and its first line together**, through the same `createItem`
+  the stock-take uses — a second way of minting an id is a second way of getting it wrong.
+
+Both land as **one write** across items, stock and requests. A half-applied purchase — an item
+created but its quantity missing — is a register that lies in a way nobody would think to check.
+
+## 95. Two judgement calls worth defending
+
+- **The reason is required.** It is the only mandatory field not needed to place an order. A
+  request nobody can judge is one somebody has to chase the requester about: more work for two
+  people than typing it cost one. Turning a request down requires a note for the same reason —
+  *"tidak jadi"* with no why gets re-asked next month.
+- **An unpriced request is counted separately, never as zero.** The header shows what the open
+  requests would cost *and* how many have no price yet. A total that silently treats "we do not
+  know" as "free" is a number somebody takes to a takmir meeting and is wrong there.
+
+**"Notify the admin" is, for now, the badge.** A push to a phone is a gateway function (§35),
+and the gateway is not deployed. Until it is, the honest version is putting the count where
+admins already look: the sidebar badge, a Beranda chip, and the request's own screen. Silently
+holding requests until somebody thinks to check would be worse than not having the screen.
