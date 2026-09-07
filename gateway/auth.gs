@@ -112,3 +112,91 @@ function attemptsLeft(deviceId) {
   var used = raw ? JSON.parse(raw).count : 0;
   return Math.max(0, MAX_ATTEMPTS - used);
 }
+
+// ---------------------------------------------------------------------------
+// Clerk — verifying an admin's session token
+// ---------------------------------------------------------------------------
+
+/**
+ * HS256, verified here, with no network call and no RSA.
+ *
+ * Both of the obvious alternatives are dead ends, and it is worth writing down which:
+ *
+ *   * Apps Script has NO RSA signature *verification* primitive. `Utilities` offers RSA and
+ *     HMAC *signing* plus digests, and the V8 runtime exposes neither `crypto` nor
+ *     `SubtleCrypto`. So Clerk's default RS256 token arrives here unverifiable.
+ *   * Clerk no longer has an endpoint that verifies a session token for you.
+ *     `POST /v1/sessions/{id}/verify` is deprecated and absent from every API spec from
+ *     2025-04-10 onward; `/v1/tokens/verify` never existed.
+ *
+ * What remains is a Clerk JWT template with a CUSTOM HS256 signing key, which
+ * `Utilities.computeHmacSha256Signature` can check natively. The trade is real and worth
+ * stating plainly: a symmetric key means this gateway could also MINT admin tokens, not just
+ * read them. That is why `CLERK_JWT_KEY` lives in Script Properties and nowhere else.
+ */
+function verifyClerk(token) {
+  var key = PROP.getProperty('CLERK_JWT_KEY');
+  if (!key) return { ok: false, error: 'gateway-misconfigured' };
+  if (!token || typeof token !== 'string') return { ok: false, error: 'no-token' };
+
+  var parts = token.split('.');
+  if (parts.length !== 3) return { ok: false, error: 'malformed' };
+
+  var header;
+  var claims;
+  try {
+    header = JSON.parse(decodeSegment(parts[0]));
+    claims = JSON.parse(decodeSegment(parts[1]));
+  } catch (err) {
+    return { ok: false, error: 'malformed' };
+  }
+
+  /* PINNED, not read from the token. Trusting the token's own `alg` is the classic JWT
+     forgery: `none` disables verification outright, and a token that declares RS256 would be
+     checked with Clerk's PUBLIC key as if it were an HMAC secret — which anyone can fetch. */
+  if (header.alg !== 'HS256') return { ok: false, error: 'bad-alg' };
+
+  var expected = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(parts[0] + '.' + parts[1], key)
+  ).replace(/=+$/, '');
+
+  // Constant-time: a byte-by-byte early exit leaks the signature one character at a time to
+  // anyone who can measure the reply.
+  if (!safeEqual(expected, parts[2])) return { ok: false, error: 'bad-signature' };
+
+  /* A signature only says the token was made with our key. Which issuer, and when, are
+     separate questions — and a token that is merely OLD is exactly what an attacker replays. */
+  var now = Math.floor(Date.now() / 1000);
+  var skew = 5;
+  if (typeof claims.exp === 'number' && now > claims.exp + skew) return { ok: false, error: 'expired' };
+  if (typeof claims.nbf === 'number' && now + skew < claims.nbf) return { ok: false, error: 'not-yet-valid' };
+
+  var issuer = PROP.getProperty('CLERK_ISSUER');
+  if (issuer && claims.iss !== issuer) return { ok: false, error: 'bad-issuer' };
+
+  return {
+    ok: true,
+    uid: claims.uid || claims.sub || '',
+    role: claims.role || '',
+    name: claims.name || '',
+  };
+}
+
+/** Base64url → text. Apps Script decodes web-safe base64 but wants the padding restored. */
+function decodeSegment(segment) {
+  var padded = segment + '==='.slice((segment.length + 3) % 4);
+  return Utilities.newBlob(Utilities.base64DecodeWebSafe(padded)).getDataAsString();
+}
+
+/**
+ * An admin, or an explanation. Role is checked HERE rather than trusted from the claim alone —
+ * the claim says what Clerk believes, and this says what the gateway will act on.
+ */
+function requireAdmin(token) {
+  var who = verifyClerk(token);
+  if (!who.ok) return who;
+  if (who.role !== 'admin' && who.role !== 'admin_utama') {
+    return { ok: false, error: 'not-admin' };
+  }
+  return who;
+}

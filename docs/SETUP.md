@@ -135,8 +135,14 @@ trigger runtime/day, 6 min per execution).
    | Key | Value |
    | --- | --- |
    | `CLERK_SECRET_KEY` | your `sk_...` |
-   | `CLERK_JWT_KEY` | the HS256 signing key from the JWT template |
-   | `PIN_PEPPER` | a long random string you generate once and never share |
+   | `CLERK_JWT_KEY` | the HS256 signing key **you generated** and pasted into the template |
+   | `CLERK_ISSUER` | `https://gentle-wallaby-8648.clerk.accounts.dev` |
+   | `PIN_PEPPER` | generated for you by `setupGateway()` — do not set this by hand |
+   | `SPREADSHEET_ID` | only if the script is **not** bound to the sheet |
+
+   > Clerk does not generate the signing key: the "Custom signing key" toggle exists for the
+   > case where a third party already has one, and here that third party is this gateway. Make
+   > it yourself (`openssl rand -base64 48`) and paste the same value into both places.
 3. **Deploy → New deployment → Web app**, with **exactly**:
    - **Execute as:** *Me*
    - **Who has access:** *Anyone*
@@ -255,7 +261,8 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 - [x] **Stage 2** — publishable key collected → `app/src/data/clerk.ts` *(committed; it is base64
       of the instance domain, not a credential)*
 - [ ] **Stage 2** — create the three roles and the user records
-- [ ] **Stage 1** — send me the spreadsheet ID *(the only thing still blocking the gateway)*
+- [x] **Stage 1** — spreadsheet ID: `1-qc4klyhOUvaNDmYgKcA-TgwOlpgCD7CG9AI4RQ9cz0`
+      *(not a credential — the sheet's own sharing settings are what protect it)*
 - [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
 - [ ] **Stage 3** — deploy as *Execute as: Me* + *Who has access: Anyone*, send me the URL
 - [ ] **Stage 4** — decide which device is the kiosk, and where it physically lives

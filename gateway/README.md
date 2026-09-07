@@ -3,16 +3,24 @@
 The one component that holds secrets, and the only thing that writes to `Transactions`.
 Google-hosted, free, no infrastructure you operate.
 
-**Status: written and reviewable, not yet deployed.** Everything here works *without Clerk* —
-the marbot hot path (device + PIN + append) needs only Apps Script. Clerk gates admin screens
-later, and that half is still blocked on the JWT Templates question (`docs/SETUP.md` #1).
+**Status: written and reviewable, not yet deployed.** The marbot hot path (device + PIN +
+append) needs only Apps Script and no Clerk at all. The Clerk half is now written too —
+JWT Templates turned out to be on the free plan (2026-09-07), so `verifyClerk` verifies a
+custom **HS256** token natively with `Utilities.computeHmacSha256Signature`.
+
+> **`auth.gs` has tests.** `cd gateway && npx vitest run` loads it as source with `Utilities`
+> and `PropertiesService` stubbed, and checks it against tokens built by Node's own crypto:
+> wrong key, `alg: none`, an RS256 token, a tampered signature, an edited payload, an expired
+> token, a foreign issuer, and an unconfigured gateway. This is the one file where "looks
+> right" is not good enough, and none of it can be exercised by deploying and clicking.
 
 ## Files
 
 | | |
 | --- | --- |
 | `Code.gs` | `doGet`/`doPost` router, sessions, and the append endpoint |
-| `auth.gs` | PIN hashing, device verification, per-device lockout |
+| `auth.gs` | PIN hashing, device verification, per-device lockout, Clerk HS256 verification |
+| `test/clerk.test.ts` | runs `auth.gs` against forged tokens — `npx vitest run` |
 | `sheets.gs` | reads the tabs, appends rows, and splits the public/detailed read tiers |
 | `setup.gs` | **run these from the editor** — one-time setup, enrol a device, set a PIN |
 | `appsscript.json` | the manifest, including the deployment access setting |

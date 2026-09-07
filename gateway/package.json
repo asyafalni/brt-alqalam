@@ -1,0 +1,8 @@
+{
+  "name": "brt-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  }
+}
