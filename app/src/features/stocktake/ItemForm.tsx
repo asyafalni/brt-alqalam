@@ -22,8 +22,17 @@ interface Props {
   onCancelEdit: () => void;
 }
 
-/** A sentinel no real satuan can collide with. Same trick the zone picker uses (§92). */
-const NEW_UNIT = '\u0000new';
+/**
+ * "Add a new one" as a value in the list, not a control beside it.
+ *
+ * Every picker on this form does it the same way — kategori, satuan, rak — because a `+` button
+ * next to one and an option inside another is two things to learn for one idea, and the button
+ * also costs 56px of a row that has to hold a control as well. A NUL is used because no real
+ * name, unit or id can contain one, so the sentinel can never collide with a real choice. Same
+ * trick as the zone picker (§92).
+ */
+const ADD_NEW = '\u0000new';
+const NEW_UNIT = ADD_NEW;
 
 export function ItemForm(p: Props) {
   const nameRef = useRef<HTMLInputElement | null>(null);
@@ -150,28 +159,25 @@ export function ItemForm(p: Props) {
       <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label class={LABEL} for="kategori">Kategori</label>
-          <div class="flex gap-2">
-            <Select
-              id="kategori"
-              value={p.input.categoryId}
-              onChange={(e: Event) => p.onChange('categoryId', (e.target as HTMLSelectElement).value)}
-            >
-              {p.categories.map((c) => (
-                <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
-              ))}
-            </Select>
-            {/* Categories are free-form (Part XI). Hitting a thing that fits nowhere must not
-                stop the walk — that is exactly when a stock-take gets abandoned. */}
-            <button
-              type="button"
-              class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
-              onClick={() => setNewCategory('')}
-              aria-label="Tambah kategori baru"
-              title="Tambah kategori baru"
-            >
-              +
-            </button>
-          </div>
+          {/* Categories are free-form (Part XI). Hitting a thing that fits nowhere must not
+              stop the walk — that is exactly when a stock-take gets abandoned. The way to add
+              one is IN the list, like satuan and zona: a separate `+` beside the control was a
+              second thing to find, and three fields in a row solving the same problem three
+              different ways is three things to learn. */}
+          <Select
+            id="kategori"
+            value={p.input.categoryId}
+            onChange={(e: Event) => {
+              const picked = (e.target as HTMLSelectElement).value;
+              if (picked === ADD_NEW) setNewCategory('');
+              else p.onChange('categoryId', picked);
+            }}
+          >
+            {p.categories.map((c) => (
+              <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+            ))}
+            <option value={ADD_NEW}>+ Kategori baru…</option>
+          </Select>
           {newCategory != null && (
             <div class="mt-2 flex gap-2">
               <input
@@ -244,29 +250,24 @@ export function ItemForm(p: Props) {
           sabun" does not help a marbot; "Rak B3" does. Sticky, like category and unit. */}
       <div class="mb-4">
         <label class={LABEL} for="rak">Rak / tempat</label>
-        <div class="flex gap-2">
-          <Select
-            id="rak"
-            value={p.input.locationId ?? ''}
-            onChange={(e: Event) => p.onChange('locationId', (e.target as HTMLSelectElement).value || undefined)}
-          >
-            <option value="">Belum ditempatkan</option>
-            {p.locations.map((l) => (
-              <option key={l.locationId} value={l.locationId}>
-                {l.code}{l.name ? ` — ${l.name}` : ''} · {l.zone}
-              </option>
-            ))}
-          </Select>
-          <button
-            type="button"
-            class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
-            onClick={() => setNewRack({ code: '', zone: p.locations.at(-1)?.zone ?? 'Gudang Utama' })}
-            aria-label="Tambah rak baru"
-            title="Tambah rak baru"
-          >
-            +
-          </button>
-        </div>
+        <Select
+          id="rak"
+          value={p.input.locationId ?? ''}
+          onChange={(e: Event) => {
+            const picked = (e.target as HTMLSelectElement).value;
+            if (picked === ADD_NEW) {
+              setNewRack({ code: '', zone: p.locations.at(-1)?.zone ?? 'Gudang Utama' });
+            } else p.onChange('locationId', picked || undefined);
+          }}
+        >
+          <option value="">Belum ditempatkan</option>
+          {p.locations.map((l) => (
+            <option key={l.locationId} value={l.locationId}>
+              {l.code}{l.name ? ` — ${l.name}` : ''} · {l.zone}
+            </option>
+          ))}
+          <option value={ADD_NEW}>+ Rak baru…</option>
+        </Select>
         {newRack != null && (
           <div class="mt-2 flex flex-wrap gap-2">
             <input

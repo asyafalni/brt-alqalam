@@ -211,7 +211,8 @@ describe('editing a row mid-walk', () => {
 describe('categories are free-form', () => {
   it('a new category can be added mid-walk and is selected immediately', () => {
     const r = render(Harness);
-    fireEvent.click(r.getByLabelText('Tambah kategori baru'));
+    // Adding one is an option IN the list now, the same as satuan and rak — one idea, one shape.
+    fireEvent.change(r.getByLabelText('Kategori'), { target: { value: '\u0000new' } });
     type(r.getByLabelText('Nama kategori baru'), 'Alat Masak');
     fireEvent.click(r.getByText('Simpan'));
     addItem(r, 'Panci besar', '2');
@@ -224,7 +225,8 @@ describe('categories are free-form', () => {
 
   it('backing out of the new-category field adds nothing', () => {
     const r = render(Harness);
-    fireEvent.click(r.getByLabelText('Tambah kategori baru'));
+    // Adding one is an option IN the list now, the same as satuan and rak — one idea, one shape.
+    fireEvent.change(r.getByLabelText('Kategori'), { target: { value: '\u0000new' } });
     type(r.getByLabelText('Nama kategori baru'), 'Tidak jadi');
     fireEvent.click(r.getByText('Batal'));
     addItem(r, 'Sabun', '1');
@@ -237,7 +239,8 @@ describe('categories are free-form', () => {
     // happy-dom provides neither, so any surviving call would throw rather than pass silently.
     const r = render(Harness);
     addItem(r, 'Sabun', '1');
-    fireEvent.click(r.getByLabelText('Tambah kategori baru'));
+    // Adding one is an option IN the list now, the same as satuan and rak — one idea, one shape.
+    fireEvent.change(r.getByLabelText('Kategori'), { target: { value: '\u0000new' } });
     fireEvent.click(desk(r).getByLabelText('Hapus Sabun'));
     fireEvent.click(r.getByText('Kosongkan'));
     expect(r.getByText(/Hapus semua/)).toBeTruthy();
@@ -352,5 +355,37 @@ describe('picking a satuan', () => {
 
     fireEvent.click(r.getByText('Pilih'));
     expect((r.getByLabelText('Satuan') as HTMLSelectElement).tagName).toBe('SELECT');
+  });
+});
+
+describe('one shape for "add a new one"', () => {
+  // Kategori used a `+` button beside the control while satuan and rak offered it inside the
+  // list. Three fields in a row solving one problem three ways is three things to learn, and
+  // the button also cost 56px of a row that has to hold a control as well.
+  const ADD_NEW = '\u0000new';
+
+  it('offers it in the list on every picker', () => {
+    const r = render(Harness);
+    for (const field of ['Kategori', 'Satuan', 'Rak / tempat']) {
+      const values = [...(r.getByLabelText(field) as HTMLSelectElement).options].map((o) => o.value);
+      expect(values, field).toContain(ADD_NEW);
+    }
+  });
+
+  it('leaves no stray + buttons behind', () => {
+    const r = render(Harness);
+    expect(r.queryByLabelText('Tambah kategori baru')).toBeNull();
+    expect(r.queryByLabelText('Tambah rak baru')).toBeNull();
+  });
+
+  it('adds a rack from inside the list and selects it', () => {
+    const r = render(Harness);
+    fireEvent.change(r.getByLabelText('Rak / tempat'), { target: { value: ADD_NEW } });
+    type(r.getByLabelText('Kode rak'), 'C9');
+    fireEvent.click(r.getByText('Simpan'));
+
+    const shown = [...(r.getByLabelText('Rak / tempat') as HTMLSelectElement).options]
+      .map((o) => o.textContent);
+    expect(shown.some((v) => v?.startsWith('C9'))).toBe(true);
   });
 });
