@@ -29,7 +29,7 @@ import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
-import { RequestPhotos } from './RequestPhotos';
+import { RequestPhotos, RequestPhotoStrip } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
 export const rupiah = (n: number): string => `Rp${n.toLocaleString('id-ID')}`;
@@ -98,6 +98,11 @@ export function RequestBoard(
   const [adding, setAdding] = useState(prefill != null);
   const [buying, setBuying] = useState<PurchaseRequest | null>(null);
   const [rejecting, setRejecting] = useState<PurchaseRequest | null>(null);
+  const [photosFor, setPhotosFor] = useState<PurchaseRequest | null>(null);
+  /* The row's strip and the panel's manager keep separate copies of the photo list, so closing
+     the panel bumps this to make the row re-read. Cheaper than lifting IndexedDB state for a
+     list that changes once in a while. */
+  const [photoVersion, setPhotoVersion] = useState(0);
 
   const rows = useMemo(() => sortRequests(requests), [requests]);
   const open = useMemo(() => openRequests(requests), [requests]);
@@ -343,7 +348,12 @@ export function RequestBoard(
                       meant to prevent. */}
                   <p class="mt-2 text-sm leading-relaxed text-slate-700">{r.reason}</p>
 
-                  <RequestPhotos requestId={r.requestId} name={r.name} />
+                  <RequestPhotoStrip
+                    requestId={r.requestId}
+                    name={r.name}
+                    refreshKey={photoVersion}
+                    onOpen={() => setPhotosFor(r)}
+                  />
 
                   {r.note && (
                     <p class="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -425,6 +435,15 @@ export function RequestBoard(
             onCancel={() => setBuying(null)}
           />
         ))}
+      </Sheet>
+
+      <Sheet
+        open={photosFor !== null}
+        title="Foto"
+        description={photosFor?.name}
+        onClose={() => { setPhotosFor(null); setPhotoVersion((n) => n + 1); }}
+      >
+        {photosFor && <RequestPhotos requestId={photosFor.requestId} name={photosFor.name} />}
       </Sheet>
 
       <Sheet

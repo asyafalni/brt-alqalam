@@ -5,19 +5,14 @@
 // page — costs a scroll on every visit to reach the thing you actually came for, and reads as
 // part of the workflow when it is really an occasional errand.
 //
-// IT IS A REAL DIALOG, deliberately. An accessibility audit of this app found the existing
-// mobile drawer failing exactly here: eight controls left in the tab order while it was closed,
-// no focus trap, no Escape, no scroll lock. Everything that was missing there is done here —
-// focus moves in on open and returns to whatever opened it on close, Tab cycles inside, Escape
-// and the backdrop both dismiss, and the page behind cannot scroll. Written once, so the next
-// panel inherits it rather than repeating the same omissions.
+// IT IS A REAL DIALOG, deliberately — focus moves in on open and returns to whatever opened it,
+// Tab cycles inside, Escape and the backdrop both dismiss, and the page behind cannot scroll.
+// That behaviour now lives in `useDialog`, so the mobile drawer inherits it rather than keeping
+// its own broken version.
 
 import { useEffect, useRef, useState } from 'octane';
 import { X } from '@octanejs/lucide';
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), '
-  + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { useDialog } from './useDialog';
 
 export function Sheet(
   { open, title, description, onClose, children }:
@@ -28,48 +23,13 @@ export function Sheet(
       a CSS transition has nothing to animate from if the element arrives at its final position. */
   const [shown, setShown] = useState(false);
 
+  useDialog(open, onClose, panel);
+
   useEffect(() => {
     if (!open) { setShown(false); return; }
-
-    const returnTo = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => setShown(true));
-
-    // Focus the panel itself rather than its first control: reading the title before landing
-    // on a button is the right order, and it avoids arming a destructive action by accident.
-    const focusFrame = requestAnimationFrame(() => panel.current?.focus());
-
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
-      if (e.key !== 'Tab' || !panel.current) return;
-
-      const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-        .filter((el) => el.offsetParent !== null);
-      if (items.length === 0) { e.preventDefault(); return; }
-
-      const first = items[0];
-      const last = items[items.length - 1];
-      const active = document.activeElement;
-      // Wrapping by hand, because a dialog rendered in the page (not the top layer) does not
-      // get the browser's own containment.
-      if (e.shiftKey && (active === first || active === panel.current)) {
-        e.preventDefault(); last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault(); first.focus();
-      }
-    };
-
-    addEventListener('keydown', onKey);
-    return () => {
-      cancelAnimationFrame(frame);
-      cancelAnimationFrame(focusFrame);
-      removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
-      returnTo?.focus?.();
-    };
-  }, [open, onClose]);
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
 
   // Unmounted when closed, which is the simplest way to keep its controls out of the tab
   // order — the failure mode the audit found in the drawer that stays in the DOM.

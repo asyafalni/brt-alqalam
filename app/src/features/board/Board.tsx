@@ -8,7 +8,7 @@
 // from the same column definitions, so the two shapes cannot drift apart.
 
 import { useMemo } from 'octane';
-import { MapPin, Package, TriangleAlert, X } from '@octanejs/lucide';
+import { ArrowUpDown, MapPin, Package, TriangleAlert, X } from '@octanejs/lucide';
 import type { Category, DerivedItem, Item, Location } from '../../../../domain/types';
 import type { BoardFilter, BoardKind, BoardSort } from '../../state/route';
 import { BOARD_FILTERS, BOARD_KINDS } from '../../state/route';
@@ -255,52 +255,60 @@ export function Board(
 
           {/* Inventory.tsx:100-205 — table in a flush Card. */}
           <div class={CARD_FLUSH}>
-            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
-              <h2 class="text-sm font-bold text-slate-900">
-                Daftar Stok
-                {q !== '' && <span class="ml-2 font-normal text-slate-500">· hasil cari "{search}"</span>}
-              </h2>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {rows.length} baris
-              </span>
-            </div>
-
-            {/* Chips rather than a second dropdown: these four are the questions actually asked
-                while standing in the gudang, and a chip answers one in a tap and says how many
-                it will find before it is pressed. The category, which has as many values as the
-                masjid has categories, gets the select. */}
-            <div class="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 sm:px-6">
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Saring stok">
-                {BOARD_FILTERS
-                  // `minus` is a contradiction in the data, not an everyday view, so it only
-                  // appears when there is one — otherwise it is a permanent zero.
-                  .filter((f) => f !== 'minus' || counts.minus > 0)
-                  .map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      aria-pressed={filter === f}
-                      class={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold ${filter === f
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-400 bg-white text-slate-700 hover:border-slate-900'}`}
-                      onClick={() => onView({ filter: f })}
-                    >
-                      {FILTER_LABEL[f]}
-                      <span class={`tabular-nums ${filter === f ? 'text-white/60' : 'text-slate-400'}`}>
-                        {counts[f]}
-                      </span>
-                    </button>
-                  ))}
+            {/* Title and controls share one tinted band. As two strips — a grey header above a
+                white filter row — they read as two separate things stacked, and the controls
+                looked like they belonged to the table rather than to the list's own heading. */}
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+              <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <h2 class="text-sm font-bold text-slate-900">
+                  Daftar Stok
+                  {q !== '' && <span class="ml-2 font-normal text-slate-500">· hasil cari "{search}"</span>}
+                </h2>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {rows.length} baris
+                </span>
               </div>
 
-              <div class="ml-auto flex flex-wrap items-center gap-2">
+              {/* One segmented control, not four separate pills: they are one choice, and four
+                  outlined buttons in a row made the loudest thing on the page a set of filters
+                  nobody has pressed yet. The single border around the group is also what keeps
+                  WCAG 1.4.11 satisfied without a boundary on every segment. */}
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <div
+                  class="inline-flex flex-wrap rounded-lg border border-slate-400 bg-white p-0.5"
+                  role="group"
+                  aria-label="Saring stok"
+                >
+                  {BOARD_FILTERS
+                    // `minus` is a contradiction in the data, not an everyday view, so it only
+                    // appears when there is one — otherwise it is a permanent zero.
+                    .filter((f) => f !== 'minus' || counts.minus > 0)
+                    .map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        aria-pressed={filter === f}
+                        class={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-semibold ${filter === f
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                        onClick={() => onView({ filter: f })}
+                      >
+                        {FILTER_LABEL[f]}
+                        <span class={`text-xs tabular-nums ${filter === f ? 'text-white/60' : 'text-slate-400'}`}>
+                          {counts[f]}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+
+              <div class="flex flex-wrap items-center gap-2">
                 {/* Beside the category, not among the chips: both answer "which subset of the
                     catalog", while the chips answer "which of them needs me". */}
                 <label class="sr-only" for="board-kind">Jenis barang</label>
                 <Select
                   id="board-kind"
                   wrapClass="w-40"
-                  class="min-h-11 py-0 text-sm"
+                  class="min-h-10 py-0 text-sm"
                   value={kind}
                   onChange={(e: Event) => onView({ kind: (e.target as HTMLSelectElement).value as BoardKind })}
                 >
@@ -313,7 +321,7 @@ export function Board(
                 <Select
                   id="board-category"
                   wrapClass="w-48"
-                  class="min-h-11 py-0 text-sm"
+                  class="min-h-10 py-0 text-sm"
                   value={category}
                   onChange={(e: Event) => onView({ category: (e.target as HTMLSelectElement).value })}
                 >
@@ -323,11 +331,15 @@ export function Board(
                   ))}
                 </Select>
 
+                {/* Divider and icon, because three identical grey boxes read as three filters.
+                    Two of them narrow the list; this one only reorders it. */}
+                <span class="mx-1 hidden h-6 w-px bg-slate-300 sm:block" aria-hidden="true" />
+                <ArrowUpDown class="hidden h-4 w-4 shrink-0 text-slate-500 sm:block" aria-hidden="true" />
                 <label class="sr-only" for="board-sort">Urutkan</label>
                 <Select
                   id="board-sort"
-                  wrapClass="w-52"
-                  class="min-h-11 py-0 text-sm"
+                  wrapClass="w-48"
+                  class="min-h-10 py-0 text-sm"
                   value={sort}
                   onChange={(e: Event) => onView({ sort: (e.target as HTMLSelectElement).value as BoardSort })}
                 >
@@ -339,12 +351,13 @@ export function Board(
                 {(filter !== 'semua' || category !== '' || kind !== 'semua' || sort !== 'nama') && (
                   <button
                     type="button"
-                    class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-slate-500 underline hover:text-slate-900"
+                    class="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-slate-500 underline hover:text-slate-900"
                     onClick={() => onView({ filter: 'semua', category: '', kind: 'semua', sort: 'nama' })}
                   >
                     <X class="h-4 w-4" /> Reset
                   </button>
                 )}
+              </div>
               </div>
             </div>
 

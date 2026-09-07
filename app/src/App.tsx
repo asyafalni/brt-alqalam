@@ -36,6 +36,7 @@ import type { Route } from './state/route';
 import { StockTake } from './features/stocktake/StockTake';
 
 import { Board } from './features/board/Board';
+import { History } from './features/history/History';
 import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import type { MovementTarget } from './features/movement/MovementSheet';
@@ -216,6 +217,15 @@ export function App() {
                 ? { type: route.type, assetId: route.assetId }
                 : undefined}
               onPrefillUsed={() => { if (route.assetId) navigate({ name: 'pengajuan' }); }}
+            />
+          )}
+          {route.name === 'histori' && (
+            <History
+              txns={inventory.txns}
+              items={draft.items}
+              locations={draft.locations}
+              stock={draft.stock}
+              search={search}
             />
           )}
           {route.name === 'laporan' && (

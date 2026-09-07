@@ -1,8 +1,13 @@
-// Photos on a purchase request — "this is the thing I mean".
+// Photos on a request — "this is the thing I mean".
 //
 // A picture settles a request faster than any description: a screenshot of the listing, or a
 // photo of the broken one being replaced, answers "which one?" and "why?" at the same time. It
 // is the field the boss asked for, and the one most likely to be a screenshot from a phone.
+//
+// TWO PIECES, on purpose. The LIST shows a strip of thumbnails and nothing else — a row is read,
+// not worked on, and a dashed upload target on every card made the list look like a form. ADDING
+// happens in a right-side sheet, the same panel pattern as every other occasional errand here
+// (export, cek rak, rak baru): you open it, do the thing, and dismiss it.
 //
 // Same `PhotoStore` the items use. The port's first argument is an owner id, not specifically
 // an item id — keying by `requestId` is what it is for, and it means downscaling, the six-photo
@@ -50,6 +55,43 @@ function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: (src: string) => v
   );
 }
 
+/**
+ * The row's version: what is already there, and a way in. No upload target, no delete.
+ *
+ * `refreshKey` is bumped by the board when the sheet closes — the strip and the manager keep
+ * separate copies of the list, and without it a photo added in the panel would not appear on
+ * the row behind it until a reload.
+ */
+export function RequestPhotoStrip(
+  { requestId, name, refreshKey = 0, onOpen }:
+  { requestId: string; name: string; refreshKey?: number; onOpen: () => void },
+) {
+  const [photos, setPhotos] = useState<ItemPhoto[]>([]);
+  const [open, setOpen] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    store.list(requestId).then((p) => { if (alive) setPhotos(p); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [requestId, refreshKey]);
+
+  return (
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      {photos.map((p) => <Thumb key={p.photoId} photo={p} onOpen={setOpen} />)}
+      <button
+        type="button"
+        class="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+        onClick={onOpen}
+      >
+        <Camera class="h-4 w-4" />
+        {photos.length === 0 ? 'Tambah foto' : `Foto (${photos.length})`}
+      </button>
+
+      {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
+    </div>
+  );
+}
+
 export function RequestPhotos({ requestId, name }: { requestId: string; name: string }) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [open, setOpen] = useState('');
@@ -89,7 +131,7 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
   };
 
   return (
-    <div class="mt-3">
+    <div>
       {/* `capture` is deliberately absent: on a phone it forces the camera and removes the
           gallery, and the common case here is a screenshot of a marketplace listing. */}
       <input
@@ -123,29 +165,39 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
         <p role="alert" class="mt-2 text-xs text-red-700">{error}</p>
       )}
 
-      {open && (
-        <div
-          class="fixed inset-0 z-50 flex flex-col bg-black/90 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Foto ${name}`}
-          onClick={() => setOpen('')}
+      <p class="mt-3 text-xs leading-relaxed text-slate-400">
+        Maksimal {MAX_PHOTOS_PER_ITEM} foto. Tersimpan di perangkat ini saja, belum ikut
+        tersinkron.
+      </p>
+
+      {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
+    </div>
+  );
+}
+
+/** Full-bleed viewer, shared by the strip and the manager. */
+function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+  return (
+    <div
+      class="fixed inset-0 z-[60] flex flex-col bg-black/90 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Foto ${name}`}
+      onClick={onClose}
+    >
+      <div class="flex shrink-0 justify-end">
+        <button
+          type="button"
+          class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25"
+          aria-label="Tutup"
+          onClick={onClose}
         >
-          <div class="flex shrink-0 justify-end">
-            <button
-              type="button"
-              class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25"
-              aria-label="Tutup"
-              onClick={() => setOpen('')}
-            >
-              <X class="h-5 w-5" />
-            </button>
-          </div>
-          <div class="flex min-h-0 flex-1 items-center justify-center pt-2">
-            <img src={open} alt={name} class="max-h-full max-w-full rounded-lg object-contain" />
-          </div>
-        </div>
-      )}
+          <X class="h-5 w-5" />
+        </button>
+      </div>
+      <div class="flex min-h-0 flex-1 items-center justify-center pt-2">
+        <img src={src} alt={name} class="max-h-full max-w-full rounded-lg object-contain" />
+      </div>
     </div>
   );
 }

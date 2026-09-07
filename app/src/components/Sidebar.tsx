@@ -7,10 +7,19 @@
 //  - Framer's spring width animation and `layoutId` shared-layout pill become CSS transitions.
 //    @octanejs/motion is not a dependency yet, and its `layoutId` is single-element FLIP rather
 //    than a full projection tree (OCTANE-FINDINGS.md). Static appearance is identical.
+//
+// ON A PHONE THIS IS A DIALOG. An accessibility audit found it failing every part of that: eight
+// controls left in the tab order while it sat off-screen, no focus trap, no Escape, no scroll
+// lock. It now uses the same `useDialog` as `Sheet`, and closed it goes `invisible` rather than
+// merely translated — `visibility: hidden` is what actually takes its controls out of the tab
+// order, and unlike unmounting it keeps the slide-out, because `visibility` is transitionable
+// and so flips only once the panel has finished leaving.
 
-import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
+import { useRef } from 'octane';
+import { ChartColumn, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 import { Logo } from './Logo';
+import { useDialog } from './useDialog';
 
 interface NavItem { name: string; icon: typeof Package; route: Route; badge?: number }
 
@@ -28,6 +37,10 @@ interface Props {
 }
 
 export function Sidebar(p: Props) {
+  const panel = useRef<HTMLDivElement | null>(null);
+  const asDialog = p.isMobile && !p.collapsed;
+  useDialog(asDialog, p.onClose, panel);
+
   const items: NavItem[] = [
     { name: 'Beranda', icon: LayoutDashboard, route: { name: 'beranda' } },
     { name: 'Opname Gudang', icon: ClipboardList, route: { name: 'opname' } },
@@ -40,7 +53,10 @@ export function Sidebar(p: Props) {
     // having the screen.
     { name: 'Pengajuan', icon: ShoppingCart, route: { name: 'pengajuan' }, badge: p.requestCount },
     { name: 'Cetak Label', icon: QrCode, route: { name: 'label' }, badge: p.itemCount },
+    // Below Laporan: the report is the summary somebody reads, this is the raw record they
+    // drop to when the summary looks wrong.
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
+    { name: 'Histori Data', icon: History, route: { name: 'histori' } },
   ];
 
   const width = p.isMobile ? '280px' : p.collapsed ? '90px' : '260px';
@@ -57,10 +73,16 @@ export function Sidebar(p: Props) {
       )}
 
       <div
+        ref={panel}
+        role={asDialog ? 'dialog' : undefined}
+        aria-modal={asDialog ? 'true' : undefined}
+        aria-label={asDialog ? 'Menu' : undefined}
+        tabIndex={asDialog ? -1 : undefined}
         class={
-          'no-print fixed inset-y-0 left-0 z-50 h-full transition-[width,transform] duration-300 ease-out ' +
-          'md:sticky md:top-4 md:m-4 md:mr-0 md:h-[calc(100vh-32px)] md:shrink-0 ' +
-          (p.isMobile && p.collapsed ? '-translate-x-full' : 'translate-x-0')
+          'no-print fixed inset-y-0 left-0 z-50 h-full outline-none '
+          + 'transition-[width,transform,visibility] duration-300 ease-out '
+          + 'md:visible md:sticky md:top-4 md:m-4 md:mr-0 md:h-[calc(100vh-32px)] md:shrink-0 '
+          + (p.isMobile && p.collapsed ? '-translate-x-full invisible' : 'translate-x-0 visible')
         }
         style={`width:${width}`}
       >

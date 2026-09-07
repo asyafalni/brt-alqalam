@@ -39,6 +39,7 @@ export type Route =
   | { name: 'pindai' }
   | { name: 'item'; id: string }
   | { name: 'laporan' }
+  | { name: 'histori' }
   | { name: 'aset' }
   /**
    * `type` + `assetId` open the form already filled in for one unit — the link a broken or
@@ -73,6 +74,7 @@ export function parseRoute(hash: string): Route {
   }
   if (path === '/label') return { name: 'label' };
   if (path === '/laporan') return { name: 'laporan' };
+  if (path === '/histori') return { name: 'histori' };
   if (path === '/aset') return { name: 'aset' };
   if (path === '/pengajuan') {
     const asset = params.get('a');
@@ -109,6 +111,7 @@ export function routeToHash(route: Route): string {
   switch (route.name) {
     case 'label': return '#/label';
     case 'laporan': return '#/laporan';
+    case 'histori': return '#/histori';
     case 'aset': return '#/aset';
     case 'pengajuan': return route.assetId && route.type
       ? `#/pengajuan?t=${route.type}&a=${encodeURIComponent(route.assetId)}`
