@@ -207,12 +207,12 @@ export function ItemDetail(
               <p class="text-sm text-slate-500">Barang tanpa rak paling sering hilang.</p>
             </>
           ) : (
-            <ul class="divide-y divide-slate-100">
+            <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
               {shelves.map((shelf) => (
                 <li key={shelf.locationId || 'unplaced'}>
                   <button
                     type="button"
-                    class="flex w-full items-baseline gap-3 py-2 text-left hover:text-slate-900"
+                    class="flex w-full items-baseline gap-3 px-[var(--card-pad)] py-2 text-left hover:bg-slate-50"
                     disabled={!shelf.location}
                     aria-label={shelf.location ? `Buka Rak ${shelf.location.code}` : undefined}
                     onClick={() => shelf.location

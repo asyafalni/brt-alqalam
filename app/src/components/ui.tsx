@@ -8,7 +8,7 @@
 import { ChevronDown } from '@octanejs/lucide';
 
 // --- Card — SmartInv components/Card.tsx:17-19 -----------------------------------------
-export const CARD = 'rounded-lg p-5 bg-white shadow-sm border border-slate-200';
+export const CARD = 'card-pad rounded-lg p-5 bg-white shadow-sm border border-slate-200';
 /** Card with its own padding removed, for tables — Inventory.tsx:100. */
 export const CARD_FLUSH = 'rounded-lg bg-white shadow-sm border border-slate-200 p-0 overflow-hidden';
 

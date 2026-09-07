@@ -64,6 +64,13 @@ body {
   @apply bg-slate-50 text-slate-900 font-sans antialiased;
 }
 
+/* A card's own padding, published so its children can undo it.
+   A list row inside a padded card has to reach the card's edge to look like a row — a hover
+   that stops 20px short on both sides reads as a clipped rectangle rather than as "this line
+   is selected". The children need to know the padding to cancel it, and hard-coding `-mx-5`
+   in every list would silently break the day a card's padding changes. */
+.card-pad { --card-pad: 1.25rem; }
+
 /* SmartInv `frontend/index.css:11-15` — the only custom class in their CSS. */
 .glass {
   @apply border border-white/30 bg-white/70 backdrop-blur-md;

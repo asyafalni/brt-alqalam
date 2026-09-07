@@ -36,7 +36,9 @@ export function StockAlerts(
   },
 ) {
   return (
-    <ul class="divide-y divide-slate-100">
+    // Bleeds out to the card's edge and pads each row back in, so a hover fills the row rather
+    // than stopping short of the card on both sides. `--card-pad` is published by `CARD`.
+    <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
       {notifications.map((n) => {
         const d = derived.items[n.itemId];
         const badge = itemStatusBadge(d?.status ?? 'low');
@@ -75,14 +77,14 @@ export function StockAlerts(
             {onOpenItem ? (
               <button
                 type="button"
-                class="w-full rounded-lg py-3 hover:bg-slate-50"
+                class="w-full px-[var(--card-pad)] py-3 hover:bg-slate-50"
                 aria-label={`Buka ${n.name}`}
                 onClick={() => onOpenItem(n.itemId)}
               >
                 {row}
               </button>
             ) : (
-              <div class="py-3">{row}</div>
+              <div class="px-[var(--card-pad)] py-3">{row}</div>
             )}
           </li>
         );

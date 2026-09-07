@@ -255,12 +255,12 @@ export function Dashboard(
                 Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
               </p>
 
-              <ul class="divide-y divide-slate-100">
+              <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
                 {shownDue.map((d) => (
                   <li key={d.location.locationId}>
                     <button
                       type="button"
-                      class="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
+                      class="flex w-full items-center gap-3 px-[var(--card-pad)] py-3 text-left hover:bg-slate-50"
                       aria-label={`Buka Rak ${d.location.code}`}
                       onClick={() => onNavigate({ name: 'racks', id: d.location.locationId })}
                     >

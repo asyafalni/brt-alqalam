@@ -328,9 +328,9 @@ export function RackBoard(
                 </span>
               </button>
               {showArchive && (
-                <ul class="mt-3 divide-y divide-slate-100">
+                <ul class="-mx-[var(--card-pad)] mt-3 divide-y divide-slate-100">
                   {archived.map((l) => (
-                    <li key={l.locationId} class="flex flex-wrap items-center gap-3 py-2.5">
+                    <li key={l.locationId} class="flex flex-wrap items-center gap-3 px-[var(--card-pad)] py-2.5">
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-bold text-slate-500">Rak {l.code}</p>
                         <p class={CODE}>{l.zone}{l.name && ` · ${l.name}`}</p>
@@ -444,7 +444,7 @@ export function RackBoard(
                   <p class="italic text-slate-400">Rak ini kosong.</p>
                 </div>
               ) : (
-                <ul class="divide-y divide-slate-100">
+                <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
                   {contents.map((i) => {
                     const d = inventory.derived.items[i.itemId];
                     const badge = itemStatusBadge(d?.status ?? 'available');
@@ -452,7 +452,7 @@ export function RackBoard(
                       <li key={i.itemId}>
                         <button
                           type="button"
-                          class="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
+                          class="flex w-full items-center gap-3 px-[var(--card-pad)] py-3 text-left hover:bg-slate-50"
                           aria-label={`Buka ${i.name}`}
                           onClick={() => onOpenItem(i.itemId)}
                         >

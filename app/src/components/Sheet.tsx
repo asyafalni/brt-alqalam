@@ -106,7 +106,9 @@ export function Sheet(
             <X class="h-5 w-5" />
           </button>
         </div>
-        <div class="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        {/* `card-pad` for the same reason a card carries it: a list inside here has to be able
+            to reach the panel's edge, and it needs to know the padding to cancel it. */}
+        <div class="card-pad custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );
