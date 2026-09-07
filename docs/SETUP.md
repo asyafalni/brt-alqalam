@@ -260,7 +260,9 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 ## Checklist
 
 - [x] **Stage 0** — run `cd app && npm run dev`, walk the gudang *(nothing to prepare)*
-- [ ] **Stage 1** — create the spreadsheet, import **all seven** tabs from `sheets/`, **don't publish**
+- [x] **Stage 1** — spreadsheet created, all seven tabs imported, **not published**
+- [x] **Stage 1** — `checkSpreadsheet()` green: 7/7 tabs, every header matching column for column
+- [x] **Stage 3** — the four `.gs` files and the manifest pasted in; `setupGateway()` run
 - [ ] **Stage 1** — send me the spreadsheet ID
 - [x] **Stage 2** — ~~check Clerk → Configure → JWT Templates~~ **available on the free plan**
 - [x] **Stage 2** — app created, **Email + Username** both enabled *(a marbot may have no email,
