@@ -237,7 +237,9 @@ textarea:focus-visible {
    labels whose names were longest. */
 .label--poster .label-qr {
   width: auto;
-  height: 58%;
+  /* 65%: on a 95 x 135 portrait that is 88mm, just under the 91mm the width allows — so the
+     code is as large as the paper permits and the height is not the thing wasting it. */
+  height: 65%;
   flex: 0 0 auto;
   max-width: 100%;
   aspect-ratio: 1;
@@ -248,7 +250,7 @@ textarea:focus-visible {
    the narrower poster's, on an identical height budget. At 26% the second line was clipped. */
 .label--poster .label-text {
   width: 100%;
-  height: 38%;
+  height: 31%;
   flex: 0 0 auto;
   overflow: hidden;
   line-height: 1.12;

@@ -196,3 +196,22 @@ describe('every format actually fits on A4', () => {
     for (const f of SHEET_FORMATS) expect(perSheet(f)).toBe(f.columns * f.rows);
   });
 });
+
+describe('a bigger sheet means a bigger code', () => {
+  // The defect this pins: `Papan zona` (190 × 135) used the same column layout as `Poster rak`
+  // (95 × 135). Both are 135mm tall and the QR is derived from the height, so the two came out
+  // with an identical code — the bigger sheet bought nothing but paper. Turned on its side it
+  // is bounded by a height it does not share.
+  it('never stacks a landscape label', () => {
+    for (const f of SHEET_FORMATS) {
+      if (f.width > f.height) {
+        expect(['row', 'board'], `${f.name} is ${f.width}×${f.height}`).toContain(f.layout);
+      }
+    }
+  });
+
+  it('lists the sizes smallest first, so the picker reads as a ladder', () => {
+    const areas = SHEET_FORMATS.map((f) => f.width * f.height);
+    expect([...areas].sort((a, b) => a - b)).toEqual(areas);
+  });
+});

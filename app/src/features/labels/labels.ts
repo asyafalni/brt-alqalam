@@ -222,12 +222,17 @@ export const SHEET_FORMATS: SheetFormat[] = [
     columns: 2, rows: 2, width: 95, height: 135, layout: 'poster',
   },
   {
-    // The biggest worth printing. A whole A4 per rack was tried and is too much paper for one
-    // shelf — the code was already unmistakable at half that.
+    /* The biggest worth printing. A whole A4 per rack was tried and is too much paper for one
+       shelf — the code was already unmistakable at half that.
+
+       `board`, not `poster`: this label is LANDSCAPE, 190 across and 135 tall, and stacking it
+       threw away the width. Both poster sizes are 135mm tall, so a height-derived QR came out
+       identical on the two — the bigger sheet bought nothing at all. Turned on its side the
+       code is bounded by the height it does not share, and the name takes the width. */
     id: 'papan',
     name: 'Papan zona',
     purpose: 'Penanda lorong atau zona — terbaca dari seberang gudang.',
-    columns: 1, rows: 2, width: 190, height: 135, layout: 'poster',
+    columns: 1, rows: 2, width: 190, height: 135, layout: 'board',
   },
 ];
 
