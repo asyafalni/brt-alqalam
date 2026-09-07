@@ -330,6 +330,20 @@ export function LabelSheet(
             </span>
           </div>
 
+          {/* The one thing that ruins a sheet of stickers, and it happens in a dialog this app
+              cannot reach. Every browser defaults to "Fit to printable area", which shrinks the
+              page by about 5% — invisible on plain paper, and enough to walk every label off its
+              sticker by the bottom of the sheet. Cheap to say here; expensive to discover after
+              printing. */}
+          {chosen.length > 0 && (
+            <p class="no-print rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
+              <span class="font-bold text-slate-900">Di dialog cetak, setel Skala ke 100%</span>{' '}
+              (bukan “Fit to page” / “Sesuaikan halaman”) dan Margin ke Default. Kalau diperkecil,
+              ukurannya meleset dan label tidak lagi pas di stikernya.{' '}
+              <span class="text-slate-500">Coba di kertas biasa dulu sebelum pakai lembar stiker.</span>
+            </p>
+          )}
+
           {chosen.length === 0 ? (
             <div class={`${CARD} no-print py-16 text-center`}>
               <QrCode class="mx-auto mb-3 h-10 w-10 text-slate-300" />
