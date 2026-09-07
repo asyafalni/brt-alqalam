@@ -128,7 +128,8 @@ describe('RackBoard — a map of the room', () => {
     expect(r.queryByRole('heading', { name: 'Perlu dicek' })).toBeNull();
 
     expect(r.getByLabelText(/^Rak B3, 1 barang, Aman, belum pernah dicek/)).toBeTruthy();
-    expect(r.queryByLabelText(/^Cek Rak B4/)).toBeNull();
+    // Every rack carries the badge; the colour is what says which ones are still owed a walk.
+    expect(r.getByLabelText('Cek Rak B4 — dicek 1 hari lalu')).toBeTruthy();
 
     fireEvent.click(r.getByLabelText(/^Cek Rak B3/));
     expect(r.getByRole('dialog', { name: 'Rak B3' })).toBeTruthy();
@@ -263,7 +264,9 @@ describe('a rack knows when it was last counted', () => {
     const r = render(Harness);
 
     expect(r.getByLabelText(/^Rak B3.*dicek 3 hari lalu/)).toBeTruthy();
-    expect(r.queryByLabelText(/^Cek Rak B3/)).toBeNull();   // nothing to chase
+    // The badge stays a button. "Done" must not mean "you can no longer count this" — finding
+    // a mistake is exactly when somebody wants to count it again.
+    expect(r.getByLabelText('Cek Rak B3 — dicek 3 hari lalu')).toBeTruthy();
   });
 
   it('still offers the shortcut once it falls out of the rotation', () => {

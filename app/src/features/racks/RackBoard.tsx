@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'octane';
 import {
-  Archive, Check, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
+  Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
 } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
@@ -211,27 +211,29 @@ export function RackBoard(
                           {rack.itemCount === 0 ? 'kosong' : `${rack.itemCount} barang`}
                         </span>
                       </button>
-                      {overdue && (
+                      {id !== '' && (
+                        // ONE control, always the same icon, with colour carrying the state.
+                        // Swapping the glyph for a tick when a rack was counted made "done"
+                        // look like a different kind of thing and quietly removed the way to
+                        // count it again — which is exactly what somebody wants after finding
+                        // a mistake. Green says done; the button still opens the count.
+                        //
+                        // A badge rather than a tile colour: the tile already says what is ON
+                        // the rack (habis / menipis / aman), and overwriting that with
+                        // "counted" would trade a fact somebody acts on for one they do not.
                         <button
                           type="button"
-                          class="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-500 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50"
+                          class={`absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
+                            checked
+                              ? 'border-green-600 bg-green-500 text-white hover:bg-green-600'
+                              : 'border-slate-400 bg-white text-slate-500 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50'
+                          }`}
                           aria-label={`Cek Rak ${rack.location.code} — ${countNote}`}
                           title={countNote}
                           onClick={() => { setSelected(id); setCounting(id); }}
                         >
                           <ClipboardCheck class="h-3.5 w-3.5" />
                         </button>
-                      )}
-                      {checked && (
-                        // A mark, not a tile colour: the tile's colour already means what is
-                        // ON the rack (habis / menipis / aman), and overwriting that with
-                        // "counted" would trade a fact somebody acts on for one they do not.
-                        <span
-                          class="pointer-events-none absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg bg-green-500 text-white"
-                          title={countNote}
-                        >
-                          <Check class="h-4 w-4" />
-                        </span>
                       )}
                     </div>
                   );
