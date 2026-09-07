@@ -215,3 +215,30 @@ describe('the navbar search filters the screen you are on', () => {
     expect(r.queryByText('Sabun cuci')).toBeNull();
   });
 });
+
+describe('the rail on a desktop', () => {
+  // SmartInv collapses its sidebar to give a wide table the screen; ours could too — the
+  // component has always known how to draw at 90px — but the only control was `md:hidden`,
+  // so on a desktop there was no way to ask for it.
+  it('narrows and widens from the same control', () => {
+    seed(input());
+    const r = render(App);
+
+    const rail = () => r.getByLabelText(/Ciutkan menu|Lebarkan menu/);
+    expect(rail().getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(rail());
+    expect(rail().getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(rail());
+    expect(rail().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('remembers the choice — a rail you narrowed should still be narrow tomorrow', () => {
+    seed(input());
+    const r = render(App);
+    fireEvent.click(r.getByLabelText('Ciutkan menu'));
+    expect(localStorage.getItem('brt.sidebar.collapsed')).toBe('1');
+
+    cleanup();
+    expect(render(App).getByLabelText('Lebarkan menu')).toBeTruthy();
+  });
+});

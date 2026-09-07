@@ -16,7 +16,7 @@
 // and so flips only once the panel has finished leaving.
 
 import { useRef } from 'octane';
-import { ChartColumn, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
+import { ChartColumn, ChevronLeft, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 import { Logo } from './Logo';
 import { useDialog } from './useDialog';
@@ -34,6 +34,8 @@ interface Props {
   requestCount: number;
   onNavigate: (route: Route) => void;
   onClose: () => void;
+  /** Desktop only: narrow the rail to icons, or widen it back. */
+  onToggle: () => void;
 }
 
 export function Sidebar(p: Props) {
@@ -86,6 +88,24 @@ export function Sidebar(p: Props) {
         }
         style={`width:${width}`}
       >
+        {/* On the panel's EDGE, not in its header: collapsed the rail is 90px and the header is
+            already a 44px logo tile, so a button beside it would be the cramped half of a
+            cramped row. Here it stays the same size and in the same place at both widths, which
+            is what makes it findable a second time.
+
+            A child of the OUTER element, because the panel inside clips its overflow — hung
+            there, the half that sticks out would simply be cut off. */}
+        <button
+          type="button"
+          class="absolute -right-3 top-24 z-10 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-md transition-colors hover:border-slate-900 hover:text-slate-900 md:flex"
+          aria-label={p.collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
+          aria-expanded={!p.collapsed}
+          title={p.collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
+          onClick={p.onToggle}
+        >
+          {p.collapsed ? <ChevronRight class="h-4 w-4" /> : <ChevronLeft class="h-4 w-4" />}
+        </button>
+
         <div
           class="relative flex h-full flex-col overflow-hidden border-r border-white/10 bg-slate-900/95
                  backdrop-blur-xl md:rounded-[32px] md:border md:shadow-2xl"
@@ -152,11 +172,16 @@ export function Sidebar(p: Props) {
           </nav>
 
           <div class="relative z-10 mt-auto border-t border-white/5 p-4">
-            <p class="px-2 text-[10px] font-bold uppercase tracking-tighter text-slate-500">
-              Masjid Al-Qalam
-            </p>
+            {/* The name goes with the rest of the text. At 90px it wrapped onto three lines
+                and read as a layout fault rather than a signature — and the logo above is
+                already saying whose app this is. */}
             {showText && (
-              <p class="px-2 text-[11px] text-slate-600">Belum terhubung ke gateway</p>
+              <>
+                <p class="px-2 text-[10px] font-bold uppercase tracking-tighter text-slate-500">
+                  Masjid Al-Qalam
+                </p>
+                <p class="px-2 text-[11px] text-slate-600">Belum terhubung ke gateway</p>
+              </>
             )}
           </div>
         </div>

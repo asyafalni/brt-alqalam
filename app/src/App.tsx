@@ -42,6 +42,9 @@ import { MovementSheet } from './features/movement/MovementSheet';
 import type { MovementTarget } from './features/movement/MovementSheet';
 
 
+/** Per-viewer, per-device: which side of the app the rail is on is nobody else's business. */
+const RAIL_KEY = 'brt.sidebar.collapsed';
+
 export function App() {
   // One draft, shared. Two screens each loading from storage would be two sources of truth,
   // and the label sheet would quietly print a stale count.
@@ -71,7 +74,14 @@ export function App() {
   // SmartInv App.tsx:51-64 owns this the same way. Their version force-expands on every
   // resize, overriding a manual collapse; ours only reacts when the breakpoint is crossed.
   const [isMobile, setIsMobile] = useState(() => innerWidth < 768);
-  const [collapsed, setCollapsed] = useState(() => innerWidth < 768);
+  /* On a desktop the collapse is a PREFERENCE and it is remembered: somebody who narrows the
+     rail to read a wide table does not want it back at full width on the next visit. On a phone
+     it is not a preference at all — it is whether the drawer is open — so the stored value is
+     ignored below the breakpoint. Wrapped, because a private window can throw on read. */
+  const [collapsed, setCollapsed] = useState(() => {
+    if (innerWidth < 768) return true;
+    try { return localStorage.getItem(RAIL_KEY) === '1'; } catch { return false; }
+  });
 
   useEffect(() => {
     const onResize = () => {
@@ -84,6 +94,15 @@ export function App() {
     addEventListener('resize', onResize);
     return () => removeEventListener('resize', onResize);
   }, []);
+
+  /** Only the desktop state is worth remembering; on a phone this is drawer open/shut. */
+  function toggleRail() {
+    setCollapsed((was) => {
+      const next = !was;
+      if (!isMobile) { try { localStorage.setItem(RAIL_KEY, next ? '1' : '0'); } catch { /* private window */ } }
+      return next;
+    });
+  }
 
   const navigate = (next: Parameters<typeof go>[0]) => {
     go(next);
@@ -112,6 +131,7 @@ export function App() {
         route={route}
         collapsed={collapsed}
         isMobile={isMobile}
+        onToggle={toggleRail}
         itemCount={draft.items.length}
         alertCount={inventory.notifications.length}
         rackCount={draft.locations.length}
