@@ -1539,3 +1539,27 @@ exist to give the second column the same weight as the first.
   way to count it again — which is exactly what somebody wants after finding a mistake. Tinted
   rather than filled, because "already counted" is the one state needing no attention at all,
   and the badges that *do* want a walk should be the easier ones to spot.
+
+## 92. Zones are a label, and now a manageable one (v1.12)
+
+> **"rak bisa ditambahkan tapi zona apakah bisa ditambahkan, dimodif atau diremove?"**
+
+Before this: **add yes** (implicitly, by typing a new name), **rename no**, **remove no**. And a
+hazard underneath — `zone` was a free-text field, so "Gudang Utama" and "gudang utama" became
+two zones and the board quietly split in half.
+
+**A zone stays a LABEL, not an entity.** A Zones tab with its own ids and admin screen would be
+recurring work to maintain for what is, here, about four names — §0.0's test rules it out. What
+was missing was not a table; it was the two operations that make a label affordable:
+
+- **The zone field is a picker** over the zones already in use, with "+ Zona baru…" one tap
+  away. The right answer becomes the easy one, and the spellings stop drifting apart.
+- **A zone can be renamed from its heading on the board**, carrying every rack in it at once —
+  the alternative was editing fourteen racks by hand, which nobody does, which is why the
+  spellings drifted in the first place. The panel says how many racks will move.
+
+**Removing a zone is renaming it onto another one.** That is not a workaround, it is what the
+model means: a zone cannot exist without racks, so emptying it *is* deleting it. A separate
+delete would have to either orphan the racks or refuse. Renaming onto an existing zone therefore
+**merges**, the form warns before it happens, and the panel says all of this in plain Indonesian
+because "how do I delete a zone" is the obvious next question and the answer is not a button.

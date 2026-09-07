@@ -12,17 +12,17 @@ import { useEffect, useMemo, useState } from 'octane';
 import {
   Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
 } from '@octanejs/lucide';
-import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
+import { groupByZone, rollupLocations, racksNeedingAttention, UNASSIGNED } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState } from '../../../../domain/cycleCount';
 import { contentsOf } from '../../../../domain/stock';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
-import { Button, CARD, CODE, FIELD, LABEL, PageHeader, Stat } from '../../components/ui';
+import { Button, CARD, CODE, FIELD, LABEL, PageHeader, Select, Stat } from '../../components/ui';
 import {
   applyCount, archiveLocation, blocksArchive, blocksDelete, createLocation, deleteLocation,
-  editLocation, markCounted, restoreLocation,
+  editLocation, markCounted, racksInZone, renameZone, restoreLocation, zonesOf,
 } from '../stocktake/draft';
 import type { LocationEdit, RemovalBlock } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
@@ -60,6 +60,7 @@ export function RackBoard(
   const [editing, setEditing] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [renamingZone, setRenamingZone] = useState<string | null>(null);
 
   /** Everything the panel holds is per-rack, so closing it clears all of it. */
   const closePanel = () => {
@@ -83,6 +84,8 @@ export function RackBoard(
     [locations, items, inventory.derived],
   );
   const zones = useMemo(() => groupByZone(racks), [racks]);
+  /** Just the names, for the picker — `zones` above is the grouped board. */
+  const zoneNames = useMemo(() => zonesOf(locations), [locations]);
   // `rollupLocations` drops inactive racks, which is what keeps the map about the room as it
   // is now — so the archived ones have to be read straight off the draft.
   const archived = useMemo(() => locations.filter((l) => !l.active), [locations]);
@@ -120,6 +123,26 @@ export function RackBoard(
           a new rack against, since the code has to fit alongside the ones already painted on
           the shelves. */}
       <Sheet
+        open={renamingZone !== null}
+        title="Ubah zona"
+        description={renamingZone ?? undefined}
+        onClose={() => setRenamingZone(null)}
+      >
+        {renamingZone !== null && (
+          <ZoneForm
+            zone={renamingZone}
+            rackCount={racksInZone(locations, renamingZone)}
+            others={zoneNames.filter((z) => z !== renamingZone)}
+            onSave={(to) => {
+              setLocations((prev) => renameZone(prev, renamingZone, to));
+              setRenamingZone(null);
+            }}
+            onCancel={() => setRenamingZone(null)}
+          />
+        )}
+      </Sheet>
+
+      <Sheet
         open={editing === 'new'}
         title="Rak baru"
         description="Satu QR per rak — bukan per barang."
@@ -127,6 +150,7 @@ export function RackBoard(
       >
         <RackForm
           initial={{ code: '', name: '', zone: locations[locations.length - 1]?.zone ?? '' }}
+          zones={zoneNames}
           onSave={addRack}
           onCancel={() => setEditing(null)}
         />
@@ -171,7 +195,22 @@ export function RackBoard(
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-                <h2 class="font-bold text-slate-900">{zone.zone}</h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="font-bold text-slate-900">{zone.zone}</h2>
+                  {/* The unplaced bucket is not a zone anybody named, so there is nothing to
+                      rename — it exists precisely because those racks have no zone. */}
+                  {zone.zone !== UNASSIGNED.zone && (
+                    <button
+                      type="button"
+                      class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                      aria-label={`Ubah zona ${zone.zone}`}
+                      title="Ubah zona"
+                      onClick={() => setRenamingZone(zone.zone)}
+                    >
+                      <Pencil class="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   {zone.racks.length} rak ·{' '}
                   {zone.racks.filter((r) => r.status === 'low' || r.status === 'out').length} perlu diurus ·{' '}
@@ -368,6 +407,7 @@ export function RackBoard(
                 <div class="mb-4">
                   <RackForm
                     title="Ubah rak"
+                    zones={zoneNames}
                     initial={{
                       code: selectedRack.location.code,
                       name: selectedRack.location.name,
@@ -481,14 +521,83 @@ function rackSubtitle(location: Location, now: number): string {
  * three things. Inline rather than a modal: the rack map is the context, and a dialog over it
  * would hide the neighbouring codes somebody is naming this one against.
  */
+/**
+ * Renaming a zone, which is also the only way to remove one.
+ *
+ * A zone is a label carried by its racks, so it cannot exist without them: emptying it IS
+ * deleting it. Renaming onto a zone that already exists therefore MERGES the two, and the form
+ * says so before it happens rather than surprising somebody with a board that lost a section.
+ */
+function ZoneForm(
+  { zone, rackCount, others, onSave, onCancel }:
+  {
+    zone: string; rackCount: number; others: string[];
+    onSave: (to: string) => void; onCancel: () => void;
+  },
+) {
+  const [name, setName] = useState(zone);
+  const target = name.trim();
+  const merging = target !== '' && target !== zone && others.includes(target);
+
+  return (
+    <div>
+      <label class={LABEL} for="zone-name">Nama zona</label>
+      <input
+        id="zone-name"
+        class={`${FIELD} min-h-touch`}
+        value={name}
+        autocomplete="off"
+        onInput={(e: Event) => setName((e.target as HTMLInputElement).value)}
+      />
+      <p class="mt-1.5 text-sm text-slate-500">
+        {rackCount} rak akan ikut pindah.
+      </p>
+
+      {merging && (
+        <p class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm text-amber-800">
+          Zona <strong>{target}</strong> sudah ada — kedua zona akan digabung.
+        </p>
+      )}
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <Button size="touch" disabled={target === '' || target === zone} onClick={() => onSave(target)}>
+          Simpan
+        </Button>
+        <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
+          Batal
+        </button>
+      </div>
+
+      {/* Said plainly, because "how do I delete a zone" is the obvious next question and the
+          answer is not a delete button. */}
+      {others.length > 0 && (
+        <p class="mt-6 border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-500">
+          Mau menghapus zona ini? Ganti namanya menjadi nama zona lain — semua raknya pindah ke
+          sana dan zona ini hilang dengan sendirinya. Zona hanyalah nama yang dibawa oleh
+          rak-raknya, jadi tanpa rak ia memang tidak ada.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const NEW_ZONE = '\u0000new';
+
 function RackForm(
-  { title, initial, onSave, onCancel }:
-  { title?: string; initial: LocationEdit; onSave: (edit: LocationEdit) => void; onCancel: () => void },
+  { title, initial, zones, onSave, onCancel }:
+  {
+    title?: string; initial: LocationEdit; zones: string[];
+    onSave: (edit: LocationEdit) => void; onCancel: () => void;
+  },
 ) {
   const [code, setCode] = useState(initial.code);
   const [name, setName] = useState(initial.name);
   const [zone, setZone] = useState(initial.zone);
   const [artId, setArtId] = useState(initial.artId);
+  /** Starts typing when the zone is new — an unknown zone has nothing to pick from. */
+  const [typingZone, setTypingZone] = useState(
+    () => initial.zone !== '' && !zones.includes(initial.zone),
+  );
 
   const submit = () => { if (code.trim() !== '') onSave({ code, name, zone, artId }); };
 
@@ -527,13 +636,33 @@ function RackForm(
         </div>
         <div>
           <label class={LABEL} for="rack-zone">Zona</label>
-          <input
-            id="rack-zone"
-            class={`${FIELD} min-h-touch`}
-            value={zone}
-            placeholder="Gudang Utama"
-            onInput={(e: Event) => setZone((e.target as HTMLInputElement).value)}
-          />
+          {/* A list, not a blank field. A zone is only a string on each rack, so nothing keeps
+              two spellings apart: typed free-hand, "Gudang Utama" and "gudang utama" become two
+              zones and the board quietly splits in half. Offering what already exists makes the
+              right answer the easy one, and typing a new one is still one tap away. */}
+          {typingZone || zones.length === 0 ? (
+            <input
+              id="rack-zone"
+              class={`${FIELD} min-h-touch`}
+              value={zone}
+              placeholder="Gudang Utama"
+              autocomplete="off"
+              onInput={(e: Event) => setZone((e.target as HTMLInputElement).value)}
+            />
+          ) : (
+            <Select
+              id="rack-zone"
+              value={zones.includes(zone) ? zone : (zones[0] ?? '')}
+              onChange={(e: Event) => {
+                const picked = (e.target as HTMLSelectElement).value;
+                if (picked === NEW_ZONE) { setTypingZone(true); setZone(''); }
+                else setZone(picked);
+              }}
+            >
+              {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+              <option value={NEW_ZONE}>+ Zona baru…</option>
+            </Select>
+          )}
           <p class="mt-1 text-xs text-slate-400">Ruangan atau areanya.</p>
         </div>
       </div>

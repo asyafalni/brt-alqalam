@@ -13,6 +13,8 @@ import {
   instancesFor,
   isBlocking,
   nextItemId,
+  racksInZone,
+  renameZone,
   restoreLocation,
   summarise,
   toCategoriesCsv,
@@ -23,6 +25,7 @@ import {
   updateEntry,
   updateItem,
   validate,
+  zonesOf,
 } from './draft';
 import type { DraftInput } from './draft';
 import { parseItems, parseInstances, parseCategories, parseStock } from '../../../../data/parse';

@@ -297,6 +297,47 @@ export function blocksDelete(
     ?? (location.lastCountedTs == null ? null : { kind: 'has-history' });
 }
 
+/* -------------------------------------------------------------------------------------------
+   Zones.
+
+   A zone is a LABEL, not an entity: it is a string on each rack, and the list of zones is
+   derived by grouping. That is deliberate and it stays — a Zones tab, its own ids and its own
+   admin screen would be real recurring work to maintain for what is, at this masjid, about
+   four names (§0.0: does this remove work, or add it?).
+
+   The cost of a label is that nothing keeps two spellings apart, so "Gudang Utama" and "gudang
+   utama" become two zones and the board quietly splits in half. These two functions are what
+   pay that cost off: the picker offers what already exists, and renaming moves every rack at
+   once instead of asking somebody to edit fourteen of them by hand.
+------------------------------------------------------------------------------------------- */
+
+/** Every zone in use, in board order. What the picker offers instead of a blank text field. */
+export function zonesOf(locations: readonly Location[]): string[] {
+  const seen: string[] = [];
+  for (const l of locations) if (!seen.includes(l.zone)) seen.push(l.zone);
+  return seen;
+}
+
+/**
+ * Rename a zone, carrying every rack in it.
+ *
+ * Renaming ONTO an existing zone merges the two, and that is the answer to "can a zone be
+ * removed?" — it cannot exist without racks, so emptying it *is* removing it. There is no
+ * separate delete, because a delete would have to either orphan the racks or refuse, and
+ * "move them somewhere" is what the person actually meant either way.
+ */
+export function renameZone(
+  locations: readonly Location[], from: string, to: string,
+): Location[] {
+  const target = to.trim() || 'Gudang';
+  if (target === from) return [...locations];
+  return locations.map((l) => (l.zone === from ? { ...l, zone: target } : l));
+}
+
+/** How many racks a rename would move — the number that makes it feel consequential. */
+export const racksInZone = (locations: readonly Location[], zone: string): number =>
+  locations.filter((l) => l.zone === zone).length;
+
 export function archiveLocation(locations: readonly Location[], locationId: string): Location[] {
   return locations.map((l) => (l.locationId === locationId ? { ...l, active: false } : l));
 }

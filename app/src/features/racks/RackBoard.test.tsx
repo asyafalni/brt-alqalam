@@ -275,3 +275,56 @@ describe('a rack knows when it was last counted', () => {
     expect(r.getByLabelText(/^Cek Rak B3 — dicek 45 hari lalu/)).toBeTruthy();
   });
 });
+
+// --- Zones ----------------------------------------------------------------------------------
+//
+// A zone is a label its racks carry, not an entity with its own row. That keeps it free to
+// maintain, at the cost that nothing keeps two spellings apart — which is what the picker and
+// the rename are for.
+
+describe('managing a zone', () => {
+  const A1 = createLocation('A1', 'Gudang Utama', '', []);
+  const A2 = createLocation('A2', 'Gudang Utama', '', [A1]);
+  const P1 = createLocation('P1', 'Gudang PHBI', '', [A1, A2]);
+
+  it('renames a zone and carries every rack in it', () => {
+    seed([], [A1, A2, P1]);
+    const r = render(Harness);
+
+    fireEvent.click(r.getByLabelText('Ubah zona Gudang Utama'));
+    expect(r.getByText('2 rak akan ikut pindah.')).toBeTruthy();
+
+    type(r.getByLabelText('Nama zona'), 'Gudang Barat');
+    fireEvent.click(r.getByText('Simpan'));
+
+    expect(stored().locations.map((l: { zone: string }) => l.zone))
+      .toEqual(['Gudang Barat', 'Gudang Barat', 'Gudang PHBI']);
+  });
+
+  it('warns before merging two zones, because a section vanishes from the board', () => {
+    seed([], [A1, A2, P1]);
+    const r = render(Harness);
+
+    fireEvent.click(r.getByLabelText('Ubah zona Gudang PHBI'));
+    type(r.getByLabelText('Nama zona'), 'Gudang Utama');
+    expect(r.getByText(/sudah ada — kedua zona akan digabung/)).toBeTruthy();
+  });
+
+  it('offers the zones already in use rather than a blank field', () => {
+    // Typed free-hand, "Gudang Utama" and "gudang utama" become two zones and the board
+    // quietly splits in half.
+    seed([], [A1, P1]);
+    const r = render(Harness);
+    fireEvent.click(r.getAllByText('Rak baru')[0]);
+
+    const zone = r.getByLabelText('Zona') as HTMLSelectElement;
+    expect([...zone.options].map((o) => o.textContent))
+      .toEqual(['Gudang Utama', 'Gudang PHBI', '+ Zona baru…']);
+  });
+
+  it('has no rename for the unplaced bucket — it is not a zone anybody named', () => {
+    seed(catalog(input({ name: 'Sabun' })), [A1]);
+    const r = render(Harness);
+    expect(r.queryByLabelText(/^Ubah zona Belum ditempatkan/)).toBeNull();
+  });
+});
