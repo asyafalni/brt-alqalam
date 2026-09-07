@@ -78,6 +78,30 @@ body {
 
 /* Never let a mis-tap zoom the kiosk. */
 input, select, textarea, button { font: inherit; }
+
+/* Tailwind 4's preflight no longer sets `cursor: pointer` on buttons — v3 did, and dropping it
+   was a deliberate change to follow the browser default. On a desk that reads as "this is not
+   clickable" across most of the app, which is the opposite of true, so it is put back here
+   rather than repeated on every control. `role="link"` covers the DataTable's activatable rows.
+
+   Disabled controls are explicitly excluded: a pointer over a button that will not respond is
+   a promise the UI does not keep. */
+button:not(:disabled),
+select:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]),
+[role="link"],
+[role="radio"]:not([aria-disabled="true"]),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+label[for] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+}
 input, select, textarea { font-size: max(16px, 1em); }
 
 /* `outline-solid` is not optional here. Tailwind 4's `outline-2` sets the WIDTH only, and the

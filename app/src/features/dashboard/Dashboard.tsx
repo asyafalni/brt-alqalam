@@ -197,10 +197,13 @@ export function Dashboard(
           so they sit beside each other rather than stacked, where the second would live below
           the fold on a phone and be read by nobody. Stacked below `lg`, where there is no room
           for two and reading order is the only ordering available. */}
+      {/* No `items-start` on the grid: the two cards are a matched pair, and one ending 40px
+          above the other reads as a rendering slip rather than as "this list is shorter". They
+          stretch, and each footer is pushed to the bottom with `mt-auto`. */}
       {(inventory.notifications.length > 0 || dueCount > 0) && (
-        <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <div class="grid gap-4 lg:grid-cols-2">
           {inventory.notifications.length > 0 && (
-            <section class={`${CARD} border-amber-200`}>
+            <section class={`${CARD} flex h-full flex-col border-amber-200`}>
               <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
                 <h2 class="font-bold text-slate-900">Perlu dibeli lagi</h2>
@@ -228,7 +231,7 @@ export function Dashboard(
               {inventory.notifications.length > ALERT_PREVIEW && (
                 <button
                   type="button"
-                  class="mt-3 text-sm font-semibold text-slate-900 underline"
+                  class="mt-auto pt-3 text-left text-sm font-semibold text-slate-900 underline"
                   onClick={() => setShowAllAlerts(!showAllAlerts)}
                 >
                   {showAllAlerts
@@ -240,7 +243,7 @@ export function Dashboard(
           )}
 
           {dueCount > 0 && (
-            <section class={CARD}>
+            <section class={`${CARD} flex h-full flex-col`}>
               <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <ClipboardCheck class="h-5 w-5 shrink-0 text-slate-500" />
                 <h2 class="font-bold text-slate-900">Rak perlu dicek</h2>
@@ -257,7 +260,7 @@ export function Dashboard(
                   <li key={d.location.locationId}>
                     <button
                       type="button"
-                      class="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50"
+                      class="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
                       aria-label={`Buka Rak ${d.location.code}`}
                       onClick={() => onNavigate({ name: 'racks', id: d.location.locationId })}
                     >
@@ -287,7 +290,7 @@ export function Dashboard(
               {dueCount > ALERT_PREVIEW && (
                 <button
                   type="button"
-                  class="mt-3 text-sm font-semibold text-slate-900 underline"
+                  class="mt-auto pt-3 text-left text-sm font-semibold text-slate-900 underline"
                   onClick={() => setShowAllDue(!showAllDue)}
                 >
                   {showAllDue ? 'Tampilkan lebih sedikit' : `Lihat semua ${dueCount}`}
