@@ -321,3 +321,69 @@ describe('the photo is part of describing the request', () => {
     expect(stored().requests.at(-1).requestId).toBe('REQ-0008');
   });
 });
+
+describe('changing a request after it was sent', () => {
+  it('reopens the same form, filled in with what was asked for', () => {
+    // One form for both jobs. A separate edit screen would be these eight fields maintained
+    // twice, and the second copy is the one that stops getting the fix.
+    seed(catalog(input()), [req({ name: 'Sapu ijuk', qty: 2, price: 27_500, reason: 'Patah' })]);
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Ubah' }));
+    expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('Sapu ijuk');
+    expect((r.getByLabelText('Jumlah') as HTMLInputElement).value).toBe('2');
+    expect((r.getByLabelText(/Perkiraan harga/) as HTMLInputElement).value).toBe('27500');
+  });
+
+  it('saves the change onto the same request rather than making a second one', () => {
+    seed(catalog(input()), [req({ name: 'Sapu ijuk', qty: 2 })]);
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Ubah' }));
+    type(r.getByLabelText('Jumlah'), '5');
+    fireEvent.click(r.getByText('Simpan perubahan'));
+
+    const after = stored().requests;
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ requestId: 'REQ-0001', qty: 5 });
+  });
+
+  it('lets a price be cleared, not merely replaced', () => {
+    // "We no longer know" is a real answer, and spreading only the present keys would keep the
+    // old guess while the field looked empty.
+    seed(catalog(input()), [req({ price: 27_500 })]);
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Ubah' }));
+    type(r.getByLabelText(/Perkiraan harga/), '');
+    fireEvent.click(r.getByText('Simpan perubahan'));
+
+    expect(stored().requests[0].price).toBeUndefined();
+  });
+
+  it('leaves who asked and when alone — those are the record, not fields', () => {
+    seed(catalog(input()), [req({ requestedBy: 'USR-A', requestedTs: 111 })]);
+    const r = render(App);
+
+    fireEvent.click(r.getByRole('button', { name: 'Ubah' }));
+    type(r.getByLabelText('Kenapa perlu dibeli?'), 'Alasan baru');
+    fireEvent.click(r.getByText('Simpan perubahan'));
+
+    expect(stored().requests[0]).toMatchObject({
+      requestedBy: 'USR-A', requestedTs: 111, status: 'diajukan', reason: 'Alasan baru',
+    });
+  });
+
+  it('offers no Ubah on a request that has been decided', () => {
+    // Then it is the record of what was decided, and editing it rewrites what was approved.
+    seed(catalog(input()), [req({ status: 'selesai' })]);
+    expect(render(App).queryByRole('button', { name: 'Ubah' })).toBeNull();
+  });
+
+  it('no longer carries a photo action on the row', () => {
+    // One way to reach the job, and it is Ubah. Every control on a row is a thing between
+    // somebody and the reason they opened the screen.
+    seed(catalog(input()), [req()]);
+    expect(render(App).queryByText('Tambah foto')).toBeNull();
+  });
+});

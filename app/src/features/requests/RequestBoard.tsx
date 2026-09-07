@@ -16,7 +16,7 @@
 // the shelf, as an appended `status_change`.
 
 import { useMemo, useState } from 'octane';
-import { Check, ExternalLink, Plus, ShoppingCart, Wrench, X } from '@octanejs/lucide';
+import { Check, ExternalLink, Pencil, Plus, ShoppingCart, Wrench, X } from '@octanejs/lucide';
 import {
   addToStock, openRequests, openTotal, purchaseIntoStock, repairDone, requestTotal, sortRequests,
 } from '../../../../domain/requests';
@@ -29,7 +29,7 @@ import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
-import { discardPhotos, RequestPhotos, RequestPhotoStrip } from './RequestPhotos';
+import { discardPhotos, RequestPhotoStrip } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
 export const rupiah = (n: number): string => `Rp${n.toLocaleString('id-ID')}`;
@@ -98,10 +98,10 @@ export function RequestBoard(
   const [adding, setAdding] = useState(prefill != null);
   const [buying, setBuying] = useState<PurchaseRequest | null>(null);
   const [rejecting, setRejecting] = useState<PurchaseRequest | null>(null);
-  const [photosFor, setPhotosFor] = useState<PurchaseRequest | null>(null);
-  /* The row's strip and the panel's manager keep separate copies of the photo list, so closing
-     the panel bumps this to make the row re-read. Cheaper than lifting IndexedDB state for a
-     list that changes once in a while. */
+  const [editing, setEditing] = useState<PurchaseRequest | null>(null);
+  /* The row's strip and the form keep separate copies of the photo list, so closing the form
+     bumps this to make the rows re-read. Cheaper than lifting IndexedDB state for a list that
+     changes once in a while. */
   const [photoVersion, setPhotoVersion] = useState(0);
 
   const rows = useMemo(() => sortRequests(requests), [requests]);
@@ -146,10 +146,42 @@ export function RequestBoard(
     onPrefillUsed?.();
   }
 
-  /** Cancelling means the request never existed, so neither should the photos taken for it. */
+  /** Cancelling a NEW request means it never existed, so neither should its photos. */
   function abandonForm() {
     void discardPhotos(draftId);
     closeForm();
+  }
+
+  function closeEdit() {
+    setEditing(null);
+    setPhotoVersion((n) => n + 1);
+  }
+
+  /**
+   * Save an edit.
+   *
+   * Only the description changes. `status`, `requestedBy`, `requestedTs` and the whole decision
+   * — who closed it, when, with what note — are the record of what happened rather than fields
+   * somebody is editing, so they carry through untouched.
+   */
+  function saveEdit(target: PurchaseRequest, input: RequestInput) {
+    setRequests((prev) => prev.map((r) => (r.requestId === target.requestId
+      ? {
+        ...r,
+        type: input.type,
+        name: input.name.trim(),
+        qty: input.qty,
+        unit: input.unit.trim(),
+        reason: input.reason.trim(),
+        /* Assigned, not merged: clearing the price or the link has to mean "we no longer
+           know", and spreading only the present keys would silently keep the old value. */
+        itemId: input.itemId,
+        assetId: input.assetId,
+        price: input.price,
+        url: input.url && input.url.trim() !== '' ? input.url.trim() : undefined,
+      }
+      : r)));
+    closeEdit();
   }
 
   function submit(input: RequestInput) {
@@ -367,7 +399,6 @@ export function RequestBoard(
                     requestId={r.requestId}
                     name={r.name}
                     refreshKey={photoVersion}
-                    onOpen={() => setPhotosFor(r)}
                   />
 
                   {r.note && (
@@ -400,6 +431,18 @@ export function RequestBoard(
                         >
                           <X class="h-4 w-4" /> Tidak jadi
                         </Button>
+                        {/* Last, after the pair: the two decisions belong beside each other,
+                            and putting an edit between them separates a yes from its no.
+                            Only while it is still open — once decided, a request is the record
+                            of what was decided, and editing it rewrites what was approved. */}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          class="min-h-11"
+                          onClick={() => setEditing(r)}
+                        >
+                          <Pencil class="h-4 w-4" /> Ubah
+                        </Button>
                       </>
                     )}
                     {r.status !== 'diajukan' && r.decidedTs && (
@@ -422,6 +465,7 @@ export function RequestBoard(
         onClose={abandonForm}
       >
         <RequestForm
+          key={draftId}
           items={draft.items}
           instances={instances}
           prefill={formPrefill}
@@ -454,12 +498,24 @@ export function RequestBoard(
       </Sheet>
 
       <Sheet
-        open={photosFor !== null}
-        title="Foto"
-        description={photosFor?.name}
-        onClose={() => { setPhotosFor(null); setPhotoVersion((n) => n + 1); }}
+        open={editing !== null}
+        title="Ubah pengajuan"
+        description={editing?.name}
+        onClose={closeEdit}
       >
-        {photosFor && <RequestPhotos requestId={photosFor.requestId} name={photosFor.name} />}
+        {editing && (
+          <RequestForm
+            /* Keyed by the request, so opening a second one starts from ITS values rather than
+               keeping the first one's. */
+            key={editing.requestId}
+            items={draft.items}
+            instances={instances}
+            requestId={editing.requestId}
+            initial={editing}
+            onSubmit={(input) => saveEdit(editing, input)}
+            onCancel={closeEdit}
+          />
+        )}
       </Sheet>
 
       <Sheet

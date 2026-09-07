@@ -4,16 +4,14 @@
 // photo of the broken one being replaced, answers "which one?" and "why?" at the same time. It
 // is the field the boss asked for, and the one most likely to be a screenshot from a phone.
 //
-// TWO PIECES, on purpose. The LIST shows a strip of thumbnails and nothing else — a row is read,
-// not worked on, and a dashed upload target on every card made the list look like a form.
-// The MANAGER is used twice: inside the request form, where a photo is part of describing the
-// thing (it is one of the four fields the boss named), and later from a right-side sheet when
-// somebody wants to add one to a request that already exists.
+// TWO PIECES, on purpose. The LIST shows a strip of thumbnails and NOTHING ELSE — a row is read,
+// not worked on, and every control on it is one more thing between somebody and the reason they
+// opened the screen. Adding, replacing and deleting all happen in the request form, which can
+// be reopened on an existing request; there is no second way to reach the same job.
 //
 // The form case needs an id before the request is saved. That is not a problem, only a cost:
 // the id is minted when the form opens, and photos attached to an abandoned draft are deleted
-// on cancel (`discardPhotos`). The earlier design made people save, find the row and open a
-// panel to attach the photo they had in their hand — three steps to avoid one cleanup call.
+// on cancel (`discardPhotos`).
 //
 // Same `PhotoStore` the items use. The port's first argument is an owner id, not specifically
 // an item id — keying by `requestId` is what it is for, and it means downscaling, the six-photo
@@ -62,15 +60,19 @@ function Thumb({ photo, onOpen }: { photo: ItemPhoto; onOpen: (src: string) => v
 }
 
 /**
- * The row's version: what is already there, and a way in. No upload target, no delete.
+ * The row's version: what is already there, and nothing else.
  *
- * `refreshKey` is bumped by the board when the sheet closes — the strip and the manager keep
- * separate copies of the list, and without it a photo added in the panel would not appear on
- * the row behind it until a reload.
+ * Tapping one opens it full size — reading a photo is reading the row. Changing them is
+ * Ubah's job, so this renders nothing at all when there are none rather than holding a slot
+ * open for a control that no longer lives here.
+ *
+ * `refreshKey` is bumped by the board when the form closes: the strip and the form keep
+ * separate copies of the list, and without it a photo added while editing would not appear on
+ * the row behind until a reload.
  */
 export function RequestPhotoStrip(
-  { requestId, name, refreshKey = 0, onOpen }:
-  { requestId: string; name: string; refreshKey?: number; onOpen: () => void },
+  { requestId, name, refreshKey = 0 }:
+  { requestId: string; name: string; refreshKey?: number },
 ) {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [open, setOpen] = useState('');
@@ -81,18 +83,11 @@ export function RequestPhotoStrip(
     return () => { alive = false; };
   }, [requestId, refreshKey]);
 
+  if (photos.length === 0) return null;
+
   return (
     <div class="mt-3 flex flex-wrap items-center gap-2">
       {photos.map((p) => <Thumb key={p.photoId} photo={p} onOpen={setOpen} />)}
-      <button
-        type="button"
-        class="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
-        onClick={onOpen}
-      >
-        <Camera class="h-4 w-4" />
-        {photos.length === 0 ? 'Tambah foto' : `Foto (${photos.length})`}
-      </button>
-
       {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
     </div>
   );

@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'octane';
 import { ShoppingCart, Wrench } from '@octanejs/lucide';
 import { validateRequest } from '../../../../domain/requests';
-import type { RequestProblem, RequestType } from '../../../../domain/requests';
+import type { PurchaseRequest, RequestProblem, RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import { Button, CODE, ERROR_TEXT, FIELD, FIELD_ERROR, LABEL, Select } from '../../components/ui';
 import { artFor, ItemArt } from '../items/ItemArt';
@@ -55,17 +55,26 @@ export function replacementReason(d: DerivedInstance, note?: string): string {
 }
 
 export function RequestForm(
-  { items, instances, onSubmit, onCancel, prefill, requestId }:
+  { items, instances, onSubmit, onCancel, prefill, requestId, initial }:
   {
     items: Item[];
     instances: DerivedInstance[];
     onSubmit: (input: RequestInput) => void;
     onCancel: () => void;
     /**
-     * The id this request WILL have. Minted before the form opens so photos have somewhere to
-     * go; released by the caller if the form is abandoned.
+     * The id this request will have — minted before the form opens so photos have somewhere to
+     * go, or the existing id when editing. Released by the caller if a NEW form is abandoned.
      */
     requestId: string;
+    /**
+     * The request being changed, when this is an edit rather than a new one.
+     *
+     * One form for both, because they ask the same questions: a separate edit screen would be
+     * the same eight fields maintained twice, and the second copy is the one that stops getting
+     * the fix. Only the description is editable — status, who asked and when are the record of
+     * what happened, not fields.
+     */
+    initial?: PurchaseRequest;
     /**
      * Set when the form was opened from a broken or lost unit rather than from the button.
      * `note` is what the person who reported the loss wrote at the time.
@@ -81,20 +90,24 @@ export function RequestForm(
   const fromItem = from && items.find((i) => i.itemId === from.instance.itemId);
   const replacing = prefill?.type === 'beli' ? from : undefined;
 
-  const [type, setType] = useState<RequestType>(prefill?.type ?? 'beli');
-  const [assetId, setAssetId] = useState(prefill?.assetId ?? '');
+  const [type, setType] = useState<RequestType>(initial?.type ?? prefill?.type ?? 'beli');
+  const [assetId, setAssetId] = useState(initial?.assetId ?? prefill?.assetId ?? '');
   /* A replacement knife is the same catalog row, so it starts as a RESTOCK of it. A second
      row called "Pisau potong" is exactly the mess §0 says the register exists to clear up —
      and "Barang baru" is still one tap away for a different model. */
-  const [itemId, setItemId] = useState(replacing && fromItem ? fromItem.itemId : NEW_THING);
-  const [name, setName] = useState(replacing && fromItem ? fromItem.name : '');
-  const [qty, setQty] = useState(1);
-  const [unit, setUnit] = useState(replacing && fromItem ? fromItem.unit : 'buah');
-  const [reason, setReason] = useState(
-    replacing ? replacementReason(replacing, prefill?.note) : '',
+  const [itemId, setItemId] = useState(
+    initial?.itemId ?? (replacing && fromItem ? fromItem.itemId : NEW_THING),
   );
-  const [price, setPrice] = useState('');
-  const [url, setUrl] = useState('');
+  const [name, setName] = useState(initial?.name ?? (replacing && fromItem ? fromItem.name : ''));
+  const [qty, setQty] = useState(initial?.qty ?? 1);
+  const [unit, setUnit] = useState(
+    initial?.unit || (replacing && fromItem ? fromItem.unit : 'buah'),
+  );
+  const [reason, setReason] = useState(
+    initial?.reason ?? (replacing ? replacementReason(replacing, prefill?.note) : ''),
+  );
+  const [price, setPrice] = useState(initial?.price == null ? '' : String(initial.price));
+  const [url, setUrl] = useState(initial?.url ?? '');
   const [showProblems, setShowProblems] = useState(false);
 
   const repair = type === 'perbaikan';
@@ -360,7 +373,9 @@ export function RequestForm(
       <div class="mt-5 flex flex-wrap items-center gap-3">
         {/* Not "Ajukan": that is the word on the button that opened this sheet, and two
             controls with one name is how somebody clicks the wrong one. */}
-        <Button size="touch" onClick={submit}>Kirim pengajuan</Button>
+        <Button size="touch" onClick={submit}>
+          {initial ? 'Simpan perubahan' : 'Kirim pengajuan'}
+        </Button>
         <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
           Batal
         </button>
