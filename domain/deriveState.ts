@@ -106,18 +106,37 @@ export function deriveState(
   // for 24h. Stock was already decremented at take-time (conservative); if not returned
   // within the window it stays consumed — nothing to undo, no cron. The window only affects
   // the `outstanding` figure we surface for reconciliation.
+  /* Units grouped by their item, so an instance-tracked item's figures come from the unit
+     statuses rather than from a quantity nothing ever decrements. */
+  const unitsOf: Record<string, DerivedInstance[]> = {};
+  Object.values(inst).forEach((d) => { (unitsOf[d.instance.itemId] ??= []).push(d); });
+
   const derivedItems: Record<string, DerivedItem> = {};
   items.forEach((i) => {
     const rows = byLocation[i.itemId];
     // The minimum is compared against the TOTAL: nobody wants to be told sabun is low on A1
     // while there are twelve of them on A3.
-    const q = Object.values(rows).reduce((sum, n) => sum + n, 0);
+    const shelved = Object.values(rows).reduce((sum, n) => sum + n, 0);
+
+    /* An instance move carries `qtyDelta: 0` — it changes an identity's status, not an amount
+       — so the quantity fold above never touches a labelled item. Its two figures come from
+       the units instead. Guarded on there BEING units: a caller that folds without instances
+       would otherwise see every labelled item drop to zero. */
+    const units = i.trackBy === 'instance' ? unitsOf[i.itemId] : undefined;
+    const q = units && units.length > 0
+      ? units.filter((u) => u.status === 'available').length
+      : shelved;
+    const owned = units && units.length > 0
+      ? units.filter((u) => u.status !== 'lost' && u.status !== 'retired').length
+      : shelved;
+
     const pend = outstanding[i.itemId]
       .filter((o) => now - o.ts <= DAY_MS)
       .reduce((s, o) => s + o.qty, 0);
     const status = q <= 0 ? 'out' : (i.minStock != null && q <= i.minStock ? 'low' : 'available');
     derivedItems[i.itemId] = {
-      item: i, qty: q, byLocation: rows, status, outstanding: pend, takenTotal: taken[i.itemId],
+      item: i, qty: q, ownedQty: owned, byLocation: rows, status,
+      outstanding: pend, takenTotal: taken[i.itemId],
     };
   });
 

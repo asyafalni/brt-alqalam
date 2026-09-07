@@ -138,11 +138,31 @@ export interface Txn {
 
 export interface DerivedItem {
   item: Item;
-  /** Total across every rack. This is what the minimum is compared against. */
+  /**
+   * How many can be laid hands on RIGHT NOW, across every rack. This is what the minimum is
+   * compared against, and what the stock list shows.
+   *
+   * For a quantity-tracked item it is the folded balance. For an instance-tracked one it is
+   * the number of units whose status is `available` — a borrowed senter is not stock you can
+   * take, and until this existed the list showed four when three were on the hook. A lost one
+   * counted too, which quietly overstated what the masjid owns (§23 says lost and retired
+   * leave the count entirely).
+   */
   qty: number;
   /**
-   * The same total, split by rack — keyed by `locationId`, with `''` for unplaced stock.
-   * A rack count reconciles one of these, never the total.
+   * How many we still OWN — everything except lost and retired. The asset-register answer to
+   * "berapa yang kita punya", as opposed to "berapa yang bisa saya ambil sekarang".
+   *
+   * Equal to `qty` for a quantity-tracked item, where the two questions have one answer.
+   */
+  ownedQty: number;
+  /**
+   * Split by rack — keyed by `locationId`, with `''` for unplaced stock. A rack count
+   * reconciles one of these, never the total.
+   *
+   * ⚠️ For an INSTANCE-tracked item these are the units KEPT on each shelf, so they sum to
+   * `ownedQty`, not to `qty`: a unit's status is a fact about the unit, and the log does not
+   * say which rack a borrowed one left from. Never sum this expecting the available figure.
    */
   byLocation: Record<string, number>;
   status: 'available' | 'low' | 'out'; outstanding: number;

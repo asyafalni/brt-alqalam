@@ -12,7 +12,7 @@ const row = (
     kind, unit: 'buah', trackBy: kind === 'equipment' ? 'instance' : 'quantity',
     minStock: 2, active: true,
   },
-  qty, byLocation, status, outstanding: 0, takenTotal: 0,
+  qty, ownedQty: qty, byLocation, status, outstanding: 0, takenTotal: 0,
 });
 
 const rack = (locationId: string, code: string): Location => ({

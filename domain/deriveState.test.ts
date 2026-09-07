@@ -255,3 +255,78 @@ describe('stock split across racks', () => {
     expect(s.byLocation).toEqual({ 'LOC-A1': 4, 'LOC-A3': 6, '': -2 });
   });
 });
+
+describe('a labelled item counts its units, not its opening quantity', () => {
+  // The bug this fixes: four senter, one borrowed, and the stock list still said four. An
+  // instance move carries `qtyDelta: 0`, so the quantity fold never touched it.
+  const senter = (): Item => ({
+    itemId: 'ITM-S', barcode: 'ALQ-ITM-S', name: 'Senter', categoryId: 'CAT-K',
+    kind: 'equipment', unit: 'buah', trackBy: 'instance', minStock: null, active: true,
+  });
+  const units = (n: number): AssetInstance[] => Array.from({ length: n }, (_, k) => ({
+    assetId: `ALQ-ITM-S-00${k + 1}`, itemId: 'ITM-S', label: `Senter #${k + 1}`,
+    acquiredTs: 0, active: true,
+  }));
+  const lines: StockLine[] = [{ itemId: 'ITM-S', locationId: 'LOC-A1', initialStock: 4 }];
+  let n = 0;
+  const move = (assetId: string, p: Partial<Txn> & Pick<Txn, 'type'>): Txn => {
+    n += 1;
+    return {
+      txnId: `T${n}`, clientTxnId: `C${n}`, ts: 1000 + n, assetId, qtyDelta: 0,
+      actorUserId: 'USR-1', ...p,
+    };
+  };
+
+  it('does not count a borrowed unit as stock somebody can take', () => {
+    const s = deriveState([senter()], units(4), [
+      move('ALQ-ITM-S-001', { type: 'peminjaman', recipient: 'Ronda malam' }),
+    ], 9999, lines);
+    expect(s.items['ITM-S'].qty).toBe(3);
+  });
+
+  it('still says we own it, because a borrowed thing is coming back', () => {
+    const s = deriveState([senter()], units(4), [
+      move('ALQ-ITM-S-001', { type: 'peminjaman' }),
+    ], 9999, lines);
+    expect(s.items['ITM-S'].ownedQty).toBe(4);
+  });
+
+  it('drops a lost unit out of both figures — it left the asset base entirely', () => {
+    const s = deriveState([senter()], units(4), [
+      move('ALQ-ITM-S-001', { type: 'peminjaman' }),
+      move('ALQ-ITM-S-001', { type: 'pengembalian', condition: 'hilang' }),
+    ], 9999, lines);
+    expect(s.items['ITM-S']).toMatchObject({ qty: 3, ownedQty: 3 });
+  });
+
+  it('keeps a broken unit as owned but not available — it is ours, it does not work', () => {
+    const s = deriveState([senter()], units(4), [
+      move('ALQ-ITM-S-002', { type: 'peminjaman' }),
+      move('ALQ-ITM-S-002', { type: 'pengembalian', condition: 'rusak' }),
+    ], 9999, lines);
+    expect(s.items['ITM-S']).toMatchObject({ qty: 3, ownedQty: 4 });
+  });
+
+  it('goes low when too many are out to meet the minimum', () => {
+    // Consistent with a consumable, where taking stock out is what triggers the alarm.
+    const item = { ...senter(), minStock: 2 };
+    const s = deriveState([item], units(4), [
+      move('ALQ-ITM-S-001', { type: 'peminjaman' }),
+      move('ALQ-ITM-S-002', { type: 'peminjaman' }),
+    ], 9999, lines);
+    expect(s.items['ITM-S'].status).toBe('low');
+  });
+
+  it('falls back to the shelved count when folded without any units', () => {
+    // A caller that does not build instances must not see every labelled item drop to zero.
+    const s = deriveState([senter()], [], [], 9999, lines);
+    expect(s.items['ITM-S']).toMatchObject({ qty: 4, ownedQty: 4 });
+  });
+
+  it('leaves a counted item alone — its two figures are one answer', () => {
+    const ember: Item = { ...senter(), itemId: 'ITM-E', trackBy: 'quantity', name: 'Ember' };
+    const s = deriveState([ember], [], [], 9999,
+      [{ itemId: 'ITM-E', locationId: 'LOC-A1', initialStock: 8 }]);
+    expect(s.items['ITM-E']).toMatchObject({ qty: 8, ownedQty: 8 });
+  });
+});

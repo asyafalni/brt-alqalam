@@ -67,8 +67,11 @@ export function Board(
      gudang; making them move with the chips would mean "50 jenis barang" and "9 total unit"
      sitting side by side, describing different populations. The filtered count belongs on the
      list header, where it says "3 baris". */
+  /* OWNED, not available. This tile answers §0's first problem — "nobody knows what we own" —
+     and a borrowed senter is still ours. The Stok column beside it answers the other question,
+     what can be picked up now, which is why the two numbers differ and both are right. */
   const totalUnits = useMemo(
-    () => items.reduce((n, i) => n + (derived.items[i.itemId]?.qty ?? 0), 0),
+    () => items.reduce((n, i) => n + (derived.items[i.itemId]?.ownedQty ?? 0), 0),
     [items, derived.items],
   );
   const negative = found.filter((d) => d.qty < 0);
@@ -180,6 +183,12 @@ export function Board(
         <span class="whitespace-nowrap">
           <span class="text-sm font-bold tabular-nums text-slate-900">{d.qty}</span>{' '}
           <span class="text-xs text-slate-400">{d.item.unit}</span>
+          {/* Only when they differ, which is only ever a labelled item with a unit out or
+              broken. "3 buah" alone would lose the fact that a fourth exists and is coming
+              back; "3 dari 4" every time would be the same number said twice. */}
+          {d.ownedQty > d.qty && (
+            <span class="block text-xs text-slate-400">dari {d.ownedQty}</span>
+          )}
         </span>
       ),
     },

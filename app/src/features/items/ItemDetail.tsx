@@ -225,6 +225,14 @@ export function ItemDetail(
                   {derived?.qty ?? 0}{' '}
                   <span class="text-base font-normal text-slate-400">{item.unit}</span>
                 </span>
+                {/* The headline is what can be picked up now. A labelled item with units out
+                    or broken owns more than that, and hiding the difference is what made the
+                    stock list say four senter while three were on the hook. */}
+                {derived && derived.ownedQty > derived.qty && (
+                  <span class="text-sm text-slate-500">
+                    tersedia · dari {derived.ownedQty} yang dimiliki
+                  </span>
+                )}
               </div>
               <p class={`${CODE} truncate`}>{item.barcode}</p>
             </div>
