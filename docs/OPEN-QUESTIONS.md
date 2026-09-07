@@ -29,6 +29,16 @@ design — it is **three things only a human can find out**, plus the build.
    keterangan, deleted `digunakan`) change things he wrote. Take him **one page of proposed
    deviations, each framed as "your goal, fewer steps"**, for batch approval.
 
+## Settled by running it, not by arguing about it
+
+- **The scanner works on a real phone** (2026-09-07, against https://brt-alqalam.fly.dev). Camera
+  opens over HTTPS, a QR decodes, the deep link resolves, and a movement is recorded. §15.4 had
+  flagged this as needing an explicit device test; it has now had one.
+- **The inferred keterangan survives contact with a person.** The same *Ambil* button logged a
+  `pemakaian` on a consumable and a `peminjaman` on a durable, with nobody choosing a word —
+  which is the whole bet of Part XVI decision 2, and the first time it has been taken by a human
+  rather than by a test.
+
 ## Blocked on research in flight
 - `docs/SMARTINV-REUSE-MAP.md` — being filled from the real cloned template.
 - `docs/OCTANE-FINDINGS.md` — how Octane actually works (it's 0.2.3; no `@octanejs/clerk` exists).

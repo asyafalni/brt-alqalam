@@ -1620,3 +1620,38 @@ created but its quantity missing — is a register that lies in a way nobody wou
 and the gateway is not deployed. Until it is, the honest version is putting the count where
 admins already look: the sidebar badge, a Beranda chip, and the request's own screen. Silently
 holding requests until somebody thinks to check would be worse than not having the screen.
+
+# Part XXIV — It ran on a phone (v1.14)
+
+Recorded 2026-09-07. The app is live at **https://brt-alqalam.fly.dev**, and for the first time
+somebody pointed a real camera at a real QR and the register moved.
+
+## 96. What that actually settled
+
+Three things stop being assumptions:
+
+- **The camera path works.** §15.4 flagged it as needing an explicit device test and it had never
+  had one — `getUserMedia` refuses to run outside a secure context, so until there was an HTTPS
+  address the scanner could not be tried at all. It opens, it decodes, the deep link resolves.
+- **The deep link is the right shape.** A QR shown on a laptop screen, scanned by a phone, landed
+  on that rack's panel. Hash routing (§66) did what it was chosen for: no rewrite rule to get
+  wrong, so no way to end up with a gudang full of stickers pointing at 404s.
+- **The inferred keterangan survives a person.** The same *Ambil* button recorded a `pemakaian` on
+  a consumable and a `peminjaman` on a durable, with nobody choosing a word. That is the whole bet
+  of Part XVI decision 2, and it had only ever been taken by a test.
+
+## 97. What it did NOT settle, and saying so is the point
+
+§57 warns about design iterating on itself. The corrective is not to overclaim the first contact
+with reality either:
+
+- **One person, who wrote the thing.** Not a marbot, in a gudang, in a hurry, with wet hands. The
+  speed budget (§58: ~10 seconds, ≤6 taps) is still unmeasured against anybody real.
+- **One device.** iOS Safari is the risky half of §15.4 and remains untested unless that phone was
+  an iPhone. The typed-code fallback exists precisely because this may still fail somewhere.
+- **One machine's data.** localStorage per device, no gateway — so a QR resolves only on a phone
+  that already loaded the catalog. Scanning from a second device shows "Katalog masih kosong",
+  which reads like a broken sticker and is not one. This is the sharpest reason Stages 1–3 exist.
+
+The register still cannot be shared. What is proven is that the path from a sticker to a recorded
+movement is real, which is the part nobody could argue their way to.

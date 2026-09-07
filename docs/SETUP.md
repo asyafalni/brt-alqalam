@@ -23,6 +23,11 @@ Everything below is about turning that into a shared, live system.
 
 ### ⚠️ Stage 0b — the camera needs HTTPS. Read this before testing on a phone.
 
+> ✅ **Settled 2026-09-07.** The app is live at **https://brt-alqalam.fly.dev**, and the whole
+> scan path was run on a real phone against it: the camera opened, a QR shown on a laptop screen
+> decoded, the deep link resolved, and both an *Ambil* and a *peminjaman* were recorded. This was
+> the last part of the design that had only ever run in tests.
+
 `npm run dev -- --host` prints a LAN address like `http://192.168.18.32:5173`. Every screen works
 there **except the scanner**: browsers refuse `getUserMedia` outside a *secure context*, so on
 plain `http://` over the LAN the camera will not open. The app detects this and says
@@ -164,7 +169,15 @@ one wall-mounted tablet in the gudang.
 
 ---
 
-## Stage 5 — Deploy, before you print a single label 🚀
+## Stage 5 — Deploy, before you print a single label 🚀 ✅ *(done)*
+
+> **Live at https://brt-alqalam.fly.dev** (Fly.io, `sin`). `Dockerfile` + `fly.toml` are in the
+> repo root — the build context must be the ROOT, since the UI compiles `domain/` and `data/`
+> into its bundle, and the build stage must be Debian, since Octane's native addon is glibc-only.
+> Redeploy with `fly deploy --remote-only`.
+>
+> Nothing below needs doing again; it is kept because it explains *why* the deploy looks the way
+> it does.
 
 The QR codes encode **deep links** — `https://<your-app>/#/scan?i=ITM-0001` — so the app must be
 online at a stable address *before* labels are printed. The label screen refuses to print against
@@ -222,7 +235,7 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 
 ## Checklist
 
-- [ ] **Stage 0** — run `cd app && npm run dev`, walk the gudang *(nothing to prepare)*
+- [x] **Stage 0** — run `cd app && npm run dev`, walk the gudang *(nothing to prepare)*
 - [ ] **Stage 1** — create the spreadsheet, import the four tabs from `sheets/`, **don't publish**
 - [ ] **Stage 1** — send me the spreadsheet ID
 - [ ] **Stage 2** — ⚠️ **check Clerk → Configure → JWT Templates** *(blocks the gateway)*
@@ -231,8 +244,11 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 - [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
 - [ ] **Stage 3** — deploy as *Execute as: Me* + *Who has access: Anyone*, send me the URL
 - [ ] **Stage 4** — decide which device is the kiosk, and where it physically lives
-- [ ] **Stage 5** — deploy to Vercel/Cloudflare (no rewrite rules needed — hash routing)
-- [ ] **Stage 5** — put the deployed address into "Alamat aplikasi" *before* printing labels
+- [x] **Stage 5** — deployed to **Fly.io**: https://brt-alqalam.fly.dev *(hash routing, so no
+      rewrite rules were needed)*
+- [x] **Stage 5** — "Alamat aplikasi" defaults to `location.origin`, so opening the label screen
+      **on the deployed site** already points every QR at the right place
+- [x] **Stage 0b** — scanner verified on a real phone over HTTPS
 - [ ] ~~Google Form~~ — **not now**, deliberately
 
 ## And three things that aren't configuration
