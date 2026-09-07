@@ -16,22 +16,35 @@ custom **HS256** token natively with `Utilities.computeHmacSha256Signature`.
 
 ## Files
 
+### Five go into Apps Script — four `.gs` and one manifest
+
 | | |
 | --- | --- |
 | `Code.gs` | `doGet`/`doPost` router, sessions, and the append endpoint |
 | `auth.gs` | PIN hashing, device verification, per-device lockout, Clerk HS256 verification |
-| `test/clerk.test.ts` | runs `auth.gs` against forged tokens — `npx vitest run` |
 | `sheets.gs` | reads the tabs, appends rows, and splits the public/detailed read tiers |
 | `setup.gs` | **run these from the editor** — one-time setup, enrol a device, set a PIN |
-| `appsscript.json` | the manifest, including the deployment access setting |
+| `appsscript.json` | the manifest — **not** a `.gs`, and easy to miss |
+
+`appsscript.json` is hidden until you turn it on: **Project Settings → tick "Show
+appsscript.json manifest file in editor"**. It is worth the extra click, because it carries
+`"access": "ANYONE_ANONYMOUS"` — the setting the deployment trap below is about.
+
+### These stay in the repo
+
+| | |
+| --- | --- |
+| `test/clerk.test.ts` | runs `auth.gs` against forged tokens — `cd gateway && npx vitest run` |
+| `package.json` | so that command works |
+| `README.md` | this file |
 
 ## Deploying — 15 minutes
 
 1. Open your spreadsheet → **Extensions → Apps Script**. A *bound* script reaches the sheet
    with no extra authorisation.
-2. Create the five files above and paste each one in. (Apps Script names them `.gs`; keep the
-   same names so the split stays readable.) In **Project Settings**, tick *"Show appsscript.json"*
-   and paste the manifest.
+2. Create the four `.gs` files above and paste each one in, keeping the same names so the split
+   stays readable. Then tick *"Show appsscript.json"* in **Project Settings** and paste the
+   manifest over what is there.
 3. **Run `setupGateway()`** once — toolbar dropdown → Run. It mints the PIN pepper. Approve the
    permission prompt.
 4. **Run `checkSpreadsheet()`** — it verifies every tab exists and that the `Transactions` header
