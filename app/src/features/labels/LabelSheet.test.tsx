@@ -35,8 +35,13 @@ const sheet = (items: Item[], locations: Location[] = [], stock: StockLine[] = l
   return render(Harness);
 };
 
-const setBaseUrl = (r: ReturnType<typeof render>, value: string) =>
+/* The address lives in a side sheet now — set once when the app gets a real URL, not chosen on
+   every visit — so setting it means opening that sheet. */
+const setBaseUrl = (r: ReturnType<typeof render>, value: string) => {
+  fireEvent.click(r.getByLabelText('Tujuan QR'));
   fireEvent.input(r.getByLabelText('Alamat aplikasi'), { target: { value } });
+  fireEvent.click(r.getByText('Selesai'));
+};
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
@@ -69,8 +74,12 @@ describe('LabelSheet', () => {
   it('refuses to print against a dev-server address', () => {
     // happy-dom's location.origin is http://localhost:3000 — exactly the trap.
     const r = sheet(catalog(input()));
-    expect(r.getByRole('alert')).toBeTruthy();
+    // The warning is on the icon that opens the sheet, beside Cetak — an unusable address is
+    // the one thing that stops printing, so it cannot be three cards away from the button.
     expect((r.getByText('Cetak') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(r.getByLabelText('Tujuan QR'));
+    expect(r.getByRole('alert')).toBeTruthy();
+    fireEvent.click(r.getByText('Selesai'));
 
     setBaseUrl(r, 'https://inventaris.example.com');
     expect(r.queryByRole('alert')).toBeNull();

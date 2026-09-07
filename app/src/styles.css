@@ -204,6 +204,38 @@ textarea:focus-visible {
 }
 .label--board .label-text { flex: 1 1 auto; min-width: 0; }
 
+/* A POSTER: the code gets the whole width and the name sits under it.
+   Only worth printing PORTRAIT. On a landscape board the QR is bounded by the height, so
+   handing it the width buys about 5mm; upright, the width is the limit and the code can be as
+   large as the paper allows — 182mm on a full A4, which scans from the far end of a gudang and
+   is legible as a sign at the same time. */
+.label--poster {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3mm;
+  text-align: center;
+}
+.label--poster .label-qr {
+  width: auto;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  aspect-ratio: 1;
+  align-self: center;
+}
+.label--poster .label-text { width: 100%; flex: 0 0 auto; }
+.label--poster .label-title {
+  -webkit-line-clamp: 2;
+  font-size: clamp(6mm, calc(var(--label-w) * 0.11), 26mm);
+  line-height: 1.05;
+}
+.label--poster .label-subtitle {
+  -webkit-line-clamp: 1;
+  font-size: clamp(4mm, calc(var(--label-w) * 0.05), 12mm);
+}
+.label--poster .label-code { font-size: clamp(3mm, calc(var(--label-w) * 0.035), 8mm); }
+
 /* Type scales with the sticker, because the sizes exist for different reading distances.
    A fixed 3mm name is right on a 37mm rack label, cramped on a 25mm tag, and absurd on a
    99×70mm shelf board. Clamped at both ends so the extremes stay sane. */

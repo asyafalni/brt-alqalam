@@ -19,7 +19,8 @@
 // proportional to the selection rather than to the size of the gudang.
 
 import { useEffect, useMemo, useRef, useState } from 'octane';
-import { Printer, QrCode, Search } from '@octanejs/lucide';
+import { Printer, QrCode, Search, Settings, TriangleAlert } from '@octanejs/lucide';
+import { Sheet } from '../../components/Sheet';
 import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import { Button, CARD, FIELD, LABEL } from '../../components/ui';
 import { qrSvg, qrViewBox } from './qr';
@@ -43,6 +44,7 @@ export function LabelSheet(
   { items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[] },
 ) {
   const [baseUrl, setBaseUrl] = useState(() => location.origin);
+  const [targetOpen, setTargetOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
 
@@ -285,29 +287,6 @@ export function LabelSheet(
             </div>
           </section>
 
-          {/* --- 3. Where the QR points -------------------------------------------------- */}
-          <section class={CARD}>
-            <Step n={3} title="Tujuan QR" />
-            <label class={LABEL} for="base-url">Alamat aplikasi</label>
-            <input
-              id="base-url"
-              class={FIELD}
-              value={baseUrl}
-              onInput={(e: Event) => setBaseUrl((e.target as HTMLInputElement).value)}
-            />
-            <p class="mt-1.5 text-xs text-slate-400">Alamat yang dibuka saat label dipindai.</p>
-            {/* A sticker outlives the laptop that printed it. Catching this here costs a
-                sentence; catching it later costs reprinting every label in the gudang. */}
-            {risky && (
-              <p
-                role="alert"
-                class="mt-3 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2.5 text-sm font-medium text-red-700"
-              >
-                Alamat ini hanya hidup di komputer ini. Label yang dicetak sekarang tidak akan
-                bisa dibuka dari HP lain — isi dulu alamat aplikasi yang sudah online.
-              </p>
-            )}
-          </section>
         </div>
 
         {/* --- Preview ------------------------------------------------------------------- */}
@@ -321,7 +300,23 @@ export function LabelSheet(
               <span class="font-bold text-slate-900 tabular-nums">{sheetCount(chosen.length, format)}</span> lembar A4
               <span class="text-slate-400"> · {format.name}</span>
             </p>
-            <span class="ml-auto">
+            <span class="ml-auto flex items-center gap-2">
+              {/* The QR's destination is set once, when the app gets a real address, and then
+                  never again — so it lived as a third step in a column of things chosen on
+                  every visit. It is an icon here instead, next to the button it guards: an
+                  unusable address is the one thing that stops printing, so the warning has to
+                  be beside Cetak rather than three cards away from it. */}
+              <button
+                type="button"
+                class={`flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border ${risky
+                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'border-slate-400 bg-white text-slate-600 hover:bg-slate-100'}`}
+                aria-label="Tujuan QR"
+                title="Tujuan QR"
+                onClick={() => setTargetOpen(true)}
+              >
+                {risky ? <TriangleAlert class="h-5 w-5" /> : <Settings class="h-5 w-5" />}
+              </button>
               {/* Printing mid-build would send half-drawn sheets to a printer, which costs
                   paper and stickers rather than just a retry. */}
               <Button
@@ -392,6 +387,40 @@ export function LabelSheet(
         </div>
       </div>
 
+      <Sheet
+        open={targetOpen}
+        title="Tujuan QR"
+        description="Alamat yang dibuka saat label dipindai."
+        onClose={() => setTargetOpen(false)}
+      >
+        <label class={LABEL} for="base-url">Alamat aplikasi</label>
+        <input
+          id="base-url"
+          class={`${FIELD} min-h-touch`}
+          value={baseUrl}
+          autocomplete="off"
+          onInput={(e: Event) => setBaseUrl((e.target as HTMLInputElement).value)}
+        />
+        <p class="mt-1.5 text-xs text-slate-400">
+          Setiap QR berisi alamat ini. Diisi sekali, saat aplikasinya sudah punya alamat tetap.
+        </p>
+
+        {/* A sticker outlives the laptop that printed it. Catching this here costs a sentence;
+            catching it later costs reprinting every label in the gudang. */}
+        {risky && (
+          <p
+            role="alert"
+            class="mt-4 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2.5 text-sm font-medium text-red-700"
+          >
+            Alamat ini hanya hidup di komputer ini. Label yang dicetak sekarang tidak akan bisa
+            dibuka dari HP lain — isi dulu alamat aplikasi yang sudah online.
+          </p>
+        )}
+
+        <div class="mt-5">
+          <Button size="touch" onClick={() => setTargetOpen(false)}>Selesai</Button>
+        </div>
+      </Sheet>
     </div>
   );
 }

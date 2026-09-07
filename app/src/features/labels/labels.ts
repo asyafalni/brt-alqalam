@@ -146,7 +146,7 @@ export function groupLabels(
 
 // --- Sheet formats ------------------------------------------------------------------------
 
-export type LabelLayout = 'row' | 'stack' | 'board';
+export type LabelLayout = 'row' | 'stack' | 'board' | 'poster';
 
 /** Sticker sheet geometry. Sizes are the common A4 label formats sold locally. */
 export interface SheetFormat {
@@ -196,6 +196,24 @@ export const SHEET_FORMATS: SheetFormat[] = [
     name: 'Rak jumbo',
     purpose: 'Papan rak besar — terbaca dari ujung gudang.',
     columns: 2, rows: 4, width: 99, height: 70, layout: 'board',
+  },
+  /* The two below are PORTRAIT, and that is the whole reason they exist. On a 99×70 landscape
+     board the QR is bounded by the HEIGHT — giving it the full width would take it from 57mm
+     to about 62mm, which is not a size worth a second entry. Turn the label upright and the
+     width becomes the limit instead, and the code can be as large as the paper allows. */
+  {
+    id: 'papan4',
+    name: 'Papan rak ¼ A4',
+    purpose: 'Empat per lembar — QR besar untuk tiap rak, hemat kertas.',
+    columns: 2, rows: 2, width: 95, height: 135, layout: 'poster',
+  },
+  {
+    // The biggest worth printing. A whole A4 per rack was tried and is too much paper for one
+    // shelf — the code was already unmistakable at half that.
+    id: 'papan',
+    name: 'Papan zona A5',
+    purpose: 'Setengah A4 — dipindai dan dibaca dari seberang gudang.',
+    columns: 1, rows: 2, width: 190, height: 135, layout: 'poster',
   },
 ];
 
