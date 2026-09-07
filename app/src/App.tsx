@@ -203,6 +203,7 @@ export function App() {
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onRequest={(type, assetId) => navigate({ name: 'pengajuan', type, assetId })}
+              onOpenCounted={() => navigate({ name: 'board', kind: 'barang-tetap' })}
             />
           )}
           {route.name === 'pengajuan' && (

@@ -13,6 +13,7 @@ const NOW = Date.now();
 
 const opened = vi.fn();
 const requested = vi.fn();
+const counted = vi.fn();
 
 // The draft is owned above the screen (App), so the test supplies it the same way.
 function Harness() {
@@ -24,6 +25,7 @@ function Harness() {
       search=""
       onOpenItem={opened}
       onRequest={requested}
+      onOpenCounted={counted}
     />
   );
 }
@@ -225,5 +227,29 @@ describe('the next step attached to each problem', () => {
     // ALQ-ITM-0001-001 is the one on loan.
     expect(labels.some((l) => l?.endsWith('Pisau potong #1'))).toBe(false);
     expect(labels.some((l) => l?.endsWith('Pisau potong #2'))).toBe(true);
+  });
+});
+
+describe('the barang tetap that are NOT here', () => {
+  // "Bedanya barang tetap sama aset apa?" — every aset is a barang tetap, but a durable we
+  // chose to count rather than label has no per-unit status, so it cannot appear on this
+  // screen. Without saying so, the page silently omits real, owned things.
+  it('says how many durables are counted rather than labelled, and where they are', () => {
+    seed(catalog(
+      input({ name: 'Pisau potong', initialStock: 3 }),
+      input({ name: 'Ember besar', initialStock: 8, trackBy: 'quantity' }),
+      input({ name: 'Terpal 4x6', initialStock: 2, trackBy: 'quantity' }),
+    ), []);
+    const r = render(Harness);
+
+    expect(r.getByText(/2 barang tetap lainnya/)).toBeTruthy();
+    fireEvent.click(r.getByText('Lihat di Stok'));
+    expect(counted).toHaveBeenCalled();
+  });
+
+  it('says nothing when every durable is labelled', () => {
+    // A permanent note explaining an empty set is furniture.
+    seed(ITEMS(), []);
+    expect(render(Harness).queryByText(/barang tetap lainnya/)).toBeNull();
   });
 });

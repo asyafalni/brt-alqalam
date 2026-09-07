@@ -1,5 +1,12 @@
 // Aset — the three questions a durable can raise, each with a different answer.
 //
+// WHAT IS ON THIS SCREEN, precisely: barang tetap that are labelled ONE BY ONE. Not every
+// barang tetap is. `kind` says whether a thing gets used up; `trackBy` says whether we label
+// each unit, and they are separate on purpose (Part XI) — labelling 200 blades is an
+// operational project, so a durable can be counted instead. A counted durable has no
+// individual units to have a status, so it cannot appear here, and the note below says so
+// rather than leaving somebody to wonder where their terpal went.
+//
 // Design doc §24 asks for exactly this split, and it is the reason rusak and hilang were never
 // allowed to share a colour (Part IV):
 //
@@ -41,9 +48,11 @@ const TABLE_SHAPE_ACTION =
   `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, search, onOpenItem, onRequest }:
+  { draft, inventory, search, onOpenItem, onRequest, onOpenCounted }:
   {
     draft: Draft; inventory: Inventory; search: string; onOpenItem: (id: string) => void;
+    /** To the stock list, narrowed to barang tetap — where the counted ones actually live. */
+    onOpenCounted: () => void;
     /**
      * The bridge from "this is broken" to somebody doing something about it.
      *
@@ -74,6 +83,12 @@ export function AssetBoard(
     }
     return undefined;
   };
+
+  /** Durables we deliberately do not label per unit — real, owned, and not on this screen. */
+  const counted = useMemo(
+    () => draft.items.filter((i) => i.kind === 'equipment' && i.trackBy === 'quantity').length,
+    [draft.items],
+  );
 
   const groups = useMemo(() => ({
     out: all.filter((d) => d.status === 'out' && matches(d)),
@@ -116,6 +131,23 @@ export function AssetBoard(
         title="Aset"
         subtitle="Barang tetap yang dilabeli satu per satu — siapa pegang, mana yang rusak, mana yang hilang."
       />
+
+      {/* The answer to "kenapa terpal saya tidak ada di sini?", stated where the question is
+          asked. Only shown when there is something to explain. */}
+      {counted > 0 && (
+        <p class="text-sm leading-relaxed text-slate-500">
+          {counted} barang tetap lainnya dicatat dengan cara{' '}
+          <span class="font-semibold text-slate-700">hitung jumlahnya</span>, bukan dilabeli satu
+          per satu, jadi tidak punya status per unit dan tidak muncul di sini.{' '}
+          <button
+            type="button"
+            class="font-semibold text-slate-700 underline hover:text-slate-900"
+            onClick={onOpenCounted}
+          >
+            Lihat di Stok
+          </button>
+        </p>
+      )}
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat value={activeBase} label="Masih dimiliki" />
