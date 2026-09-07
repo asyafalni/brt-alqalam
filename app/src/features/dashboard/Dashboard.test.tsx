@@ -55,7 +55,7 @@ describe('Beranda surfaces what needs a person', () => {
     const r = render(App);
 
     expect(r.queryByText('Semua aman.')).toBeNull();
-    expect(r.getByText('1 rusak')).toBeTruthy();
+    expect(r.getByRole('button', { name: '1 rusak' })).toBeTruthy();
   });
 
   it('counts a lost asset too, and keeps it distinct from a broken one', () => {
@@ -63,8 +63,8 @@ describe('Beranda surfaces what needs a person', () => {
     seed(items, txns);
     const r = render(App);
 
-    expect(r.getByText('1 hilang')).toBeTruthy();
-    expect(r.queryByText('1 rusak')).toBeNull();
+    expect(r.getByRole('button', { name: '1 hilang' })).toBeTruthy();
+    expect(r.queryByRole('button', { name: '1 rusak' })).toBeNull();
   });
 
   it('a chip goes straight to the screen that fixes it', () => {
@@ -73,7 +73,7 @@ describe('Beranda surfaces what needs a person', () => {
     const r = render(App);
 
     const chips = r.getByRole('group', { name: 'Perlu diurus' });
-    fireEvent.click(within(chips).getByText('1 rusak'));
+    fireEvent.click(within(chips).getByRole('button', { name: '1 rusak' }));
     expect(location.hash).toBe('#/aset');
     expect(r.getByRole('heading', { name: 'Aset' })).toBeTruthy();
   });
@@ -92,7 +92,7 @@ describe('Beranda surfaces what needs a person', () => {
     const r = render(App);
 
     const chips = r.getByRole('group', { name: 'Perlu diurus' });
-    expect(within(chips).getByText('1 stok minus')).toBeTruthy();
+    expect(within(chips).getByRole('button', { name: '1 stok minus' })).toBeTruthy();
     expect(r.getByText('1 barang tercatat minus.')).toBeTruthy();
     expect(r.getByText(/Hitung ulang raknya/)).toBeTruthy();
   });

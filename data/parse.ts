@@ -226,6 +226,9 @@ export const buildItem = (r: Record<string, string>): Item => {
       ...(r['locationid'] ? { locationId: r['locationid'] } : {}),
       // The spec's per-row KETERANGAN on MENU STOK. Optional, and validated when present.
       ...(r['keterangan'] ? { keterangan: oneOf<MovementType>(r, 'keterangan', MOVEMENTS) } : {}),
+      // Not validated against a list here: the drawings are the app's, not the domain's, and
+      // the app already falls back when it does not recognise one.
+      ...(r['artid'] ? { artId: r['artid'] } : {}),
     };
 };
 

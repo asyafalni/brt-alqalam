@@ -7,10 +7,11 @@
 // a real table on a desk and stacks the same rows as cards below `sm`, actions included.
 
 import { useMemo, useState } from 'octane';
-import { Package, Pencil, Trash2 } from '@octanejs/lucide';
+import { Download, Package, Pencil, Trash2 } from '@octanejs/lucide';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
+import { Sheet } from '../../components/Sheet';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import {
@@ -35,6 +36,7 @@ export function StockTake(
   const [showProblems, setShowProblems] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const problems = useMemo(
     () => validate(input, items, editingId ?? undefined),
@@ -240,14 +242,27 @@ export function StockTake(
               </Button>
             </div>
           ) : (
-            <Button
-              variant="secondary"
-              class="min-h-[44px]"
-              disabled={items.length === 0}
-              onClick={() => setConfirmReset(true)}
-            >
-              Kosongkan
-            </Button>
+            <div class="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                class="min-h-[44px]"
+                disabled={items.length === 0}
+                onClick={() => setExporting(true)}
+              >
+                <Download class="h-4 w-4" />
+                <span class="hidden sm:inline">Ekspor</span>
+              </Button>
+              <Button
+                variant="secondary"
+                class="min-h-[44px]"
+                disabled={items.length === 0}
+                aria-label="Kosongkan semua barang"
+                onClick={() => setConfirmReset(true)}
+              >
+                <Trash2 class="h-4 w-4" />
+                <span class="hidden sm:inline">Kosongkan</span>
+              </Button>
+            </div>
           )
         }
       />
@@ -276,7 +291,14 @@ export function StockTake(
         />
       </div>
 
-      <ExportPanel items={items} categories={categories} locations={locations} labelCount={labelCount} />
+      <Sheet
+        open={exporting}
+        title="Ekspor ke Google Sheet"
+        description="Satu berkas per tab. Impor lewat File → Import → Upload."
+        onClose={() => setExporting(false)}
+      >
+        <ExportPanel items={items} categories={categories} locations={locations} labelCount={labelCount} />
+      </Sheet>
 
       <div class={CARD_FLUSH}>
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
@@ -356,11 +378,7 @@ function ExportPanel(
   }
 
   return (
-    <div class={CARD}>
-      <h2 class="font-bold text-slate-900">Ekspor ke Google Sheet</h2>
-      <p class="mb-4 text-sm text-slate-500">
-        Satu berkas per tab. Impor lewat <strong>File → Import → Upload</strong>.
-      </p>
+    <div>
       <ul class="space-y-2">
         {files.map((f) => (
           <li key={f.tab} class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
@@ -372,6 +390,10 @@ function ExportPanel(
           </li>
         ))}
       </ul>
+      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        Diunduh satu per satu, bukan sekaligus — browser memblokir beberapa unduhan yang
+        dipicu dari satu ketukan, dan memblokirnya tanpa pemberitahuan.
+      </p>
     </div>
   );
 }

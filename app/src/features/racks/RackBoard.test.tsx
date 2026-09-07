@@ -143,3 +143,96 @@ describe('RackBoard — a map of the room', () => {
     expect(r.getByText(/dicek hari ini/)).toBeTruthy();
   });
 });
+
+// --- Rack CRUD ------------------------------------------------------------------------------
+//
+// Before this existed, a rack could only be created — inline, inside the item form — and never
+// renamed, moved or retired. That mattered more than an ordinary missing screen, because a rack
+// code is printed onto a sticker: a typo was permanent, and the label and the app disagreed
+// forever.
+
+describe('RackBoard — mengelola rak', () => {
+  const openRack = (r: ReturnType<typeof render>, code: string) =>
+    fireEvent.click(r.getByRole('button', { name: new RegExp(`^Rak ${code}`) }));
+
+  it('creates a rack from the map, where somebody looking at racks already is', () => {
+    seed([], []);
+    const r = render(Harness);
+
+    fireEvent.click(r.getAllByText('Rak baru')[0]);
+    type(r.getByLabelText('Kode rak'), 'C7');
+    type(r.getByLabelText('Zona'), 'Gudang PHBI');
+    fireEvent.click(r.getByText('Simpan'));
+
+    const saved = stored().locations;
+    expect(saved).toHaveLength(1);
+    expect(saved[0].code).toBe('C7');
+    expect(saved[0].zone).toBe('Gudang PHBI');
+  });
+
+  it('corrects a typo without changing the id the printed QR encodes', () => {
+    seed([], [B3]);
+    const r = render(Harness);
+
+    openRack(r, 'B3');
+    fireEvent.click(r.getByLabelText('Ubah rak B3'));
+    type(r.getByLabelText('Kode rak'), 'B-3');
+    fireEvent.click(r.getByText('Simpan'));
+
+    const [saved] = stored().locations;
+    expect(saved.code).toBe('B-3');
+    // The load-bearing assertion of this whole feature.
+    expect(saved.locationId).toBe(B3.locationId);
+  });
+
+  it('refuses to retire a rack that still holds things, and names them', () => {
+    seed(catalog(input({ name: 'Sabun', locationId: B3.locationId })), [B3]);
+    const r = render(Harness);
+
+    openRack(r, 'B3');
+    fireEvent.click(r.getByText(/Arsipkan atau hapus rak ini/));
+
+    expect(r.getByText(/Masih ada 1 barang di sini \(Sabun\)/)).toBeTruthy();
+    expect(r.queryByText('Arsipkan')).toBeNull();
+  });
+
+  it('archives an empty rack, and keeps a way back', () => {
+    seed([], [B3]);
+    const r = render(Harness);
+
+    openRack(r, 'B3');
+    fireEvent.click(r.getByText(/Arsipkan atau hapus rak ini/));
+    fireEvent.click(r.getByText('Arsipkan'));
+
+    expect(stored().locations[0].active).toBe(false);
+    // Off the map, but not gone — archiving must never be a one-way door.
+    expect(r.queryByRole('button', { name: /^Rak B3/ })).toBeNull();
+
+    fireEvent.click(r.getByText('Rak diarsipkan'));
+    fireEvent.click(r.getByText(/Aktifkan lagi/));
+    expect(stored().locations[0].active).toBe(true);
+  });
+
+  it('offers a permanent delete only for a rack that never became real', () => {
+    seed([], [B3]);
+    const r = render(Harness);
+
+    openRack(r, 'B3');
+    fireEvent.click(r.getByText(/Arsipkan atau hapus rak ini/));
+    fireEvent.click(r.getByText(/Hapus permanen/));
+    expect(stored().locations).toEqual([]);
+  });
+
+  it('will not permanently delete a rack that has ever been counted', () => {
+    // Deleting it would rewrite a walk somebody actually did; archiving keeps that honest.
+    seed([], [{ ...B3, lastCountedTs: NOW - DAY_MS }]);
+    const r = render(Harness);
+
+    openRack(r, 'B3');
+    fireEvent.click(r.getByText(/Arsipkan atau hapus rak ini/));
+
+    expect(r.getByText('Arsipkan')).toBeTruthy();
+    expect(r.queryByText(/Hapus permanen/)).toBeNull();
+    expect(r.getByText(/pernah dicek/)).toBeTruthy();
+  });
+});

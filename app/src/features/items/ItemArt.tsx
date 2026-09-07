@@ -359,10 +359,21 @@ const BY_CATEGORY: [RegExp, ArtId][] = [
   [/phbi|qurban|dapur|masak/i, 'pisau'],
 ];
 
+/** Every drawing, in the order the picker shows them. */
+export const ART_IDS = Object.keys(SHAPES) as ArtId[];
+
+export const isArtId = (v: string | undefined): v is ArtId =>
+  v != null && Object.prototype.hasOwnProperty.call(SHAPES, v);
+
 export function artFor(
-  item: Pick<Item, 'name' | 'unit' | 'kind'>,
+  item: Pick<Item, 'name' | 'unit' | 'kind'> & { artId?: string },
   categoryName = '',
 ): ArtId {
+  // A person's explicit choice outranks every guess below it. Unrecognised values fall
+  // through rather than throwing: a sheet naming a drawing we have since renamed should
+  // degrade to the guess, not break the row.
+  if (isArtId(item.artId)) return item.artId;
+
   const unit = item.unit.trim().toLowerCase();
 
   const strong = BY_UNIT_STRONG[unit];

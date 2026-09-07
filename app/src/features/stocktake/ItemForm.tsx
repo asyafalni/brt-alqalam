@@ -3,6 +3,7 @@ import type { Category, Location } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
 import { CARD, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
+import { ART_IDS, artFor, ItemArt } from '../items/ItemArt';
 
 
 interface Props {
@@ -25,6 +26,14 @@ export function ItemForm(p: Props) {
   // some browsers suppress outright — the opposite of the 56px targets everything else uses.
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [newRack, setNewRack] = useState<{ code: string; zone: string } | null>(null);
+  const [pickingArt, setPickingArt] = useState(false);
+
+  // What this item will be drawn as right now — the override if one was chosen, otherwise the
+  // guess, recomputed as the operator types.
+  const art = artFor(
+    { name: p.input.name, unit: p.input.unit, kind: p.input.kind, artId: p.input.artId },
+    p.categories.find((c) => c.categoryId === p.input.categoryId)?.name ?? '',
+  );
 
   const problemFor = (field: keyof DraftInput) =>
     p.showProblems ? p.problems.find((x) => x.field === field) : undefined;
@@ -54,17 +63,72 @@ export function ItemForm(p: Props) {
 
       <div class="mb-4">
         <label class={LABEL} for="nama">Nama barang</label>
-        <input
-          id="nama"
-          ref={nameRef}
-          class={FIELD}
-          value={p.input.name}
-          placeholder="Sabun cuci tangan"
-          autocomplete="off"
-          /* Octane uses NATIVE events: onChange fires on blur. Text must use onInput. */
-          onInput={(e: Event) => p.onChange('name', (e.target as HTMLInputElement).value)}
-        />
-        <Problem problem={problemFor('name')} />
+        <div class="flex items-start gap-3">
+          {/* The drawing is CHOSEN FOR YOU, from the name, the unit and the category — no
+              field to fill in, which is the point (§0.0: does this remove work, or add it?).
+              It is shown here so the guess is visible before saving rather than discovered on
+              a list later, and it can be overridden for the times the guess is wrong. */}
+          <button
+            type="button"
+            class="mt-0.5 flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border border-slate-400 bg-white hover:border-slate-900"
+            aria-label={`Gambar barang: ${art}. Ketuk untuk ganti.`}
+            aria-expanded={pickingArt}
+            onClick={() => setPickingArt(!pickingArt)}
+          >
+            <ItemArt art={art} size={40} />
+          </button>
+          <div class="min-w-0 flex-1">
+            <input
+              id="nama"
+              ref={nameRef}
+              class={FIELD}
+              value={p.input.name}
+              placeholder="Sabun cuci tangan"
+              autocomplete="off"
+              /* Octane uses NATIVE events: onChange fires on blur. Text must use onInput. */
+              onInput={(e: Event) => p.onChange('name', (e.target as HTMLInputElement).value)}
+            />
+            <Problem problem={problemFor('name')} />
+          </div>
+        </div>
+
+        {pickingArt && (
+          <div class="mt-3 rounded-lg border border-slate-400 bg-slate-50/60 p-3">
+            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-900">Pilih gambar</p>
+              {p.input.artId && (
+                <button
+                  type="button"
+                  class="text-xs font-semibold text-slate-600 underline"
+                  onClick={() => { p.onChange('artId', undefined); setPickingArt(false); }}
+                >
+                  Kembali ke otomatis
+                </button>
+              )}
+            </div>
+            <div class="grid grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-2">
+              {ART_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-label={id}
+                  aria-pressed={p.input.artId === id}
+                  class={`flex aspect-square items-center justify-center rounded-lg border-2 bg-white ${
+                    p.input.artId === id ? 'border-slate-900' : 'border-slate-200 hover:border-slate-400'
+                  }`}
+                  onClick={() => { p.onChange('artId', id); setPickingArt(false); }}
+                >
+                  <ItemArt art={id} size={34} />
+                </button>
+              ))}
+            </div>
+            <p class="mt-2 text-xs text-slate-500">
+              {p.input.artId
+                ? 'Dipilih sendiri. Tidak akan berubah walaupun nama atau satuannya diubah.'
+                : 'Sekarang otomatis — ikut nama, satuan dan kategori barang.'}
+            </p>
+          </div>
+        )}
       </div>
 
       <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

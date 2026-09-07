@@ -22,7 +22,8 @@ type R = ReturnType<typeof render>;
 // (components/DataTable.tsx), so the Aksi column can no longer fall off the right edge of a
 // phone. Row queries therefore name the shape they mean; `phone` is the one a marbot sees.
 const desk = (r: R) => within(r.container.querySelector('table')!);
-// Not just any <ul> — the export panel renders one first.
+// Not just any <ul>: the form's kind toggle and the phone list are both lists, so the class
+// that only the phone list carries is what picks it out.
 const phone = (r: R) => within(r.container.querySelector('ul[class~="sm:hidden"]')!);
 
 function addItem(r: R, name: string, qty: string) {
@@ -242,12 +243,17 @@ describe('export', () => {
   it('offers one file per sheet tab, and only lists instances when there are any', () => {
     const r = render(Harness);
     addItem(r, 'Sabun', '5');
+    // Export is an occasional errand, so it lives in a panel rather than at the foot of the
+    // page somebody scrolls past on every visit.
+    fireEvent.click(r.getByText('Ekspor'));
     expect(r.getByText('Items')).toBeTruthy();
     expect(r.getByText('Categories')).toBeTruthy();
     expect(r.queryByText('AssetInstances')).toBeNull();
 
+    fireEvent.click(r.getByLabelText('Tutup'));
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '2');
+    fireEvent.click(r.getByText('Ekspor'));
     expect(r.getByText('AssetInstances')).toBeTruthy();
     expect(r.getByText(/2 baris · unit yang dilabeli/)).toBeTruthy();
   });
@@ -258,5 +264,50 @@ describe('export', () => {
     const parsed = parseItems(toItemsCsv(stored().items));
     expect(parsed.quarantined).toEqual([]);
     expect(parsed.ok[0]).toMatchObject({ name: 'Sabun', initialStock: 12, kind: 'consumable' });
+  });
+});
+
+// --- The item drawing -----------------------------------------------------------------------
+//
+// It is chosen automatically, from the name, unit and category. The picker exists only for the
+// times the guess is wrong — adding a required "pick an icon" step to every item would fail the
+// design doc's own test (§0.0: does this remove work from people, or add it?).
+
+describe('gambar barang', () => {
+  it('is guessed as you type, with no field to fill in', () => {
+    const r = render(Harness);
+    type(r.getByLabelText('Nama barang'), 'Pisau potong');
+    expect(r.getByLabelText(/Gambar barang: pisau/)).toBeTruthy();
+  });
+
+  it('can be overridden when the guess is wrong, and the choice sticks', () => {
+    const r = render(Harness);
+    type(r.getByLabelText('Nama barang'), 'Sabun cuci tangan');
+
+    fireEvent.click(r.getByLabelText(/Gambar barang/));
+    fireEvent.click(r.getByLabelText('kantong'));
+    expect(r.getByLabelText(/Gambar barang: kantong/)).toBeTruthy();
+
+    type(r.getByLabelText('Jumlah dihitung'), '3');
+    fireEvent.click(r.getByText('Tambah barang'));
+    expect(stored().items[0].artId).toBe('kantong');
+  });
+
+  it('an item left on automatic stores nothing, so the guess can improve later', () => {
+    const r = render(Harness);
+    addItem(r, 'Sabun cuci tangan', '3');
+    expect(stored().items[0].artId).toBeUndefined();
+  });
+
+  it('can be handed back to the guess', () => {
+    const r = render(Harness);
+    type(r.getByLabelText('Nama barang'), 'Pisau potong');
+    fireEvent.click(r.getByLabelText(/Gambar barang/));
+    fireEvent.click(r.getByLabelText('lampu'));
+    expect(r.getByLabelText(/Gambar barang: lampu/)).toBeTruthy();
+
+    fireEvent.click(r.getByLabelText(/Gambar barang/));
+    fireEvent.click(r.getByText('Kembali ke otomatis'));
+    expect(r.getByLabelText(/Gambar barang: pisau/)).toBeTruthy();
   });
 });

@@ -1319,3 +1319,73 @@ so seven of thirty-two tab stops on the rack board had no visible focus at all. 
 
 Still open from that audit: the closed mobile drawer keeps 8 controls in the tab order
 off-screen, and it is not a real dialog (no focus trap, no Escape, no scroll lock).
+
+# Part XIX — Rack CRUD, the masjid's mark, and per-item pictures (v1.9)
+
+## 78. Racks were create-only, and the code goes on a sticker
+
+A rack could be created — inline, inside the item form — and never renamed, moved or retired.
+That is worse than an ordinary missing screen, because the rack **code is printed onto a QR
+sticker**: a typo was permanent, and the label and the app disagreed forever.
+
+Full CRUD now lives on **Peta Rak**, where somebody looking at racks already is. The rule that
+shapes all of it: **`locationId` is immutable, and every edit preserves it.** It is what the QR
+encodes, so it is not a database key that can be regenerated from a corrected `code` — it is
+glued to a shelf. The happy consequence is stated in the UI rather than left to be feared:
+*"Mengubah kode tidak merusak stiker QR yang sudah dicetak."*
+
+Removal has **two verbs**, because they are different acts:
+- **Arsipkan** — `active: false`. The honest answer almost every time: a dismantled shelf still
+  appears in months of history and on labels that may still be stuck to things. Blocked while
+  the rack holds items, and the block **names them** ("Masih ada 3 barang di sini (Sabun, …)"),
+  because telling somebody they are stuck is not the same as telling them what to move.
+- **Hapus permanen** — only for a rack that never became real: nothing on it, never counted.
+  The "typed it twice" case. Refusing to clean that up leaves permanent litter on the map.
+
+Archived racks leave the board (`rollupLocations` filters on `active`) and are listed in a
+collapsible **Rak diarsipkan** section with one-tap restore — an archive with no way back is a
+trap, not an archive.
+
+## 79. The mark is the masjid's, redrawn from geometry
+
+The sidebar carried a stock warehouse glyph. It now carries the Masjid Al-Qalam logo, rebuilt as
+vector: the star's ten points are computed on a circle rather than traced, and every element is
+placed by measuring the original and normalising its bounding box into a 100×100 box. Placement
+was verified with `getBBox` against those measurements rather than by eye — two rounds of
+eyeballing had produced a word that ran off its arc and wrapped down the sides of the star.
+
+Two things in it look like mistakes and are not: the **book overhangs** onto the green lower
+arms (below the inner vertices the white field closes fast, and a book drawn to fit inside would
+be a third of the width), and the **quill breaks the outline** at the upper left (there is no
+room inside). An earlier pass "fixed" both, and the mark stopped looking like the masjid's.
+
+## 80. Item pictures: automatic, with an override
+
+The drawings resolve from unit → name → packaging → category → kind, and that stays the default
+because **choosing an icon for every item is exactly the kind of per-transaction decision §0.0
+says to remove**. But a guess that cannot be corrected is a guess the operator has to live with,
+so `Item.artId` is now an optional override, shown as a live preview beside the name field.
+
+`artId` is a **plain string in `domain/`**, deliberately: the set of drawings is a fact about the
+UI, and a domain that knows the name of a picture has to change when somebody adds one. The app
+validates it against the drawings it actually has and falls back to the guess when it does not
+recognise the value, so a sheet naming a retired drawing degrades instead of breaking. New
+optional column `artId` on the Items tab; blank means "keep guessing", so the guess can improve
+later for every item that never overrode it.
+
+## 81. A real dialog, at last — and the stacking bug under it
+
+Export moved off the foot of the stock-take page into a right-hand **`Sheet`**, reached by an
+icon action beside Kosongkan. Occasional errands should not cost a scroll on every visit.
+
+`Sheet` is written as a **real dialog**, and everything the accessibility audit (§77) found
+missing in the existing mobile drawer is done here: focus moves in on open and returns to the
+opener on close, Tab cycles inside, Escape and the backdrop dismiss, the page behind cannot
+scroll, and it is unmounted when closed so its controls leave the tab order entirely. Written
+once so the next panel inherits it — including the drawer, when that is fixed.
+
+Building it surfaced a bug worth recording: **`main` carried `relative z-10`**, ported from
+SmartInv where it sat above two decorative blur blobs we deliberately did not port. That
+leftover z-index made `main` a stacking context, which trapped every `position: fixed` overlay
+rendered inside it *below* the z-40 navbar, however high its own z-index went. `relative` alone
+creates no stacking context; the index is gone.

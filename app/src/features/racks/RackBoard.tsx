@@ -9,15 +9,19 @@
 // since orange already means `rusak`.
 
 import { useMemo, useState } from 'octane';
-import { ClipboardCheck, MapPin, Package } from '@octanejs/lucide';
+import { Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2 } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState, racksToCount } from '../../../../domain/cycleCount';
 import type { Category, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
-import { Button, CARD, CODE, PageHeader, Stat } from '../../components/ui';
-import { applyCount, markCounted } from '../stocktake/draft';
+import { Button, CARD, CODE, FIELD, LABEL, PageHeader, Stat } from '../../components/ui';
+import {
+  applyCount, archiveLocation, blocksArchive, blocksDelete, createLocation, deleteLocation,
+  editLocation, markCounted, restoreLocation,
+} from '../stocktake/draft';
+import type { LocationEdit, RemovalBlock } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { CountSheet } from './CountSheet';
@@ -41,15 +45,31 @@ export function RackBoard(
   { draft, inventory, search, now, onOpenItem }:
   { draft: Draft; inventory: Inventory; search: string; now: number; onOpenItem: (id: string) => void },
 ) {
-  const { items, categories, locations } = draft;
+  const { items, categories, locations, setLocations } = draft;
   const [selected, setSelected] = useState<string | null>(null);
   const [counting, setCounting] = useState<string | null>(null);
+  /** `'new'` while adding; a locationId while editing that rack. One form, two jobs. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
+
+  const addRack = (edit: LocationEdit) => {
+    setLocations((prev) => [...prev, createLocation(edit.code, edit.zone, edit.name, prev)]);
+    setEditing(null);
+  };
+  const saveRack = (locationId: string, edit: LocationEdit) => {
+    setLocations((prev) => editLocation(prev, locationId, edit));
+    setEditing(null);
+  };
 
   const racks = useMemo(
     () => rollupLocations(locations, items, inventory.derived),
     [locations, items, inventory.derived],
   );
   const zones = useMemo(() => groupByZone(racks), [racks]);
+  // `rollupLocations` drops inactive racks, which is what keeps the map about the room as it
+  // is now — so the archived ones have to be read straight off the draft.
+  const archived = useMemo(() => locations.filter((l) => !l.active), [locations]);
   const attention = racksNeedingAttention(racks);
   // IronNest's "section health", per zone rather than per cell.
   const due = useMemo(() => racksToCount(locations, now), [locations, now]);
@@ -73,16 +93,33 @@ export function RackBoard(
       <PageHeader
         title="Peta Rak"
         subtitle="Setiap kotak satu rak. Warnanya mengikuti isi yang paling perlu diurus."
+        action={
+          <Button onClick={() => { setSelected(null); setCounting(null); setEditing('new'); }}>
+            <Plus class="h-4 w-4" /> Rak baru
+          </Button>
+        }
       />
+
+      {editing === 'new' && (
+        <RackForm
+          title="Rak baru"
+          initial={{ code: '', name: '', zone: locations[locations.length - 1]?.zone ?? '' }}
+          onSave={addRack}
+          onCancel={() => setEditing(null)}
+        />
+      )}
 
       {locations.length === 0 ? (
         <div class={`${CARD} py-20 text-center`}>
           <MapPin class="mx-auto mb-3 h-10 w-10 text-slate-300" />
           <p class="mb-1 font-semibold text-slate-700">Belum ada rak.</p>
-          <p class="mx-auto max-w-md text-sm italic text-slate-400">
-            Tambahkan rak lewat tombol <strong>+</strong> di sebelah kolom "Rak / tempat" saat
-            mencatat barang. Satu QR per rak — bukan per barang.
+          <p class="mx-auto mb-5 max-w-md text-sm text-slate-500">
+            Satu QR per rak — bukan per barang. Bisa ditambahkan di sini, atau sambil mencatat
+            barang di Opname Gudang.
           </p>
+          <Button size="touch" onClick={() => setEditing('new')}>
+            <Plus class="h-5 w-5" /> Rak baru
+          </Button>
         </div>
       ) : (
         <>
@@ -145,6 +182,55 @@ export function RackBoard(
               </div>
             </section>
           ))}
+
+          {/* Archived racks live here rather than on the map: taking a dismantled shelf off
+              the map is the whole point of archiving, but a one-way door is a trap, so they
+              stay one tap from coming back. */}
+          {archived.length > 0 && (
+            <section class={CARD}>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 text-left"
+                aria-expanded={showArchive}
+                onClick={() => setShowArchive(!showArchive)}
+              >
+                <Archive class="h-4 w-4 shrink-0 text-slate-400" />
+                <h2 class="font-bold text-slate-900">Rak diarsipkan</h2>
+                <span class="ml-auto text-xs font-bold tabular-nums text-slate-500">
+                  {archived.length}
+                </span>
+              </button>
+              {showArchive && (
+                <ul class="mt-3 divide-y divide-slate-100">
+                  {archived.map((l) => (
+                    <li key={l.locationId} class="flex flex-wrap items-center gap-3 py-2.5">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-bold text-slate-500">Rak {l.code}</p>
+                        <p class={CODE}>{l.zone}{l.name && ` · ${l.name}`}</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-slate-700 underline"
+                        onClick={() => setLocations((prev) => restoreLocation(prev, l.locationId))}
+                      >
+                        <RotateCcw class="h-4 w-4" /> Aktifkan lagi
+                      </button>
+                      {blocksDelete(l, items) === null && (
+                        <button
+                          type="button"
+                          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-400 text-slate-500 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+                          aria-label={`Hapus permanen rak ${l.code}`}
+                          onClick={() => setLocations((prev) => deleteLocation(prev, l.locationId))}
+                        >
+                          <Trash2 class="h-4 w-4" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           </div>
 
@@ -221,21 +307,61 @@ export function RackBoard(
                     })()}
                   </p>
                 </div>
-                <div class="flex items-center gap-3">
-                  {selectedRack.location.locationId && (
-                    <Button size="sm" onClick={() => setCounting(selectedRack.location.locationId)}>
-                      Cek rak
-                    </Button>
-                  )}
+                <div class="flex items-center gap-2">
+                  <Button size="sm" onClick={() => setCounting(selectedRack.location.locationId)}>
+                    Cek rak
+                  </Button>
+                  <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-600 hover:bg-slate-100"
+                    aria-label={`Ubah rak ${selectedRack.location.code}`}
+                    onClick={() => setEditing(selectedRack.location.locationId)}
+                  >
+                    <Pencil class="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     class="text-sm font-semibold text-slate-500 underline"
-                    onClick={() => setSelected(null)}
+                    onClick={() => { setSelected(null); setEditing(null); setConfirmRemove(null); }}
                   >
                     Tutup
                   </button>
                 </div>
               </div>
+
+              {editing === selectedRack.location.locationId && (
+                <div class="mb-4">
+                  <RackForm
+                    title="Ubah rak"
+                    initial={{
+                      code: selectedRack.location.code,
+                      name: selectedRack.location.name,
+                      zone: selectedRack.location.zone,
+                    }}
+                    onSave={(edit) => saveRack(selectedRack.location.locationId, edit)}
+                    onCancel={() => setEditing(null)}
+                  />
+                </div>
+              )}
+
+              {confirmRemove === selectedRack.location.locationId && (
+                <RemoveRack
+                  code={selectedRack.location.code}
+                  archiveBlock={blocksArchive(selectedRack.location.locationId, items)}
+                  deleteBlock={blocksDelete(selectedRack.location, items)}
+                  onArchive={() => {
+                    setLocations((prev) => archiveLocation(prev, selectedRack.location.locationId));
+                    setConfirmRemove(null);
+                    setSelected(null);
+                  }}
+                  onDelete={() => {
+                    setLocations((prev) => deleteLocation(prev, selectedRack.location.locationId));
+                    setConfirmRemove(null);
+                    setSelected(null);
+                  }}
+                  onCancel={() => setConfirmRemove(null)}
+                />
+              )}
 
               {contents.length === 0 ? (
                 <div class="py-8 text-center">
@@ -271,12 +397,179 @@ export function RackBoard(
                   })}
                 </ul>
               )}
+
+              {/* Removal lives at the bottom, under the contents, because whether a rack can
+                  be retired is a question about what is on it — and the answer is right there. */}
+              <div class="mt-4 border-t border-slate-100 pt-3">
+                {selectedRack.location.active === false ? (
+                  <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-sm text-slate-500">Rak ini diarsipkan.</span>
+                    <button
+                      type="button"
+                      class="ml-auto flex items-center gap-1.5 text-sm font-semibold text-slate-700 underline"
+                      onClick={() => setLocations((prev) => restoreLocation(prev, selectedRack.location.locationId))}
+                    >
+                      <RotateCcw class="h-4 w-4" /> Aktifkan lagi
+                    </button>
+                  </div>
+                ) : confirmRemove !== selectedRack.location.locationId && (
+                  <button
+                    type="button"
+                    class="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-red-700"
+                    onClick={() => setConfirmRemove(selectedRack.location.locationId)}
+                  >
+                    <Archive class="h-4 w-4" /> Arsipkan atau hapus rak ini
+                  </button>
+                )}
+              </div>
             </section>
           )}
           </div>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One form for both jobs, because adding a rack and correcting one ask for exactly the same
+ * three things. Inline rather than a modal: the rack map is the context, and a dialog over it
+ * would hide the neighbouring codes somebody is naming this one against.
+ */
+function RackForm(
+  { title, initial, onSave, onCancel }:
+  { title: string; initial: LocationEdit; onSave: (edit: LocationEdit) => void; onCancel: () => void },
+) {
+  const [code, setCode] = useState(initial.code);
+  const [name, setName] = useState(initial.name);
+  const [zone, setZone] = useState(initial.zone);
+
+  const submit = () => { if (code.trim() !== '') onSave({ code, name, zone }); };
+
+  return (
+    <section class={`${CARD} border-slate-900`}>
+      <h2 class="mb-3 font-bold text-slate-900">{title}</h2>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div>
+          <label class={LABEL} for="rack-code">Kode rak</label>
+          <input
+            id="rack-code"
+            class={`${FIELD} min-h-touch`}
+            value={code}
+            placeholder="A1"
+            // `onInput`, never `onChange`: Octane has no synthetic event layer, so `change`
+            // is the platform event and only fires on blur.
+            onInput={(e: Event) => setCode((e.target as HTMLInputElement).value)}
+          />
+          <p class="mt-1 text-xs text-slate-400">Yang tertulis di raknya.</p>
+        </div>
+        <div>
+          <label class={LABEL} for="rack-name">Isi rak (opsional)</label>
+          <input
+            id="rack-name"
+            class={`${FIELD} min-h-touch`}
+            value={name}
+            placeholder="Sabun & pembersih"
+            onInput={(e: Event) => setName((e.target as HTMLInputElement).value)}
+          />
+        </div>
+        <div>
+          <label class={LABEL} for="rack-zone">Zona</label>
+          <input
+            id="rack-zone"
+            class={`${FIELD} min-h-touch`}
+            value={zone}
+            placeholder="Gudang Utama"
+            onInput={(e: Event) => setZone((e.target as HTMLInputElement).value)}
+          />
+          <p class="mt-1 text-xs text-slate-400">Ruangan atau areanya.</p>
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <Button size="touch" disabled={code.trim() === ''} onClick={submit}>Simpan</Button>
+        <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
+          Batal
+        </button>
+        {/* Said out loud because it is the thing people are most afraid of, and it is not
+            true: the QR encodes an id that never changes, so nothing already stuck to a shelf
+            stops working when the code is corrected. */}
+        <span class="ml-auto max-w-xs text-xs text-slate-400">
+          Mengubah kode tidak merusak stiker QR yang sudah dicetak.
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/** Why a rack cannot be retired yet, in the words of the thing standing in the way. */
+function blockText(block: RemovalBlock): string {
+  if (block.kind === 'has-history') return 'Rak ini pernah dicek, jadi riwayatnya perlu disimpan.';
+  const names = block.names.join(', ');
+  return block.count > block.names.length
+    ? `Masih ada ${block.count} barang di sini (${names}, dan lainnya).`
+    : `Masih ada ${block.count} barang di sini (${names}).`;
+}
+
+/**
+ * Two verbs, not one, and the difference is explained rather than assumed.
+ *
+ * Archiving keeps the rack in the record and takes it off the board — the honest answer for a
+ * shelf that was dismantled but still appears in months of history. Deleting is only offered
+ * for a rack that never became real: nothing on it, never counted. That is the "typed it
+ * twice" case, and refusing to clean it up leaves permanent litter on the map.
+ */
+function RemoveRack(
+  { code, archiveBlock, deleteBlock, onArchive, onDelete, onCancel }:
+  {
+    code: string;
+    archiveBlock: RemovalBlock | null;
+    deleteBlock: RemovalBlock | null;
+    onArchive: () => void;
+    onDelete: () => void;
+    onCancel: () => void;
+  },
+) {
+  return (
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50/40 p-4" role="group" aria-label={`Hapus rak ${code}`}>
+      <p class="mb-3 text-sm font-bold text-slate-900">Rak {code} mau diapakan?</p>
+
+      {archiveBlock ? (
+        <p class="mb-3 rounded-md bg-white px-3 py-2 text-sm text-slate-600">
+          {blockText(archiveBlock)} Pindahkan dulu isinya, baru rak ini bisa diarsipkan.
+        </p>
+      ) : (
+        <div class="mb-3 flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={onArchive}>
+            <Archive class="h-4 w-4" /> Arsipkan
+          </Button>
+          <span class="min-w-0 flex-1 text-xs text-slate-500">
+            Hilang dari peta, riwayatnya tetap tersimpan. Bisa diaktifkan lagi kapan saja.
+          </span>
+        </div>
+      )}
+
+      {deleteBlock ? (
+        !archiveBlock && (
+          <p class="text-xs text-slate-500">
+            Tidak bisa dihapus permanen — {blockText(deleteBlock).toLowerCase()}
+          </p>
+        )
+      ) : (
+        <div class="flex flex-wrap items-center gap-3 border-t border-red-100 pt-3">
+          <Button variant="danger" onClick={onDelete}>
+            <Trash2 class="h-4 w-4" /> Hapus permanen
+          </Button>
+          <span class="min-w-0 flex-1 text-xs text-slate-500">
+            Rak ini kosong dan belum pernah dicek — aman dihapus kalau salah ketik.
+          </span>
+        </div>
+      )}
+
+      <button type="button" class="mt-3 text-sm font-semibold text-slate-500 underline" onClick={onCancel}>
+        Batal
+      </button>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,keterangan
+itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,keterangan,artId
 ITM-0001,ALQ-ITM-0001,Sabun cuci tangan,CAT-KEBERSIHAN,Bisa habis,galon,,5,12,TRUE,LOC-A1,pemakaian
 ITM-0002,ALQ-ITM-0002,Kantong sampah besar,CAT-KEBERSIHAN,Bisa habis,pak,,3,8,TRUE,LOC-A1,pemakaian
 ITM-0003,ALQ-ITM-0003,Kanebo,CAT-KEBERSIHAN,Bisa habis,buah,,(-),20,TRUE,LOC-A2,pemakaian

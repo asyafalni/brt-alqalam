@@ -8,8 +8,9 @@
 //    @octanejs/motion is not a dependency yet, and its `layoutId` is single-element FLIP rather
 //    than a full projection tree (OCTANE-FINDINGS.md). Static appearance is identical.
 
-import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, Warehouse, Wrench } from '@octanejs/lucide';
+import { ChartColumn, ChevronRight, ClipboardList, LayoutDashboard, MapPin, Package, QrCode, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
+import { Logo } from './Logo';
 
 interface NavItem { name: string; icon: typeof Package; route: Route; badge?: number }
 
@@ -63,15 +64,18 @@ export function Sidebar(p: Props) {
         >
           <div class="relative z-10 mb-4 flex shrink-0 items-center justify-between p-6">
             <div class="flex items-center gap-3">
+              {/* The masjid's own mark, not a generic warehouse glyph. The tile stays white
+                  because the logo is a white-field star: dropped straight onto the black
+                  panel its outline would be the only part still visible. */}
               <div
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-50
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white
                        transition-transform hover:rotate-12 hover:scale-110"
               >
-                <Warehouse class="h-6 w-6 text-slate-900" />
+                <Logo size={34} />
               </div>
               {showText && (
                 <span class="whitespace-nowrap text-xl font-bold tracking-tight text-white">
-                  BRT Inventaris
+                  BRT Al-Qalam
                 </span>
               )}
             </div>

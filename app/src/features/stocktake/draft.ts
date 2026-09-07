@@ -22,6 +22,8 @@ export interface DraftInput {
   trackBy?: TrackBy;
   /** Which rack it sits on. Blank is allowed — "belum ditempatkan" is a real, visible state. */
   locationId?: string;
+  /** Overrides the automatic drawing. Blank means "keep guessing", which is the good default. */
+  artId?: string;
 }
 
 const PREFIX = 'ITM-';
@@ -53,6 +55,7 @@ export function createItem(input: DraftInput, existing: readonly Item[]): Item {
     initialStock: input.initialStock,
     active: true,
     ...(input.locationId ? { locationId: input.locationId } : {}),
+    ...(input.artId ? { artId: input.artId } : {}),
   };
 }
 
@@ -90,7 +93,7 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 // Export — must match sheets/Items.csv exactly, because it is imported into that tab.
 // ---------------------------------------------------------------------------
 
-const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId';
+const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,artId';
 
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
@@ -107,6 +110,7 @@ export function toItemsCsv(items: readonly Item[]): string {
     String(i.initialStock),
     i.active ? 'TRUE' : 'FALSE',
     i.locationId ?? '',
+    i.artId ?? '',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';
 }
@@ -174,6 +178,93 @@ export function createLocation(code: string, zone: string, name: string, existin
     order: existing.filter((l) => l.zone === (zone.trim() || 'Gudang')).length + 1,
     active: true,
   };
+}
+
+/* -------------------------------------------------------------------------------------------
+   Editing and retiring a rack.
+
+   THE RULE THAT SHAPES ALL OF THIS: `locationId` is immutable, and every edit below preserves
+   it. It is what the printed QR encodes (`features/labels/labels.ts`), so it is not really a
+   database key — it is a physical fact stuck to a shelf with adhesive. Regenerating it from a
+   corrected `code` would be the natural-looking thing to do and would silently kill every
+   sticker already in the gudang.
+
+   The happy consequence, worth surfacing in the UI rather than hiding: because the id never
+   moves, a rack CAN be freely renamed, relabelled and moved between zones without invalidating
+   anything already printed. Fixing a typo is cheap. That is the whole reason the id is opaque.
+------------------------------------------------------------------------------------------- */
+
+/** Fields a person may change about a rack. Deliberately not `locationId`, and not `order`. */
+export interface LocationEdit {
+  code: string;
+  name: string;
+  zone: string;
+}
+
+export function editLocation(
+  locations: readonly Location[],
+  locationId: string,
+  edit: LocationEdit,
+): Location[] {
+  return locations.map((l) => (l.locationId === locationId
+    ? {
+      ...l,
+      code: edit.code.trim() || l.code,
+      name: edit.name.trim(),
+      // Same default as `createLocation`, so a rack cannot be edited into a nameless zone that
+      // then sorts on its own at the bottom of the board.
+      zone: edit.zone.trim() || 'Gudang',
+    }
+    : l));
+}
+
+/**
+ * Why removal has two verbs.
+ *
+ * ARCHIVE (`active: false`) is the honest answer almost every time. A shelf that was
+ * dismantled still appears in months of history and on labels that may still be stuck to
+ * things; erasing it would rewrite the past and orphan the references. Archiving keeps the
+ * record and takes the rack off the board.
+ *
+ * DELETE erases it, and is allowed only for a rack that never became real: nothing stored on
+ * it, and never counted. That is the "I typed it twice" case, and refusing to clean it up
+ * leaves permanent litter on the board — which is its own kind of dishonesty about the room.
+ */
+export type RemovalBlock =
+  | { kind: 'holds-items'; count: number; names: string[] }
+  | { kind: 'has-history' };
+
+/** `null` when the rack can be archived. */
+export function blocksArchive(
+  locationId: string,
+  items: readonly Item[],
+): RemovalBlock | null {
+  const held = items.filter((i) => (i.locationId ?? '') === locationId);
+  if (held.length === 0) return null;
+  // Named, not just counted: "3 barang" tells somebody they are stuck; naming them tells them
+  // what to go and move.
+  return { kind: 'holds-items', count: held.length, names: held.slice(0, 3).map((i) => i.name) };
+}
+
+/** `null` when the rack can be deleted outright. Stricter than archiving, never looser. */
+export function blocksDelete(
+  location: Location,
+  items: readonly Item[],
+): RemovalBlock | null {
+  return blocksArchive(location.locationId, items)
+    ?? (location.lastCountedTs == null ? null : { kind: 'has-history' });
+}
+
+export function archiveLocation(locations: readonly Location[], locationId: string): Location[] {
+  return locations.map((l) => (l.locationId === locationId ? { ...l, active: false } : l));
+}
+
+export function restoreLocation(locations: readonly Location[], locationId: string): Location[] {
+  return locations.map((l) => (l.locationId === locationId ? { ...l, active: true } : l));
+}
+
+export function deleteLocation(locations: readonly Location[], locationId: string): Location[] {
+  return locations.filter((l) => l.locationId !== locationId);
 }
 
 const LOCATIONS_HEADER = 'locationId,code,name,zone,order,active';

@@ -1,7 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createItem, nextItemId, toItemsCsv, validate, isBlocking, summarise,
-  instancesFor, toInstancesCsv, createCategory, toCategoriesCsv, updateItem, toInput, filterItems,
+  archiveLocation,
+  blocksArchive,
+  blocksDelete,
+  createCategory,
+  createItem,
+  createLocation,
+  deleteLocation,
+  editLocation,
+  filterItems,
+  instancesFor,
+  isBlocking,
+  nextItemId,
+  restoreLocation,
+  summarise,
+  toCategoriesCsv,
+  toInput,
+  toInstancesCsv,
+  toItemsCsv,
+  updateItem,
+  validate,
 } from './draft';
 import type { DraftInput } from './draft';
 import { parseItems, parseInstances, parseCategories } from '../../../../data/parse';
@@ -82,7 +100,16 @@ describe('CSV export', () => {
 
   it('emits the exact header the Items sheet tab expects', () => {
     expect(toItemsCsv([]).trim())
-      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId');
+      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,artId');
+  });
+
+  it('round-trips a chosen drawing, and leaves it blank when the guess is being trusted', () => {
+    const chosen = createItem(input({ artId: 'pisau' }), []);
+    const guessed = createItem(input(), [chosen]);
+    const parsed = parseItems(toItemsCsv([chosen, guessed]));
+    expect(parsed.quarantined).toEqual([]);
+    expect(parsed.ok[0].artId).toBe('pisau');
+    expect(parsed.ok[1].artId).toBeUndefined();   // blank means "keep guessing"
   });
 
   it('round-trips the rack an item sits on, and leaves it blank when unplaced', () => {
@@ -196,5 +223,73 @@ describe('filterItems', () => {
 
   it('an empty query returns everything', () => {
     expect(filterItems(items, '  ')).toHaveLength(2);
+  });
+});
+
+// --- Racks: editing and retiring ------------------------------------------------------------
+//
+// The property under test throughout is that `locationId` never moves. It is printed inside
+// every rack QR, so it is not a database key that can be regenerated when the code changes —
+// it is glued to a shelf.
+
+describe('editLocation', () => {
+  const A1 = createLocation('A1', 'Gudang Utama', 'Sabun', []);
+
+  it('keeps the id when the code is corrected, so printed stickers still work', () => {
+    const [edited] = editLocation([A1], A1.locationId, { code: 'A-1', name: 'Sabun', zone: 'Gudang Utama' });
+    expect(edited.code).toBe('A-1');
+    expect(edited.locationId).toBe(A1.locationId);
+  });
+
+  it('lets a rack move zone without becoming a new rack', () => {
+    const [edited] = editLocation([A1], A1.locationId, { code: 'A1', name: '', zone: 'Gudang PHBI' });
+    expect(edited.zone).toBe('Gudang PHBI');
+    expect(edited.locationId).toBe(A1.locationId);
+  });
+
+  it('refuses to blank the code or the zone', () => {
+    // A nameless zone sorts on its own at the bottom of the board, and a codeless rack cannot
+    // be said out loud — neither is a state anyone chose on purpose.
+    const [edited] = editLocation([A1], A1.locationId, { code: '   ', name: '', zone: '  ' });
+    expect(edited.code).toBe('A1');
+    expect(edited.zone).toBe('Gudang');
+  });
+
+  it('leaves every other rack alone', () => {
+    const B2 = createLocation('B2', 'Gudang PHBI', '', [A1]);
+    const after = editLocation([A1, B2], A1.locationId, { code: 'X', name: '', zone: 'Z' });
+    expect(after[1]).toEqual(B2);
+  });
+});
+
+describe('archiving and deleting a rack', () => {
+  const A1 = createLocation('A1', 'Gudang Utama', '', []);
+  const stored = createItem(
+    { name: 'Sabun', categoryId: 'CAT-K', unit: 'galon', kind: 'consumable', initialStock: 4, minStock: 1, locationId: A1.locationId },
+    [],
+  );
+
+  it('will not archive a rack that still holds things, and says what they are', () => {
+    const block = blocksArchive(A1.locationId, [stored]);
+    expect(block).toEqual({ kind: 'holds-items', count: 1, names: ['Sabun'] });
+  });
+
+  it('archives an empty rack without erasing it', () => {
+    expect(blocksArchive(A1.locationId, [])).toBeNull();
+    const [archived] = archiveLocation([A1], A1.locationId);
+    expect(archived.active).toBe(false);
+    expect(restoreLocation([archived], A1.locationId)[0].active).toBe(true);
+  });
+
+  it('deletes only a rack that never became real', () => {
+    expect(blocksDelete(A1, [])).toBeNull();
+    expect(deleteLocation([A1], A1.locationId)).toEqual([]);
+  });
+
+  it('refuses to delete a rack that has ever been counted, even when empty', () => {
+    // Archiving keeps the history honest; deleting would rewrite a walk somebody actually did.
+    const counted = { ...A1, lastCountedTs: 1_700_000_000_000 };
+    expect(blocksArchive(counted.locationId, [])).toBeNull();
+    expect(blocksDelete(counted, [])).toEqual({ kind: 'has-history' });
   });
 });

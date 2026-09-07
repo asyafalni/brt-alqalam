@@ -119,7 +119,12 @@ export function App() {
         />
 
         {/* pb-24 on mobile keeps the last row clear of the bottom bar. */}
-        <main class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pb-8">
+        {/* `relative` without a z-index on purpose. SmartInv paired it with `z-10` to sit above
+            two decorative blur blobs we deliberately did not port, and the leftover z-index
+            made `main` a stacking context — which trapped every `position: fixed` overlay
+            rendered inside it *below* the z-40 navbar, however high its own z-index went.
+            Without the index, `relative` creates no context and an overlay reaches the top. */}
+        <main class="custom-scrollbar relative flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pb-8">
           {route.name === 'beranda' && (
             <Dashboard
               draft={draft}

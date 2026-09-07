@@ -63,6 +63,16 @@ export interface Item {
    * transaction that breached the minimum (which corrects the reading in §37.2).
    */
   keterangan?: MovementType;
+  /**
+   * Which drawing represents this item, when the automatic guess is wrong.
+   *
+   * OPAQUE HERE ON PURPOSE. The domain stores this string and never interprets it: the set of
+   * drawings is a fact about the UI, and a `domain/` that knows the name of a picture is a
+   * `domain/` that has to change when somebody adds one. The app validates it against the
+   * drawings it actually has and falls back to the guess when it does not recognise the value,
+   * so an old sheet naming a retired drawing degrades to the default instead of breaking.
+   */
+  artId?: string;
   /** Optional: a catalog built before locations existed has none, and that is a real state
    *  worth seeing — "belum ditempatkan" is exactly the mess we are trying to surface. */
   locationId?: string;

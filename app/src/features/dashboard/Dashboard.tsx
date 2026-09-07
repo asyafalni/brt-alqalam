@@ -101,25 +101,25 @@ export function Dashboard(
         >
           {/* First, because it is the only chip that says the numbers themselves are wrong. */}
           {counts.negative > 0 && (
-            <Chip tone="red" label={`${counts.negative} stok minus`} onClick={() => onNavigate({ name: 'board' })} />
+            <Chip tone="red" count={counts.negative} label="stok minus" onClick={() => onNavigate({ name: 'board' })} />
           )}
           {counts.out > 0 && (
-            <Chip tone="red" label={`${counts.out} habis`} onClick={() => onNavigate({ name: 'board' })} />
+            <Chip tone="red" count={counts.out} label="habis" onClick={() => onNavigate({ name: 'board' })} />
           )}
           {counts.low > 0 && (
-            <Chip tone="amber" label={`${counts.low} menipis`} onClick={() => onNavigate({ name: 'board' })} />
+            <Chip tone="amber" count={counts.low} label="menipis" onClick={() => onNavigate({ name: 'board' })} />
           )}
           {assets.broken > 0 && (
-            <Chip tone="orange" label={`${assets.broken} rusak`} onClick={() => onNavigate({ name: 'aset' })} />
+            <Chip tone="orange" count={assets.broken} label="rusak" onClick={() => onNavigate({ name: 'aset' })} />
           )}
           {assets.lost > 0 && (
-            <Chip tone="rose" label={`${assets.lost} hilang`} onClick={() => onNavigate({ name: 'aset' })} />
+            <Chip tone="rose" count={assets.lost} label="hilang" onClick={() => onNavigate({ name: 'aset' })} />
           )}
           {needWalk > 0 && (
-            <Chip tone="slate" label={`${needWalk} rak perlu didatangi`} onClick={() => onNavigate({ name: 'racks' })} />
+            <Chip tone="slate" count={needWalk} label="rak perlu didatangi" onClick={() => onNavigate({ name: 'racks' })} />
           )}
           {counts.unplaced > 0 && (
-            <Chip tone="slate" label={`${counts.unplaced} belum ditempatkan`} onClick={() => onNavigate({ name: 'racks' })} />
+            <Chip tone="slate" count={counts.unplaced} label="belum ditempatkan" onClick={() => onNavigate({ name: 'racks' })} />
           )}
         </div>
       )}
@@ -253,26 +253,39 @@ export function Dashboard(
 // status language exactly: rusak is orange, hilang is a deeper rose, because they are
 // different outcomes needing different actions and must never read as the same thing.
 const CHIP_TONE = {
-  red: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
-  orange: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-  rose: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100',
-  slate: 'bg-white text-slate-700 border-slate-400 hover:bg-slate-50',
+  red: { chip: 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100', dot: 'bg-red-500' },
+  amber: { chip: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100', dot: 'bg-amber-500' },
+  orange: { chip: 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100', dot: 'bg-orange-500' },
+  rose: { chip: 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100', dot: 'bg-rose-500' },
+  slate: { chip: 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50', dot: 'bg-slate-400' },
 } as const;
 
+/**
+ * A follow-up shortcut. Small on purpose: these are a summary of what the screen below already
+ * says in full, so at the old size a row of seven read as the page's headline rather than as
+ * its index. The colour moves into a dot and out of the type, which lets the label sit at a
+ * darker weight — smaller and MORE legible at once, rather than smaller and fainter.
+ *
+ * The count and the label are separate props so the number can carry the emphasis; passing one
+ * pre-joined string would mean bolding by regex.
+ */
 function Chip(
-  { tone, label, onClick }: { tone: keyof typeof CHIP_TONE; label: string; onClick: () => void },
+  { tone, count, label, onClick }:
+  { tone: keyof typeof CHIP_TONE; count: number; label: string; onClick: () => void },
 ) {
+  const skin = CHIP_TONE[tone];
   return (
     <button
       type="button"
       // shrink-0 and whitespace-nowrap are load-bearing: inside a flex row a chip would
       // otherwise compress and wrap its own two words onto separate lines, turning a pill
       // into a tall oval. Seen on a 390px screen, not reasoned about.
-      class={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${CHIP_TONE[tone]}`}
+      class={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors ${skin.chip}`}
       onClick={onClick}
     >
-      {label}
+      <span class={`h-1.5 w-1.5 shrink-0 rounded-full ${skin.dot}`} aria-hidden="true" />
+      <span class="font-bold tabular-nums">{count}</span>
+      <span class="font-medium">{label}</span>
     </button>
   );
 }
