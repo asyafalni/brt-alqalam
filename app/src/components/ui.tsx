@@ -96,15 +96,21 @@ export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
  * binding-parity gap in this stack lives (§62) — the wrong place to be inventive.
  */
 export function Select(
-  { class: cls = '', children, ...rest }:
+  { class: cls = '', wrapClass = 'w-full', children, ...rest }:
   {
     id?: string; value?: string; class?: string; children?: unknown;
+    /**
+     * Width lives on the WRAPPER, not the select: the chevron is positioned against the
+     * wrapper, so sizing the select alone would leave the arrow floating where the control
+     * used to end. Toolbars pass a fixed width; forms take the default.
+     */
+    wrapClass?: string;
     'aria-label'?: string; disabled?: boolean;
     onChange?: (e: Event) => void;
   },
 ) {
   return (
-    <div class="relative w-full">
+    <div class={`relative ${wrapClass}`}>
       <select class={`${FIELD} appearance-none pr-11 ${cls}`} {...rest}>
         {children}
       </select>

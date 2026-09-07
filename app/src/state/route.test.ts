@@ -109,3 +109,24 @@ describe('opening Pengajuan for one unit', () => {
     expect(parseRoute('#/pengajuan?t=hapus&a=ALQ-ITM-0001-002')).toEqual({ name: 'pengajuan' });
   });
 });
+
+describe('the stock list as a place you can be sent to', () => {
+  it('carries the filter, the category and the order', () => {
+    expect(parseRoute('#/board?f=belum-ditempatkan&c=CAT-K&s=stok-naik'))
+      .toEqual({ name: 'board', filter: 'belum-ditempatkan', category: 'CAT-K', sort: 'stok-naik' });
+  });
+
+  it('leaves the defaults out, so a plain list has a plain URL', () => {
+    expect(routeToHash({ name: 'board', filter: 'semua', sort: 'nama' })).toBe('#/board');
+  });
+
+  it('round-trips', () => {
+    const route = { name: 'board', filter: 'menipis', sort: 'rak' } as const;
+    expect(parseRoute(routeToHash(route))).toEqual(route);
+  });
+
+  it('drops a filter it does not recognise instead of erroring', () => {
+    // A stale or hand-typed link should land on the list, not on a page about a query string.
+    expect(parseRoute('#/board?f=kadaluarsa')).toEqual({ name: 'board' });
+  });
+});

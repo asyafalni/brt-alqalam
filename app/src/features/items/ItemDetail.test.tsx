@@ -17,6 +17,7 @@ function seed(items: Item[], locations: Location[] = [B3]) {
   localStorage.setItem('brt.stocktake.draft.v6',
     JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns: [] }));
 }
+const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
 
 /**
  * Builds the items AND their stock lines, because quantity and placement live on lines now.
@@ -116,5 +117,42 @@ describe('getting there', () => {
     fireEvent.click(within(table).getByLabelText('Buka Pisau dapur'));
     expect(location.hash).toBe('#/barang?i=ITM-0002');
     expect(r.getByRole('heading', { name: 'Pisau dapur' })).toBeTruthy();
+  });
+});
+
+describe('giving an item a shelf, from the screen that says it has none', () => {
+  // The unplaced row used to be a dead button: it said the thing most likely to go missing had
+  // nowhere to be, and offered nothing to do about it.
+  it('moves the whole unplaced pile onto the chosen rack', () => {
+    seed(catalog(input({ initialStock: 5 })));
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+
+    fireEvent.click(r.getByText('Tempatkan'));
+    fireEvent.change(r.getByLabelText('Rak'), { target: { value: B3.locationId } });
+    fireEvent.click(r.getAllByText('Tempatkan').at(-1)!);
+
+    expect(stored().stock).toEqual([
+      { itemId: 'ITM-0001', locationId: B3.locationId, initialStock: 5 },
+    ]);
+  });
+
+  it('will not place until a rack is picked', () => {
+    seed(catalog(input({ initialStock: 5 })));
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+    fireEvent.click(r.getByText('Tempatkan'));
+    expect((r.getAllByText('Tempatkan').at(-1)!.closest('button') as HTMLButtonElement).disabled)
+      .toBe(true);
+  });
+
+  it('sends somebody to Peta Rak when there are no racks to choose from', () => {
+    // An empty dropdown reads as broken software; no racks recorded yet is a different problem
+    // with a different next step.
+    seed(catalog(input({ initialStock: 5 })), []);
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+    fireEvent.click(r.getByText('Tempatkan'));
+    expect(r.getByText('Buka Peta Rak')).toBeTruthy();
   });
 });

@@ -7,31 +7,66 @@
 // only by scrolling sideways. DataTable renders a table on a desk and stacked cards on a phone
 // from the same column definitions, so the two shapes cannot drift apart.
 
-import { MapPin, Package, TriangleAlert } from '@octanejs/lucide';
+import { useMemo } from 'octane';
+import { MapPin, Package, TriangleAlert, X } from '@octanejs/lucide';
 import type { Category, DerivedItem, Item, Location } from '../../../../domain/types';
+import type { BoardFilter, BoardSort } from '../../state/route';
+import { BOARD_FILTERS } from '../../state/route';
 import type { Inventory } from '../../state/useInventory';
-import { CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
+import { CARD, CARD_FLUSH, CODE, PageHeader, Select, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
+import { FILTER_LABEL, SORT_LABEL, matchesFilter, sortRows } from './filters';
 
 export function Board(
-  { items, categories, locations, inventory, search, onOpenItem, onOpenRack }:
+  { items, categories, locations, inventory, search, filter = 'semua', category = '',
+    sort = 'nama', onOpenItem, onOpenRack, onView }:
   { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory;
-    search: string; onOpenItem: (itemId: string) => void; onOpenRack: (locationId: string) => void },
+    search: string;
+    filter?: BoardFilter; category?: string; sort?: BoardSort;
+    onOpenItem: (itemId: string) => void; onOpenRack: (locationId: string) => void;
+    /** Changing a control changes the URL, so the view somebody is looking at is linkable. */
+    onView: (next: { filter?: BoardFilter; category?: string; sort?: BoardSort }) => void },
 ) {
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
 
   const q = search.trim().toLowerCase();
-  const rows = items
-    .map((i) => derived.items[i.itemId])
-    .filter(Boolean)
-    .filter((d) => q === '' || `${d.item.name} ${d.item.unit}`.toLowerCase().includes(q));
 
-  const totalUnits = rows.reduce((n, d) => n + d.qty, 0);
-  const negative = rows.filter((d) => d.qty < 0);
+  /** Everything the search matches, before the filter — the counts on the chips read from it. */
+  const found = useMemo(
+    () => items
+      .map((i) => derived.items[i.itemId])
+      .filter(Boolean)
+      .filter((d) => q === '' || `${d.item.name} ${d.item.unit}`.toLowerCase().includes(q))
+      .filter((d) => category === '' || d.item.categoryId === category),
+    [items, derived.items, q, category],
+  );
+
+  const rows = useMemo(
+    () => sortRows(found.filter((d) => matchesFilter(d, filter)), sort, locations),
+    [found, filter, sort, locations],
+  );
+
+  /* Counted on the chips themselves. A filter that turns out to select nothing is a wasted tap
+     and a moment of "is this broken?"; the number says so before it is pressed. */
+  const counts = useMemo(() => {
+    const out = {} as Record<BoardFilter, number>;
+    for (const f of BOARD_FILTERS) out[f] = found.filter((d) => matchesFilter(d, f)).length;
+    return out;
+  }, [found]);
+
+  /* The whole catalog, not the filtered view. These three tiles are headline totals about the
+     gudang; making them move with the chips would mean "50 jenis barang" and "9 total unit"
+     sitting side by side, describing different populations. The filtered count belongs on the
+     list header, where it says "3 baris". */
+  const totalUnits = useMemo(
+    () => items.reduce((n, i) => n + (derived.items[i.itemId]?.qty ?? 0), 0),
+    [items, derived.items],
+  );
+  const negative = found.filter((d) => d.qty < 0);
 
   // Only the name column is allowed to grow. Everything else is `whitespace-nowrap`, so in an
   // auto-layout table the browser hands the slack to the column that can use it — which is what
@@ -225,6 +260,74 @@ export function Board(
               </span>
             </div>
 
+            {/* Chips rather than a second dropdown: these four are the questions actually asked
+                while standing in the gudang, and a chip answers one in a tap and says how many
+                it will find before it is pressed. The category, which has as many values as the
+                masjid has categories, gets the select. */}
+            <div class="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 sm:px-6">
+              <div class="flex flex-wrap gap-2" role="group" aria-label="Saring stok">
+                {BOARD_FILTERS
+                  // `minus` is a contradiction in the data, not an everyday view, so it only
+                  // appears when there is one — otherwise it is a permanent zero.
+                  .filter((f) => f !== 'minus' || counts.minus > 0)
+                  .map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      aria-pressed={filter === f}
+                      class={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold ${filter === f
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-400 bg-white text-slate-700 hover:border-slate-900'}`}
+                      onClick={() => onView({ filter: f })}
+                    >
+                      {FILTER_LABEL[f]}
+                      <span class={`tabular-nums ${filter === f ? 'text-white/60' : 'text-slate-400'}`}>
+                        {counts[f]}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <label class="sr-only" for="board-category">Kategori</label>
+                <Select
+                  id="board-category"
+                  wrapClass="w-48"
+                  class="min-h-11 py-0 text-sm"
+                  value={category}
+                  onChange={(e: Event) => onView({ category: (e.target as HTMLSelectElement).value })}
+                >
+                  <option value="">Semua kategori</option>
+                  {categories.filter((c) => c.active).map((c) => (
+                    <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+                  ))}
+                </Select>
+
+                <label class="sr-only" for="board-sort">Urutkan</label>
+                <Select
+                  id="board-sort"
+                  wrapClass="w-52"
+                  class="min-h-11 py-0 text-sm"
+                  value={sort}
+                  onChange={(e: Event) => onView({ sort: (e.target as HTMLSelectElement).value as BoardSort })}
+                >
+                  {(Object.keys(SORT_LABEL) as BoardSort[]).map((sv) => (
+                    <option key={sv} value={sv}>{SORT_LABEL[sv]}</option>
+                  ))}
+                </Select>
+
+                {(filter !== 'semua' || category !== '' || sort !== 'nama') && (
+                  <button
+                    type="button"
+                    class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-slate-500 underline hover:text-slate-900"
+                    onClick={() => onView({ filter: 'semua', category: '', sort: 'nama' })}
+                  >
+                    <X class="h-4 w-4" /> Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
             <DataTable
               // The gudang has hundreds of rows. Rendering them all is not the cost — reading
               // them is, and a list nobody reads to the end may as well end sooner.
@@ -237,7 +340,13 @@ export function Board(
               empty={(
                 <div class="px-6 py-16 text-center">
                   <Package class="mx-auto mb-3 h-10 w-10 text-slate-300" />
-                  <p class="italic text-slate-400">Tidak ada yang cocok dengan "{search}".</p>
+                  {/* Blaming the search when a filter is what emptied the list sends somebody
+                      to retype a word that was never the problem. */}
+                  <p class="italic text-slate-400">
+                    {q !== ''
+                      ? `Tidak ada yang cocok dengan "${search}".`
+                      : `Tidak ada barang yang ${FILTER_LABEL[filter].toLowerCase()}.`}
+                  </p>
                 </div>
               )}
             />

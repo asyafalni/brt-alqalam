@@ -3,18 +3,19 @@
 // Reached by tapping a row anywhere, or by scanning its label — the same screen either way,
 // because "what is this and what has happened to it" is one question however you arrived at it.
 
-import { useMemo } from 'octane';
+import { useMemo, useState } from 'octane';
 import { ArrowLeft, History, MapPin, Package, Pencil, QrCode } from '@octanejs/lucide';
 import { keteranganLabel } from '../../../../domain/keterangan';
-import type { Txn } from '../../../../domain/types';
+import type { Location, Txn } from '../../../../domain/types';
 import type { Route } from '../../state/route';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
-import { Button, CARD, CARD_FLUSH, CODE, PageHeader } from '../../components/ui';
+import { Button, CARD, CARD_FLUSH, CODE, LABEL, PageHeader, Select } from '../../components/ui';
+import { Sheet } from '../../components/Sheet';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { instancesFor } from '../stocktake/draft';
-import { totalFor } from '../../../../domain/stock';
+import { moveLine, setLine, totalFor, UNPLACED } from '../../../../domain/stock';
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
@@ -92,6 +93,11 @@ export function ItemDetail(
     );
   }
 
+  /* Pulled out of `item` once: TypeScript drops the narrowing from the guard above inside the
+     callbacks below, and a non-null assertion in each of them would be the same claim made
+     three times without saying why. */
+  const { itemId } = item;
+
   const derived = inventory.derived.items[item.itemId];
   const badge = itemStatusBadge(derived?.status ?? 'available');
   const categoryName = draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '';
@@ -105,6 +111,31 @@ export function ItemDetail(
       location: draft.locations.find((l) => l.locationId === locationId),
     }));
   }, [derived, draft.locations]);
+
+  const [placing, setPlacing] = useState(false);
+
+  /* Racks that can still be put onto. An archived shelf is one that has been dismantled — it
+     keeps its history and its printed labels, but nothing new belongs on it. */
+  const racks = useMemo(
+    () => draft.locations.filter((l) => l.active),
+    [draft.locations],
+  );
+
+  /**
+   * Give this item a shelf, from the screen that just said it has none.
+   *
+   * The unplaced pile is a stock line like any other (§87), so this is a move rather than a
+   * creation whenever there is already a quantity sitting in it — the number walks over intact.
+   * With no line at all there is nothing to move, and the new shelf opens at zero, which says
+   * "we keep it here" without inventing stock nobody counted.
+   */
+  function place(locationId: string) {
+    draft.setStock((prev) => (
+      prev.some((l) => l.itemId === itemId && l.locationId === UNPLACED)
+        ? moveLine(prev, itemId, UNPLACED, locationId)
+        : setLine(prev, itemId, locationId, 0)));
+    setPlacing(false);
+  }
 
   const instances = useMemo(
     () => (item.trackBy === 'instance'
@@ -205,28 +236,45 @@ export function ItemDetail(
             <>
               <p class="text-xl font-bold text-slate-900">Belum ditempatkan</p>
               <p class="text-sm text-slate-500">Barang tanpa rak paling sering hilang.</p>
+              <div class="mt-3">
+                <Button size="sm" onClick={() => setPlacing(true)}>
+                  <MapPin class="h-4 w-4" /> Tempatkan di rak
+                </Button>
+              </div>
             </>
           ) : (
             <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
               {shelves.map((shelf) => (
                 <li key={shelf.locationId || 'unplaced'}>
+                  {/* The pile with no rack is the one row here that is a PROBLEM rather than an
+                      answer, and it used to be the only one you could do nothing about — a dead
+                      button saying the thing most likely to go missing has nowhere to be. */}
+                  {!shelf.location ? (
+                    <div class="px-[var(--card-pad)] py-2">
+                      {/* Stacked, not side by side: this card is a third of the page, and both
+                          the label and the button were truncated trying to share one line. */}
+                      <p class="font-bold text-slate-900">Belum ditempatkan</p>
+                      <p class="text-xs text-slate-500">
+                        {shelf.qty} {item.unit} belum punya rak
+                      </p>
+                      <Button size="sm" class="mt-2" onClick={() => setPlacing(true)}>
+                        <MapPin class="h-4 w-4" /> Tempatkan
+                      </Button>
+                    </div>
+                  ) : (
                   <button
                     type="button"
                     class="flex w-full items-baseline gap-3 px-[var(--card-pad)] py-2 text-left hover:bg-slate-50"
-                    disabled={!shelf.location}
-                    aria-label={shelf.location ? `Buka Rak ${shelf.location.code}` : undefined}
-                    onClick={() => shelf.location
-                      && onNavigate({ name: 'racks', id: shelf.location.locationId })}
+                    aria-label={`Buka Rak ${shelf.location.code}`}
+                    onClick={() => onNavigate({ name: 'racks', id: shelf.location!.locationId })}
                   >
                     <div class="min-w-0 flex-1">
                       <p class="truncate font-bold text-slate-900">
-                        {shelf.location ? `Rak ${shelf.location.code}` : 'Belum ditempatkan'}
+                        Rak {shelf.location.code}
                       </p>
-                      {shelf.location && (
-                        <p class="truncate text-xs text-slate-500">
-                          {shelf.location.name || shelf.location.zone}
-                        </p>
-                      )}
+                      <p class="truncate text-xs text-slate-500">
+                        {shelf.location.name || shelf.location.zone}
+                      </p>
                     </div>
                     {/* Only when it is split. On a single shelf this is the headline figure
                         said twice, and a number repeated is a number to reconcile. */}
@@ -237,6 +285,7 @@ export function ItemDetail(
                       </span>
                     )}
                   </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -320,6 +369,91 @@ export function ItemDetail(
           }
         />
       </section>
+
+      <Sheet
+        open={placing}
+        title="Tempatkan di rak"
+        description={item.name}
+        onClose={() => setPlacing(false)}
+      >
+        <PlaceForm
+          racks={racks}
+          onPick={place}
+          onCancel={() => setPlacing(false)}
+          onOpenRacks={() => { setPlacing(false); onNavigate({ name: 'racks' }); }}
+        />
+      </Sheet>
+    </div>
+  );
+}
+
+/**
+ * Choosing the shelf, and nothing else.
+ *
+ * No quantity field: whatever is in the unplaced pile moves across whole. Splitting a thing
+ * between two shelves is real (§87) but it is the stock-take's job, done standing in front of
+ * the racks — asking for it here, from a screen nobody opened to count anything, would put a
+ * number in front of somebody who has not looked.
+ */
+function PlaceForm(
+  { racks, onPick, onCancel, onOpenRacks }:
+  {
+    racks: Location[];
+    onPick: (locationId: string) => void;
+    onCancel: () => void;
+    onOpenRacks: () => void;
+  },
+) {
+  const [picked, setPicked] = useState('');
+
+  // An empty dropdown reads as broken software. This is a gudang with no racks recorded yet,
+  // which is a different problem and has a different next step.
+  if (racks.length === 0) {
+    return (
+      <div>
+        <p class="text-sm leading-relaxed text-slate-600">
+          Belum ada rak yang terdaftar. Buat raknya dulu di Peta Rak, baru barang ini bisa
+          ditempatkan.
+        </p>
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+          <Button size="touch" onClick={onOpenRacks}>Buka Peta Rak</Button>
+          <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
+            Batal
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label class={LABEL} for="place-rack">Rak</label>
+      <Select
+        id="place-rack"
+        value={picked}
+        onChange={(e: Event) => setPicked((e.target as HTMLSelectElement).value)}
+      >
+        <option value="">Pilih raknya…</option>
+        {racks.map((l) => (
+          <option key={l.locationId} value={l.locationId}>
+            {l.code}{l.name ? ` — ${l.name}` : ''}{l.zone ? ` (${l.zone})` : ''}
+          </option>
+        ))}
+      </Select>
+
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        <Button size="touch" disabled={picked === ''} onClick={() => onPick(picked)}>
+          <MapPin class="h-5 w-5" /> Tempatkan
+        </Button>
+        <button type="button" class="font-semibold text-slate-500 underline" onClick={onCancel}>
+          Batal
+        </button>
+      </div>
+
+      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        Jumlah yang sudah tercatat ikut pindah ke rak ini. Kalau ternyata tersebar di beberapa
+        rak, sesuaikan lewat Cek rak.
+      </p>
     </div>
   );
 }

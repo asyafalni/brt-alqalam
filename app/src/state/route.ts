@@ -6,11 +6,23 @@
 // missing its SPA fallback turns every sticker in the gudang into dead paper — a failure that
 // shows up only after printing.
 
+/**
+ * How the stock list is narrowed, and in what order — in the URL, so a filtered view is a
+ * place you can be sent to. That is the whole reason these live here rather than in component
+ * state: Beranda's "belum ditempatkan" count is only useful if tapping it lands on exactly
+ * those rows, and a link somebody can send or bookmark costs nothing extra once it does.
+ */
+export type BoardFilter = 'semua' | 'menipis' | 'habis' | 'belum-ditempatkan' | 'minus';
+export type BoardSort = 'nama' | 'stok-naik' | 'stok-turun' | 'rak';
+
+export const BOARD_FILTERS: BoardFilter[] = ['semua', 'menipis', 'habis', 'belum-ditempatkan', 'minus'];
+export const BOARD_SORTS: BoardSort[] = ['nama', 'stok-naik', 'stok-turun', 'rak'];
+
 export type Route =
   | { name: 'beranda' }
   | { name: 'opname' }
   | { name: 'label' }
-  | { name: 'board' }
+  | { name: 'board'; filter?: BoardFilter; category?: string; sort?: BoardSort }
   /** `id` opens straight onto one rack's panel — the stock list links to it by rack. */
   | { name: 'racks'; id?: string }
   | { name: 'pindai' }
@@ -59,7 +71,19 @@ export function parseRoute(hash: string): Route {
     }
     return { name: 'pengajuan' };
   }
-  if (path === '/board') return { name: 'board' };
+  if (path === '/board') {
+    // Anything unrecognised is dropped rather than rejected: a stale or hand-typed link should
+    // land on the unfiltered list, not on an error page about a query string.
+    const filter = params.get('f') as BoardFilter | null;
+    const sort = params.get('s') as BoardSort | null;
+    const category = params.get('c');
+    return {
+      name: 'board',
+      ...(filter && filter !== 'semua' && BOARD_FILTERS.includes(filter) ? { filter } : {}),
+      ...(sort && sort !== 'nama' && BOARD_SORTS.includes(sort) ? { sort } : {}),
+      ...(category ? { category } : {}),
+    };
+  }
   if (path === '/racks') {
     const id = params.get('r');
     return id ? { name: 'racks', id } : { name: 'racks' };
@@ -76,7 +100,16 @@ export function routeToHash(route: Route): string {
     case 'pengajuan': return route.assetId && route.type
       ? `#/pengajuan?t=${route.type}&a=${encodeURIComponent(route.assetId)}`
       : '#/pengajuan';
-    case 'board': return '#/board';
+    case 'board': {
+      // Defaults are left out, so the plain list has a plain URL and the params that ARE there
+      // all mean something.
+      const q = new URLSearchParams();
+      if (route.filter && route.filter !== 'semua') q.set('f', route.filter);
+      if (route.category) q.set('c', route.category);
+      if (route.sort && route.sort !== 'nama') q.set('s', route.sort);
+      const query = q.toString();
+      return query === '' ? '#/board' : `#/board?${query}`;
+    }
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';
     case 'opname': return '#/opname';

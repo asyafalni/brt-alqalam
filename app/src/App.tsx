@@ -154,6 +154,17 @@ export function App() {
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onOpenRack={(id) => navigate({ name: 'racks', id })}
+              filter={route.filter}
+              category={route.category}
+              sort={route.sort}
+              /* Merged onto what is already in the URL, so changing the sort does not silently
+                 clear the filter somebody arrived with. */
+              onView={(next) => navigate({
+                name: 'board',
+                filter: next.filter ?? route.filter,
+                category: next.category ?? route.category,
+                sort: next.sort ?? route.sort,
+              })}
             />
           )}
           {route.name === 'racks' && (

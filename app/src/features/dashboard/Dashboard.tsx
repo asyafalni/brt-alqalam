@@ -150,8 +150,16 @@ export function Dashboard(
               onClick={() => onNavigate({ name: 'pengajuan' })}
             />
           )}
+          {/* Peta Rak was the wrong destination: it lists RACKS, and the whole complaint is
+              that these rows have none. The stock list, filtered to exactly them, is the
+              screen where each one can be given a shelf. */}
           {counts.unplaced > 0 && (
-            <Chip tone="slate" count={counts.unplaced} label="belum ditempatkan" onClick={() => onNavigate({ name: 'racks' })} />
+            <Chip
+              tone="slate"
+              count={counts.unplaced}
+              label="belum ditempatkan"
+              onClick={() => onNavigate({ name: 'board', filter: 'belum-ditempatkan' })}
+            />
           )}
         </div>
       )}
@@ -336,7 +344,9 @@ export function Dashboard(
           body={counts.unplaced === 0
             ? 'Semua barang sudah punya rak.'
             : `${counts.unplaced} barang belum punya rak — itu yang paling sering hilang.`}
-          onClick={() => onNavigate({ name: counts.unplaced === 0 ? 'board' : 'racks' })}
+          onClick={() => onNavigate(counts.unplaced === 0
+            ? { name: 'board' }
+            : { name: 'board', filter: 'belum-ditempatkan' })}
         />
       </div>
     </div>

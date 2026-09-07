@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { useState } from 'octane';
 import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { Board } from './Board';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import type { Item, Location, StockLine } from '../../../../domain/types';
+import type { BoardFilter, BoardSort } from '../../state/route';
 import { deriveState } from '../../../../domain/deriveState';
 import { deriveNotifications } from '../../../../domain/notifications';
 
@@ -39,8 +41,12 @@ function board(
   locations: Location[] = [A1],
   stock: StockLine[] = lines,
   onOpenRack: (id: string) => void = () => {},
+  start: { filter?: BoardFilter; category?: string; sort?: BoardSort } = {},
 ) {
   const H = () => {
+    /* The real screen keeps this in the URL. Holding it in state here means a chip click
+       actually filters the list, so the tests exercise the behaviour rather than the callback. */
+    const [view, setView] = useState(start);
     const instances = items.flatMap(
       (i) => instancesFor(i, NOW, stock.filter((l) => l.itemId === i.itemId)
         .reduce((n, l) => n + l.initialStock, 0)),
@@ -53,6 +59,10 @@ function board(
         search={search}
         onOpenItem={onOpenItem}
         onOpenRack={onOpenRack}
+        filter={view.filter}
+        category={view.category}
+        sort={view.sort}
+        onView={(next) => setView((prev) => ({ ...prev, ...next }))}
         inventory={{
           instances,
           txns: [],
@@ -173,5 +183,55 @@ describe('where a thing is', () => {
     const items = catalog(input({ name: 'Sabun' }));
     const r = board(items, '', () => {}, [A1]);
     expect(desk(r).getByText('belum ditempatkan')).toBeTruthy();
+  });
+});
+
+describe('narrowing the list to the question being asked', () => {
+  const GUDANG = () => catalog(
+    input({ name: 'Sabun', initialStock: 12, minStock: 5, locationId: A1.locationId }),
+    input({ name: 'Ember', initialStock: 1, minStock: 5, locationId: A1.locationId }),
+    input({ name: 'Kanebo', initialStock: 0, minStock: 5, locationId: A1.locationId }),
+    input({ name: 'Tali', initialStock: 7, minStock: 5 }),
+  );
+
+  it('says how many each filter will find before it is pressed', () => {
+    // A filter that turns out to select nothing is a wasted tap and a moment of "is this
+    // broken?". The number answers that in advance.
+    const r = board(GUDANG());
+    expect(within(r.getByRole('button', { name: /Menipis/ })).getByText('1')).toBeTruthy();
+    expect(within(r.getByRole('button', { name: /Belum ditempatkan/ })).getByText('1')).toBeTruthy();
+  });
+
+  it('shows only the unplaced rows when that is what was asked', () => {
+    const r = board(GUDANG());
+    fireEvent.click(r.getByRole('button', { name: /Belum ditempatkan/ }));
+    expect(r.queryAllByText('Sabun')).toHaveLength(0);
+    expect(r.getAllByText('Tali').length).toBeGreaterThan(0);
+  });
+
+  it('opens already filtered when it was linked to that way', () => {
+    // Beranda's "belum ditempatkan" count is only useful if tapping it lands on exactly those.
+    const r = board(GUDANG(), '', () => {}, [A1], lines, () => {}, { filter: 'belum-ditempatkan' });
+    expect(r.queryAllByText('Sabun')).toHaveLength(0);
+    expect(r.getAllByText('Tali').length).toBeGreaterThan(0);
+  });
+
+  it('blames the filter, not the search, when the filter is what emptied the list', () => {
+    // Otherwise somebody retypes a word that was never the problem.
+    const r = board(catalog(input({ name: 'Sabun', initialStock: 12, locationId: A1.locationId })));
+    fireEvent.click(r.getByRole('button', { name: /Habis/ }));
+    expect(r.getByText('Tidak ada barang yang habis.')).toBeTruthy();
+  });
+
+  it('hides the minus filter until something is actually minus', () => {
+    // A permanently-zero control is furniture; it earns its place only when it has an answer.
+    expect(board(GUDANG()).queryByRole('button', { name: /Minus/ })).toBeNull();
+  });
+
+  it('offers a way back to the whole list', () => {
+    const r = board(GUDANG());
+    fireEvent.click(r.getByRole('button', { name: /Habis/ }));
+    fireEvent.click(r.getByText('Reset'));
+    expect(r.getAllByText('Sabun').length).toBeGreaterThan(0);
   });
 });

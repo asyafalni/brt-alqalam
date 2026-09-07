@@ -248,24 +248,52 @@ describe('one page for both, and the repair half of it', () => {
       .toBe('ALQ-ITM-0001-002');
   });
 
-  it('lets a lost unit be replaced, and records what the replacement replaces', () => {
-    // A lost thing cannot be repaired. The link from the loss log is a purchase, and it says
-    // which unit it stands in for so the loss log can be closed out rather than just read.
-    seed(KNIVES(), [], [
-      { txnId: 'T1', clientTxnId: 'C1', ts: Date.now() - 20_000, type: 'peminjaman',
-        assetId: 'ALQ-ITM-0001-003', qtyDelta: 0, actorUserId: 'USR-A', recipient: 'Pos 2' },
-      { txnId: 'T2', clientTxnId: 'C2', ts: Date.now() - 10_000, type: 'pengembalian',
-        assetId: 'ALQ-ITM-0001-003', qtyDelta: 0, actorUserId: 'USR-A', condition: 'hilang' },
-    ]);
+  const lost = (assetId: string, note?: string): Txn[] => [
+    { txnId: 'T1', clientTxnId: 'C1', ts: Date.now() - 20_000, type: 'peminjaman',
+      assetId, qtyDelta: 0, actorUserId: 'USR-A', recipient: 'Pos Potong 2' },
+    { txnId: 'T2', clientTxnId: 'C2', ts: Date.now() - 10_000, type: 'pengembalian',
+      assetId, qtyDelta: 0, actorUserId: 'USR-A', condition: 'hilang', ...(note ? { note } : {}) },
+  ];
+
+  it('replaces a lost unit in one tap, with nothing to retype', () => {
+    // Everything here is already in the register: which unit, which catalog row, what it is
+    // called, and why it is gone. Making somebody type it again is transcription, not thought.
+    seed(KNIVES(), [], lost('ALQ-ITM-0001-003', 'Tidak kembali setelah hari-H'));
     at('#/pengajuan?t=beli&a=ALQ-ITM-0001-003');
     const r = render(App);
 
-    type(r.getByLabelText('Nama barang'), 'Pisau potong pengganti');
-    type(r.getByLabelText('Kenapa perlu dibeli?'), 'Hilang setelah qurban');
     fireEvent.click(r.getByText('Kirim pengajuan'));
 
     expect(stored().requests[0]).toMatchObject({
-      type: 'beli', assetId: 'ALQ-ITM-0001-003', name: 'Pisau potong pengganti',
+      type: 'beli',
+      assetId: 'ALQ-ITM-0001-003',
+      name: 'Pisau potong',
+      reason: 'Pengganti Pisau potong #3 yang hilang. Tidak kembali setelah hari-H',
     });
+  });
+
+  it('makes the replacement a restock of the same catalog row, not a second one', () => {
+    // A second row called "Pisau potong" is exactly the mess the register exists to clear up.
+    const items = KNIVES();
+    seed(items, [], lost('ALQ-ITM-0001-003'));
+    at('#/pengajuan?t=beli&a=ALQ-ITM-0001-003');
+    const r = render(App);
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+
+    expect(stored().requests[0].itemId).toBe(items[0].itemId);
+  });
+
+  it('says on the form what it is replacing, and lets that be dropped', () => {
+    // A link nobody can see looks like a form that filled itself in for no reason; a link
+    // nobody can undo gets worked around by starting over, and the loss stays unclosed.
+    seed(KNIVES(), [], lost('ALQ-ITM-0001-003'));
+    at('#/pengajuan?t=beli&a=ALQ-ITM-0001-003');
+    const r = render(App);
+
+    expect(r.getByText('Pengganti Pisau potong #3')).toBeTruthy();
+    fireEvent.click(r.getByText('Bukan pengganti'));
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+
+    expect(stored().requests[0].assetId).toBeUndefined();
   });
 });

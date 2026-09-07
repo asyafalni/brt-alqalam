@@ -15,7 +15,8 @@ import { ShoppingCart, Wrench } from '@octanejs/lucide';
 import { validateRequest } from '../../../../domain/requests';
 import type { RequestProblem, RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
-import { Button, ERROR_TEXT, FIELD, FIELD_ERROR, LABEL, Select } from '../../components/ui';
+import { Button, CODE, ERROR_TEXT, FIELD, FIELD_ERROR, LABEL, Select } from '../../components/ui';
+import { artFor, ItemArt } from '../items/ItemArt';
 
 export interface RequestInput {
   type: RequestType;
@@ -36,6 +37,21 @@ const NEW_THING = '';
 export const repairable = (instances: DerivedInstance[]): DerivedInstance[] =>
   instances.filter((d) => d.status === 'broken');
 
+/**
+ * The reason a replacement is being bought, written out from what the register already knows.
+ *
+ * Auto-filling a required field is normally a smell — the whole point of requiring the reason
+ * is that somebody thought about it. This is the exception, and narrowly: the loss is already
+ * recorded, with its own note, by the person who reported it. Making somebody retype "hilang
+ * setelah qurban" because the form cannot read two fields across is not asking them to think,
+ * it is asking them to transcribe. It stays editable, so anybody with more to say still can.
+ */
+export function replacementReason(d: DerivedInstance, note?: string): string {
+  const why = d.status === 'lost' ? 'hilang' : 'rusak';
+  const head = `Pengganti ${d.instance.label} yang ${why}.`;
+  return note && note.trim() !== '' ? `${head} ${note.trim()}` : head;
+}
+
 export function RequestForm(
   { items, instances, onSubmit, onCancel, prefill }:
   {
@@ -43,17 +59,33 @@ export function RequestForm(
     instances: DerivedInstance[];
     onSubmit: (input: RequestInput) => void;
     onCancel: () => void;
-    /** Set when the form was opened from a broken or lost unit rather than from the button. */
-    prefill?: { type: RequestType; assetId: string };
+    /**
+     * Set when the form was opened from a broken or lost unit rather than from the button.
+     * `note` is what the person who reported the loss wrote at the time.
+     */
+    prefill?: { type: RequestType; assetId: string; note?: string };
   },
 ) {
+  /* Everything a replacement needs is already recorded: which unit, which catalog row it
+     belongs to, what it is called, what unit it counts in, and why it is gone. Resolved
+     before the first render so it becomes the form's INITIAL state — filled in afterwards it
+     would fight anything already typed. */
+  const from = prefill && instances.find((d) => d.instance.assetId === prefill.assetId);
+  const fromItem = from && items.find((i) => i.itemId === from.instance.itemId);
+  const replacing = prefill?.type === 'beli' ? from : undefined;
+
   const [type, setType] = useState<RequestType>(prefill?.type ?? 'beli');
   const [assetId, setAssetId] = useState(prefill?.assetId ?? '');
-  const [itemId, setItemId] = useState(NEW_THING);
-  const [name, setName] = useState('');
+  /* A replacement knife is the same catalog row, so it starts as a RESTOCK of it. A second
+     row called "Pisau potong" is exactly the mess §0 says the register exists to clear up —
+     and "Barang baru" is still one tap away for a different model. */
+  const [itemId, setItemId] = useState(replacing && fromItem ? fromItem.itemId : NEW_THING);
+  const [name, setName] = useState(replacing && fromItem ? fromItem.name : '');
   const [qty, setQty] = useState(1);
-  const [unit, setUnit] = useState('buah');
-  const [reason, setReason] = useState('');
+  const [unit, setUnit] = useState(replacing && fromItem ? fromItem.unit : 'buah');
+  const [reason, setReason] = useState(
+    replacing ? replacementReason(replacing, prefill?.note) : '',
+  );
   const [price, setPrice] = useState('');
   const [url, setUrl] = useState('');
   const [showProblems, setShowProblems] = useState(false);
@@ -162,6 +194,37 @@ export function RequestForm(
         </div>
       ) : (
         <>
+          {/* What this stands in for, stated rather than hidden in a URL parameter. Without it
+              the link is invisible: the form would look like an ordinary purchase that had
+              mysteriously filled itself in. */}
+          {chosen && (
+            <div class="mt-4 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50/50 p-3">
+              <ItemArt
+                art={artFor(
+                  chosenItem ?? { name: chosen.instance.label, unit: '', kind: 'equipment' },
+                  '',
+                )}
+                size={32}
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-bold text-slate-900">
+                  Pengganti {chosen.instance.label}
+                </p>
+                <p class={CODE}>{chosen.instance.assetId}</p>
+              </div>
+              {/* Droppable, because somebody may open this from a lost knife and end up asking
+                  for something unrelated. A link that cannot be undone gets worked around by
+                  starting over, and the loss stays unclosed. */}
+              <button
+                type="button"
+                class="shrink-0 text-xs font-semibold text-slate-500 underline"
+                onClick={() => setAssetId('')}
+              >
+                Bukan pengganti
+              </button>
+            </div>
+          )}
+
           {/* Restock or something new. Picking from the catalog is what stops a second row
               called "Sabun cuci tangan" appearing when it is bought. */}
           <div class="mt-4">

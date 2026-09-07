@@ -108,6 +108,18 @@ export function RequestBoard(
     [inventory.derived.instances],
   );
 
+  /* The reducer keeps status and holder, not the note that came with them, so the last
+     transaction touching the unit is read back for the "why" — which is the sentence the form
+     writes into the reason. Same lookup Aset does for its Catatan column. */
+  const formPrefill = useMemo(() => {
+    if (!prefill) return undefined;
+    for (let i = inventory.txns.length - 1; i >= 0; i -= 1) {
+      const t = inventory.txns[i];
+      if (t.assetId === prefill.assetId && t.note) return { ...prefill, note: t.note };
+    }
+    return prefill;
+  }, [prefill, inventory.txns]);
+
   function closeForm() {
     setAdding(false);
     onPrefillUsed?.();
@@ -387,7 +399,7 @@ export function RequestBoard(
         <RequestForm
           items={draft.items}
           instances={instances}
-          prefill={prefill}
+          prefill={formPrefill}
           onSubmit={submit}
           onCancel={closeForm}
         />
