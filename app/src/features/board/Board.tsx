@@ -7,8 +7,8 @@
 // only by scrolling sideways. DataTable renders a table on a desk and stacked cards on a phone
 // from the same column definitions, so the two shapes cannot drift apart.
 
-import { CircleCheck, Package, TriangleAlert } from '@octanejs/lucide';
-import type { Category, DerivedItem, Item } from '../../../../domain/types';
+import { MapPin, Package, TriangleAlert } from '@octanejs/lucide';
+import type { Category, DerivedItem, Item, Location } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
@@ -17,9 +17,9 @@ import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 
 export function Board(
-  { items, categories, inventory, search, onOpenItem }:
-  { items: Item[]; categories: Category[]; inventory: Inventory; search: string;
-    onOpenItem: (itemId: string) => void },
+  { items, categories, locations, inventory, search, onOpenItem }:
+  { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory;
+    search: string; onOpenItem: (itemId: string) => void },
 ) {
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
@@ -66,6 +66,28 @@ export function Board(
           {categoryName(d.item.categoryId)}
         </span>
       ),
+    },
+    {
+      // "We own 12 galon sabun" does not help anybody who cannot find them; "Rak A1" does.
+      // The rack was one tap away on the item screen, which is one tap too many for the
+      // question this list exists to answer while somebody is standing in the gudang.
+      key: 'rak',
+      header: 'Rak',
+      mobile: 'meta',
+      cell: (d) => {
+        const rack = locations.find((l) => l.locationId === d.item.locationId);
+        return rack ? (
+          <span class="inline-flex items-center gap-1 whitespace-nowrap text-sm text-slate-600">
+            <MapPin class="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span class="font-semibold">{rack.code}</span>
+            <span class="hidden text-slate-400 lg:inline">{rack.zone}</span>
+          </span>
+        ) : (
+          // Not blank: an unplaced item is a real, visible state and the thing most likely to
+          // go missing, so it says so rather than leaving a gap that reads as a rendering bug.
+          <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>
+        );
+      },
     },
     {
       key: 'catat',
@@ -162,55 +184,13 @@ export function Board(
             />
           </div>
 
-          {/* Dashboard.tsx:207-261 — the amber alert rail, our Notifikasi Stok. */}
-          <div class={`${CARD} border-amber-200`}>
-            <div class="mb-4 flex items-center gap-3">
-              <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
-              <h2 class="font-bold text-slate-900">Notifikasi Stok</h2>
-              {notifications.length > 0 && (
-                <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
-                  {notifications.length}
-                </span>
-              )}
-            </div>
-
-            {notifications.length === 0 ? (
-              <div class="flex items-center gap-3 rounded-xl border border-green-100 bg-green-50/40 px-4 py-3 text-slate-500">
-                <CircleCheck class="h-5 w-5 shrink-0 text-green-500" />
-                <span class="text-sm">Semua stok aman.</span>
-              </div>
-            ) : (
-              <ul class="space-y-2">
-                {notifications.map((n) => {
-                  const d = inventory.derived.items[n.itemId];
-                  return (
-                  <li
-                    key={n.itemId}
-                    class={`flex items-center gap-3 rounded-xl border p-3 ${
-                      n.stokAkhir <= 0 ? 'border-red-100 bg-red-50/50' : 'border-amber-100 bg-white'
-                    }`}
-                  >
-                    <span
-                      class={`h-8 w-1 shrink-0 rounded-full ${n.stokAkhir <= 0 ? 'bg-red-500' : 'bg-amber-500'}`}
-                      aria-hidden="true"
-                    />
-                    {/* The same drawing the row below in the table carries. A shopping list is
-                        read by shape as much as by name — this is the list somebody takes to
-                        the shop, so it should look like the shelf they are replacing. */}
-                    <ItemArt
-                      art={d ? artFor(d.item, categoryName(d.item.categoryId)) : 'default'}
-                      size={30}
-                    />
-                    <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
-                    <span class="shrink-0 whitespace-nowrap text-xs text-slate-500 tabular-nums">
-                      sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
-                    </span>
-                  </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          {/* NO alert list here any more.
+              It was the same derived list as Beranda's "Perlu dibeli lagi" — same source, same
+              rows, on two screens. The duplicate is worse than wasted space: two lists of one
+              thing invite the question of which is current, and somebody eventually acts on
+              the staler-looking one. Beranda keeps it, because that is the screen people open
+              first and the one the bell points at. What belongs here is the stock itself, and
+              the tile above already says how many rows need attention. */}
 
           {/* Inventory.tsx:100-205 — table in a flush Card. */}
           <div class={CARD_FLUSH}>

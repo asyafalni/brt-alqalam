@@ -19,13 +19,19 @@ interface Props {
 }
 
 export function Navbar(p: Props) {
+  // The bar takes the PAGE's ground, not white. SmartInv's header is near-white because its
+  // page is near-white too; ours is a warm beige (§66), so a white bar sat on top of it as a
+  // separate pale strip — three grounds stacked down the screen (black rail, white bar, beige
+  // page) with nothing explaining the middle one. Same colour as the page, slightly
+  // translucent with a blur so content scrolling under it stays legible, and a hairline to
+  // separate the two once it does.
   return (
-    <header class="no-print sticky top-0 z-40 flex h-20 shrink-0 items-center justify-between gap-4 border-b border-slate-200/50 bg-white/80 px-4 backdrop-blur-md md:px-8">
+    <header class="no-print sticky top-0 z-40 flex h-20 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/85 px-4 backdrop-blur-md md:px-8">
       {/* Aset, Laporan and Cetak Label live only in the drawer on a phone, so a problem on
           one of them would otherwise be invisible until someone happened to open it. */}
       <button
         type="button"
-        class="relative rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform active:scale-90 md:hidden"
+        class="relative rounded-full border border-slate-400 bg-white p-3 text-slate-500 transition-transform active:scale-90 md:hidden"
         onClick={p.onToggleSidebar}
         aria-label={p.drawerAlerts > 0 ? `Buka menu — ${p.drawerAlerts} perlu diurus` : 'Buka menu'}
       >
@@ -35,12 +41,11 @@ export function Navbar(p: Props) {
         )}
       </button>
 
-      {/* A recessed pill, not a raised white box. On a white bar a white field with a white
-          border read as something stuck on top of the header; filled with the page's own warm
-          ground it reads as a well cut into it. The border is `slate-400` rather than a hairline
-          because a field boundary has to clear 3:1 (WCAG 1.4.11) — a beige fill on a white bar
-          is only 1.28:1 on its own, so the outline is what actually carries the edge. */}
-      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-400 bg-slate-50 px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:bg-white focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
+      {/* White on the beige bar, the same way every card on the page is white on beige — so
+          the field reads as the one place you can type rather than as a differently-tinted
+          patch of header. `slate-400` on the border, not a hairline: a form field's boundary
+          has to clear 3:1 (WCAG 1.4.11), and white-on-beige is 1.28:1 by itself. */}
+      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-400 bg-white px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
           class="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -54,7 +59,7 @@ export function Navbar(p: Props) {
       {/* Hidden on mobile, where the raised centre button in the bottom bar owns this. */}
       <button
         type="button"
-        class="ml-auto hidden items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-slate-50 shadow-sm md:flex"
+        class="ml-auto hidden items-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-semibold text-slate-50 md:flex"
         onClick={p.onScan}
       >
         <ScanLine class="h-5 w-5" />
@@ -63,7 +68,7 @@ export function Navbar(p: Props) {
 
       <button
         type="button"
-        class="relative rounded-2xl border border-slate-100 bg-white p-3 text-slate-500 shadow-sm transition-transform hover:-translate-y-0.5"
+        class="relative rounded-full border border-slate-400 bg-white p-3 text-slate-500 transition-transform hover:-translate-y-0.5"
         onClick={p.onShowAlerts}
         aria-label={
           p.alertCount > 0 ? `${p.alertCount} barang menipis` : 'Tidak ada notifikasi stok'

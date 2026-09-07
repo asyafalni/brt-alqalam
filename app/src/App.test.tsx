@@ -127,7 +127,7 @@ describe('the board renders derived state, not stored numbers', () => {
     expect(desk(r).getByText('Tersedia')).toBeTruthy();
   });
 
-  it('raises Notifikasi Stok for anything at or below its minimum', () => {
+  it('marks a low item as Menipis in the stock list', () => {
     seed(
       input({ name: 'Sabun', initialStock: 12, minStock: 5 }),
       input({ name: 'Kanebo', initialStock: 3, minStock: 5 }),
@@ -135,22 +135,36 @@ describe('the board renders derived state, not stored numbers', () => {
     at('#/board');
     const r = render(App);
 
-    expect(r.getByText('Notifikasi Stok')).toBeTruthy();
-    // Kanebo appears in the alert rail AND the stock list — both are correct. The list itself
-    // renders twice (desk table + phone cards), so three in the DOM is the honest count.
-    expect(r.getAllByText('Kanebo')).toHaveLength(3);
+    // The list renders twice — desk table and phone cards — so two is the honest count. The
+    // low-stock ALERT is not here at all any more: Beranda owns it, and one list of a thing
+    // beats two (features/board/Board.tsx).
+    expect(r.getAllByText('Kanebo')).toHaveLength(2);
     expect(desk(r).getByText('Menipis')).toBeTruthy();
-    expect(r.queryByText('Semua stok aman.')).toBeNull();
+  });
+
+  it('raises Notifikasi Stok on Beranda for anything at or below its minimum', () => {
+    seed(
+      input({ name: 'Sabun', initialStock: 12, minStock: 5 }),
+      input({ name: 'Kanebo', initialStock: 3, minStock: 5 }),
+    );
+    at('#/');
+    const r = render(App);
+
+    expect(r.getByText('Perlu dibeli lagi')).toBeTruthy();
+    expect(r.getByText('Notifikasi Stok')).toBeTruthy();   // his word for it, kept
+    expect(r.getByText('Kanebo')).toBeTruthy();
+    expect(r.queryByText('Sabun')).toBeNull();             // not low, so not on the list
   });
 
   it('an item with no minimum "(-)" never raises one, even at zero', () => {
     seed(input({ name: 'Kanebo', initialStock: 0, minStock: null }));
-    at('#/board');
+    at('#/');
     const r = render(App);
 
-    // The alert card is always present; what matters is that it reports nothing to act on.
-    expect(r.getByText('Semua stok aman.')).toBeTruthy();
-    expect(desk(r).getByText('Habis')).toBeTruthy();   // still reported as out of stock
+    // No minimum means no low-stock ALARM, which is not the same as no problem: an item at
+    // zero is still reported as habis. The "(-)" only silences the reorder list.
+    expect(r.queryByText('Perlu dibeli lagi')).toBeNull();
+    expect(r.getByRole('button', { name: '1 habis' })).toBeTruthy();
   });
 
   it('is honest that there is no gateway yet', () => {

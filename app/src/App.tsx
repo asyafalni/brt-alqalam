@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
-import { ClipboardList, LayoutDashboard, MapPin, Package } from '@octanejs/lucide';
+import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package } from '@octanejs/lucide';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card } from './components/ui';
+import { Sheet } from './components/Sheet';
+import { StockAlerts } from './features/alerts/StockAlerts';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
@@ -41,6 +43,10 @@ export function App() {
   const draft = useDraft();
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
+  /* The bell opens the list where you are, rather than navigating you to a screen that has it.
+     Notifikasi Stok is a thing to glance at and act on, not a destination, and sending someone
+     to Beranda from the middle of a stock-take costs them their place. */
+  const [alertsOpen, setAlertsOpen] = useState(false);
 
   // Pinned per mount: `deriveState` is a pure function of `now`, so a moving clock would
   // recompute the whole fold on every keystroke.
@@ -113,7 +119,7 @@ export function App() {
           alertCount={inventory.notifications.length}
           onSearch={setSearch}
           onToggleSidebar={() => setCollapsed(!collapsed)}
-          onShowAlerts={() => navigate({ name: 'board' })}
+          onShowAlerts={() => setAlertsOpen(true)}
           onScan={() => go({ name: 'pindai' })}
           drawerAlerts={assetIssues}
         />
@@ -140,6 +146,7 @@ export function App() {
             <Board
               items={draft.items}
               categories={draft.categories}
+              locations={draft.locations}
               inventory={inventory}
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
@@ -209,6 +216,34 @@ export function App() {
             </div>
           )}
         </main>
+
+        {/* At the frame, not inside a screen: the bell is in the navbar, so the panel it opens
+            has to exist on every route the navbar does. */}
+        <Sheet
+          open={alertsOpen}
+          title="Notifikasi Stok"
+          description={
+            inventory.notifications.length > 0
+              ? `${inventory.notifications.length} barang menyentuh atau melewati batas minimum.`
+              : undefined
+          }
+          onClose={() => setAlertsOpen(false)}
+        >
+          {inventory.notifications.length === 0 ? (
+            <div class="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50/60 px-4 py-3">
+              <CircleCheck class="h-5 w-5 shrink-0 text-green-600" />
+              <p class="text-sm text-green-800">Semua stok aman.</p>
+            </div>
+          ) : (
+            <StockAlerts
+              notifications={inventory.notifications}
+              derived={inventory.derived}
+              categoryNameOf={(id) => draft.categories.find((c) => c.categoryId === id)?.name ?? ''}
+              now={now}
+              onOpenItem={(id) => { setAlertsOpen(false); navigate({ name: 'item', id }); }}
+            />
+          )}
+        </Sheet>
       </div>
 
       <BottomNav

@@ -70,8 +70,8 @@ describe('RackBoard — a map of the room', () => {
 
     expect(r.getByRole('heading', { name: 'Gudang Utama' })).toBeTruthy();
     expect(r.getByText('2 rak · 1 perlu diurus · 13 unit')).toBeTruthy();
-    expect(r.getByLabelText('Rak B3, 1 barang, Aman')).toBeTruthy();
-    expect(r.getByLabelText('Rak B4, 1 barang, Ada yang menipis')).toBeTruthy();
+    expect(r.getByLabelText(/^Rak B3, 1 barang, Aman/)).toBeTruthy();
+    expect(r.getByLabelText(/^Rak B4, 1 barang, Ada yang menipis/)).toBeTruthy();
   });
 
   it('a rack wears the worst status on it — one empty box is what earns the walk', () => {
@@ -81,13 +81,13 @@ describe('RackBoard — a map of the room', () => {
     ), [B3]);
     const r = render(Harness);
 
-    expect(r.getByLabelText('Rak B3, 2 barang, Ada yang habis')).toBeTruthy();
+    expect(r.getByLabelText(/^Rak B3, 2 barang, Ada yang habis/)).toBeTruthy();
   });
 
   it('tapping a rack opens what is on it, and tapping it again closes it', () => {
     seed(catalog(input({ name: 'Sabun', initialStock: 10, locationId: 'LOC-B3' })), [B3]);
     const r = render(Harness);
-    const cell = () => r.getByLabelText('Rak B3, 1 barang, Aman');
+    const cell = () => r.getByLabelText(/^Rak B3, 1 barang, Aman/);
 
     fireEvent.click(cell());
     expect(cell().getAttribute('aria-pressed')).toBe('true');
@@ -99,7 +99,7 @@ describe('RackBoard — a map of the room', () => {
     expect(r.queryByText('Sabun')).toBeNull();
   });
 
-  it('"Perlu dicek" lists the racks nobody has ever counted, and opens the count sheet', () => {
+  it('marks the racks nobody has counted on the map, and the badge opens the count', () => {
     seed(
       catalog(
         input({ name: 'Sabun', initialStock: 10, locationId: 'LOC-B3' }),
@@ -110,15 +110,14 @@ describe('RackBoard — a map of the room', () => {
     );
     const r = render(Harness);
 
-    const due = r.getByRole('heading', { name: 'Perlu dicek' }).closest('section')!;
-    expect(within(due).getByText('B3')).toBeTruthy();
-    expect(within(due).getByText('belum pernah')).toBeTruthy();
-    expect(within(due).queryByText('B4')).toBeNull();
+    // No separate list: it was a second copy of the map, printed as text, above the map.
+    expect(r.queryByRole('heading', { name: 'Perlu dicek' })).toBeNull();
 
-    fireEvent.click(within(due).getByText('B3'));
-    // The panel names the rack; the count sheet inside it only names the job.
+    expect(r.getByLabelText(/^Rak B3, 1 barang, Aman, belum pernah dicek/)).toBeTruthy();
+    expect(r.queryByLabelText(/^Cek Rak B4/)).toBeNull();
+
+    fireEvent.click(r.getByLabelText(/^Cek Rak B3/));
     expect(r.getByRole('dialog', { name: 'Rak B3' })).toBeTruthy();
-    expect(r.getByRole('heading', { name: 'Cek rak' })).toBeTruthy();
     expect(r.getByLabelText('Hitungan fisik Sabun')).toBeTruthy();
   });
 
@@ -126,7 +125,7 @@ describe('RackBoard — a map of the room', () => {
     seed(catalog(input({ name: 'Sabun', initialStock: 10, locationId: 'LOC-B3' })), [B3]);
     const r = render(Harness);
 
-    fireEvent.click(r.getByLabelText('Rak B3, 1 barang, Aman'));
+    fireEvent.click(r.getByLabelText(/^Rak B3, 1 barang, Aman/));
     expect(r.getByText(/belum pernah dicek/)).toBeTruthy();
 
     fireEvent.click(r.getByText('Cek rak'));

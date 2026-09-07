@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { Board } from './Board';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { createItem, instancesFor } from '../stocktake/draft';
+import { createItem, createLocation, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item } from '../../../../domain/types';
+import type { Item, Location } from '../../../../domain/types';
 import { deriveState } from '../../../../domain/deriveState';
 import { deriveNotifications } from '../../../../domain/notifications';
 
@@ -15,16 +15,24 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   kind: 'consumable', initialStock: 12, minStock: 5, ...p,
 });
 
+const A1 = createLocation('A1', 'Gudang Utama', '', []);
+
 const catalog = (...i: DraftInput[]): Item[] =>
   i.reduce<Item[]>((acc, x) => [...acc, createItem(x, acc)], []);
 
-function board(items: Item[], search = '', onOpenItem: (id: string) => void = () => {}) {
+function board(
+  items: Item[],
+  search = '',
+  onOpenItem: (id: string) => void = () => {},
+  locations: Location[] = [A1],
+) {
   const H = () => {
     const instances = items.flatMap((i) => instancesFor(i, NOW));
     return (
       <Board
         items={items}
         categories={SEED_CATEGORIES}
+        locations={locations}
         search={search}
         onOpenItem={onOpenItem}
         inventory={{
@@ -99,15 +107,31 @@ describe('what the board says when there is nothing to show', () => {
   });
 });
 
-describe('Notifikasi Stok', () => {
-  it('reports anything at or below its minimum, and stays quiet otherwise', () => {
-    const fine = board(catalog(input({ initialStock: 20, minStock: 5 })));
-    expect(fine.getByText('Semua stok aman.')).toBeTruthy();
-    cleanup();
-
+describe('the low-stock list is not duplicated here', () => {
+  // It used to be: the same derived list, on this screen and on Beranda. Two lists of one
+  // thing mostly raise the question of which is current. Beranda keeps it; this screen keeps
+  // the stock itself, and says in its tile how many rows need attention.
+  it('marks a low row without repeating Beranda\'s alert list', () => {
     const low = board(catalog(input({ name: 'Kanebo', initialStock: 3, minStock: 5 })));
+    expect(low.queryByText('Notifikasi Stok')).toBeNull();
     expect(low.queryByText('Semua stok aman.')).toBeNull();
-    expect(low.getByText(/sisa/)).toBeTruthy();
     expect(desk(low).getByText('Menipis')).toBeTruthy();
+    expect(low.getByText('Perlu perhatian')).toBeTruthy();
+  });
+});
+
+describe('where a thing is', () => {
+  // "We own 12 galon sabun" does not help anybody who cannot find them; "Rak A1" does. It was
+  // one tap away on the item screen, which is one tap too many while standing in the gudang.
+  it('names the rack on the row itself', () => {
+    const r = board(catalog(input({ name: 'Sabun', locationId: A1.locationId })));
+    expect(desk(r).getByText('A1')).toBeTruthy();
+  });
+
+  it('says so out loud when an item has no rack, rather than leaving a gap', () => {
+    // An unplaced item is the one most likely to go missing, so a blank cell is the wrong
+    // answer — it reads as a rendering bug rather than as a real, actionable state.
+    const r = board(catalog(input({ name: 'Sabun' })));
+    expect(desk(r).getByText('belum ditempatkan')).toBeTruthy();
   });
 });

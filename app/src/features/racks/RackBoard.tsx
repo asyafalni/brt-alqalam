@@ -12,7 +12,7 @@ import { useMemo, useState } from 'octane';
 import { Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2 } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
-import { countState, racksToCount } from '../../../../domain/cycleCount';
+import { countState } from '../../../../domain/cycleCount';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -80,8 +80,6 @@ export function RackBoard(
   // is now — so the archived ones have to be read straight off the draft.
   const archived = useMemo(() => locations.filter((l) => !l.active), [locations]);
   const attention = racksNeedingAttention(racks);
-  // IronNest's "section health", per zone rather than per cell.
-  const due = useMemo(() => racksToCount(locations, now), [locations, now]);
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
   const selectedRack = racks.find((r) => r.location.locationId === selected) ?? null;
@@ -151,35 +149,6 @@ export function RackBoard(
               for the same screen — and on a phone they stop being a block you scroll past
               the grid to reach. */}
           <div class="space-y-4">
-          {due.length > 0 && (
-            <section class={CARD}>
-              <div class="mb-3 flex items-center gap-3">
-                <ClipboardCheck class="h-5 w-5 text-slate-500" />
-                <h2 class="font-bold text-slate-900">Perlu dicek</h2>
-                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-50">
-                  {due.length}
-                </span>
-              </div>
-              <p class="mb-3 text-sm text-slate-500">
-                Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
-              </p>
-              <div class="flex flex-wrap gap-2">
-                {due.slice(0, 6).map((d) => (
-                  <Button
-                    key={d.location.locationId}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => { setSelected(d.location.locationId); setCounting(d.location.locationId); }}
-                  >
-                    {d.location.code}
-                    <span class="ml-1 font-normal text-slate-400">
-                      {d.freshness === 'never' ? 'belum pernah' : `${d.daysSince} hari`}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            </section>
-          )}
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -196,25 +165,50 @@ export function RackBoard(
                   const id = rack.location.locationId;
                   const isSelected = selected === id;
                   const dimmed = !matchesSearch(rack);
+                  // Which racks are overdue used to be a separate "Perlu dicek" card listing
+                  // rack codes — a second copy of the map, printed as text, directly above the
+                  // map. The tile is where somebody is already looking and already tapping, so
+                  // the badge lives here and is itself the shortcut into the count.
+                  const count = countState(rack.location, now);
+                  const overdue = id !== '' && count.freshness !== 'fresh';
+                  const overdueNote = count.freshness === 'never'
+                    ? 'belum pernah dicek'
+                    : `dicek ${count.daysSince} hari lalu`;
                   return (
-                    <button
-                      key={id || 'unassigned'}
-                      type="button"
-                      aria-pressed={isSelected}
-                      aria-label={`Rak ${rack.location.code}, ${rack.itemCount} barang, ${ZONE_NOTE[rack.status]}`}
-                      class={
-                        'flex min-h-touch flex-col items-start justify-center rounded-xl border px-3 py-2 ' +
-                        'text-left transition-all ' + CELL[rack.status] +
-                        (isSelected ? ' ring-2 ring-orange-500 ring-offset-1' : '') +
-                        (dimmed ? ' opacity-30' : '')
-                      }
-                      onClick={() => setSelected(isSelected ? null : id)}
-                    >
-                      <span class="text-sm font-bold uppercase tabular-nums">{rack.location.code}</span>
-                      <span class="text-[10px] opacity-70">
-                        {rack.itemCount === 0 ? 'kosong' : `${rack.itemCount} barang`}
-                      </span>
-                    </button>
+                    // Wrapped, because the badge is a second action and a button cannot
+                    // contain a button.
+                    <div key={id || 'unassigned'} class={`relative${dimmed ? ' opacity-30' : ''}`}>
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
+                        aria-label={
+                          `Rak ${rack.location.code}, ${rack.itemCount} barang, ${ZONE_NOTE[rack.status]}`
+                          + (overdue ? `, ${overdueNote}` : '')
+                        }
+                        class={
+                          'flex min-h-touch w-full flex-col items-start justify-center rounded-xl border px-3 py-2 ' +
+                          'text-left transition-all ' + CELL[rack.status] +
+                          (isSelected ? ' ring-2 ring-orange-500 ring-offset-1' : '')
+                        }
+                        onClick={() => setSelected(isSelected ? null : id)}
+                      >
+                        <span class="text-sm font-bold uppercase tabular-nums">{rack.location.code}</span>
+                        <span class="text-[10px] opacity-70">
+                          {rack.itemCount === 0 ? 'kosong' : `${rack.itemCount} barang`}
+                        </span>
+                      </button>
+                      {overdue && (
+                        <button
+                          type="button"
+                          class="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-500 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50"
+                          aria-label={`Cek Rak ${rack.location.code} — ${overdueNote}`}
+                          title={overdueNote}
+                          onClick={() => { setSelected(id); setCounting(id); }}
+                        >
+                          <ClipboardCheck class="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

@@ -1389,3 +1389,53 @@ SmartInv where it sat above two decorative blur blobs we deliberately did not po
 leftover z-index made `main` a stacking context, which trapped every `position: fixed` overlay
 rendered inside it *below* the z-40 navbar, however high its own z-index went. `relative` alone
 creates no stacking context; the index is gone.
+
+# Part XX — One list per thing (v1.10)
+
+Four corrections this round, all of the same shape: the same fact was being shown twice, and
+the owner spotted each one before we did. Worth naming as a pattern — a duplicated view is not
+merely wasted space. Two lists of one thing invite the question of which is current, and
+somebody eventually acts on the staler-looking one.
+
+## 82. Notifikasi Stok lives in exactly one place, and is reachable from anywhere
+
+The low-stock list existed twice, hand-written on Beranda ("Perlu dibeli lagi") and on Stok
+("Notifikasi Stok"), from the same selector. There is now one implementation —
+`features/alerts/StockAlerts.tsx` — rendered in two *entry points* for two different reasons:
+
+- **Beranda**, because it is the screen people open first and a reorder list is the point of
+  opening it. Six rows, expanding in place.
+- **The navbar bell**, which now opens a `Sheet` rather than navigating. Notifikasi Stok is a
+  thing to glance at and act on, not a destination, and sending somebody to another screen from
+  the middle of a stock-take costs them their place. The sheet lives at the frame, because the
+  bell is in the navbar and has to work on every route the navbar does.
+
+The **Stok screen carries no alert list at all** now — it is the stock list and nothing else.
+Both surfaces carry every column the spec's NOTIFIKASI STOK screen asks for (name, stok akhir,
+set min, keterangan, and when it breached) without being a table, because six columns on a
+phone is a horizontal scroll and this is a shopping list. His word for the screen is kept
+beside ours: **"Perlu dibeli lagi"** says what to do, **"Notifikasi Stok"** is what he calls it.
+
+## 83. "Perlu dicek" was a second copy of the map, printed as text, above the map
+
+A card listed the rack codes due for a cycle count, directly above a grid of those same racks.
+Deleted. An overdue rack now wears a small check badge on its own tile, and **the badge is the
+shortcut** — tapping it opens the count directly. Its screen-reader label carries the reason
+("belum pernah dicek" / "dicek 40 hari lalu"), which the card's chips also had to spell out.
+
+## 84. The stock list says where the thing is
+
+`Rak` is a column now. "We own 12 galon sabun" does not help anybody who cannot find them;
+"Rak A1" does — §0's whole premise. It was one tap away on the item screen, which is one tap
+too many for the question this list exists to answer while somebody is standing in the gudang.
+An item with no rack says **"belum ditempatkan"** rather than leaving the cell blank: it is the
+state most likely to end in something going missing, and a gap reads as a rendering bug.
+
+## 85. The header takes the page's ground
+
+SmartInv's header is near-white because its page is near-white. Ours is a warm beige (§66), so
+a white bar sat on it as a separate pale strip — three grounds stacked down the screen (black
+rail, white bar, beige page) with nothing explaining the middle one. The bar is now the page's
+own colour, translucent with a blur so content scrolling under it stays legible. The search
+field inverts accordingly: white on beige, like every card on the page, with a `slate-400`
+outline because a form field's boundary must clear 3:1 and white-on-beige is 1.28:1 by itself.

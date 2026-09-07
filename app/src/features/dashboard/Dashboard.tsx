@@ -5,7 +5,7 @@
 // transaction history we do not have yet, and a "+3.4%" computed from nothing is a lie with a
 // green arrow on it.
 
-import { useMemo } from 'octane';
+import { useMemo, useState } from 'octane';
 import { CircleCheck, MapPin, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
 import { racksToCount } from '../../../../domain/cycleCount';
@@ -15,6 +15,9 @@ import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader } from '../../components/ui';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
+import { StockAlerts } from '../alerts/StockAlerts';
+
+const ALERT_PREVIEW = 6;
 
 export function Dashboard(
   { draft, inventory, now, onNavigate }:
@@ -53,6 +56,14 @@ export function Dashboard(
       out: all.filter((d) => d.status === 'out').length,
     };
   }, [inventory.derived]);
+
+  // Enough to act on without turning the first screen into a spreadsheet; the rest is one tap
+  // away. It expands in place rather than sending anyone to another screen, because since the
+  // Stok page stopped duplicating this list there is nowhere else to send them.
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const shownAlerts = showAllAlerts
+    ? inventory.notifications
+    : inventory.notifications.slice(0, ALERT_PREVIEW);
 
   const nothingWrong =
     inventory.notifications.length === 0 && counts.out === 0 && assets.broken === 0 && assets.lost === 0;
@@ -172,48 +183,48 @@ export function Dashboard(
         </div>
       )}
 
+      {/* The one and only low-stock list.
+          The Stok screen used to carry an identical copy, built from the same selector — two
+          lists of one thing, which mostly raises the question of which is current. This is the
+          screen people open first and the one the bell points at, so it is the one that keeps
+          it, and it carries everything the spec's NOTIFIKASI STOK screen asks for: the name,
+          the current stock, the Setting Minimum, the keterangan, and when it breached. */}
       {inventory.notifications.length > 0 && (
         <section class={`${CARD} border-amber-200`}>
-          <div class="mb-3 flex items-center gap-3">
-            <TriangleAlert class="h-5 w-5 text-amber-500" />
+          <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
             <h2 class="font-bold text-slate-900">Perlu dibeli lagi</h2>
             <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
               {inventory.notifications.length}
             </span>
+            {/* His word for this screen, kept beside ours. The spec calls it Notifikasi Stok;
+                "Perlu dibeli lagi" says what to do about it. Both, so neither of us has to
+                translate (Part XVII). */}
+            <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Notifikasi Stok
+            </span>
           </div>
-          <ul class="divide-y divide-slate-100">
-            {inventory.notifications.slice(0, 6).map((n) => {
-              const d = inventory.derived.items[n.itemId];
-              const badge = itemStatusBadge(d?.status ?? 'low');
-              const art = d
-                ? artFor(d.item, categoryNameOf(d.item.categoryId))
-                : ('default' as const);
-              return (
-                // Stacked on a phone so the name gets the full width: truncating "Kantong
-                // daging" to "Kantong dagi…" to protect a pill is the wrong trade — the name
-                // is the only part that tells you what to go and buy.
-                <li key={n.itemId} class="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-3">
-                  <div class="flex min-w-0 flex-1 items-center gap-3">
-                    <ItemArt art={art} size={28} />
-                    <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
-                  </div>
-                  <div class="flex items-center gap-3 pl-7 sm:pl-0">
-                    <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
-                    <span class="shrink-0 text-sm tabular-nums text-slate-500 sm:w-24 sm:text-right">
-                      sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          {inventory.notifications.length > 6 && (
+          <p class="mb-3 text-sm text-slate-500">
+            Stok yang sudah menyentuh atau melewati batas minimumnya.
+          </p>
+
+          <StockAlerts
+            notifications={shownAlerts}
+            derived={inventory.derived}
+            categoryNameOf={categoryNameOf}
+            now={now}
+            onOpenItem={(id) => onNavigate({ name: 'item', id })}
+          />
+
+          {inventory.notifications.length > ALERT_PREVIEW && (
             <button
               type="button"
               class="mt-3 text-sm font-semibold text-slate-900 underline"
-              onClick={() => onNavigate({ name: 'board' })}
+              onClick={() => setShowAllAlerts(!showAllAlerts)}
             >
-              Lihat semua {inventory.notifications.length}
+              {showAllAlerts
+                ? 'Tampilkan lebih sedikit'
+                : `Lihat semua ${inventory.notifications.length}`}
             </button>
           )}
         </section>
