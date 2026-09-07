@@ -1558,6 +1558,14 @@ was missing was not a table; it was the two operations that make a label afforda
   the alternative was editing fourteen racks by hand, which nobody does, which is why the
   spellings drifted in the first place. The panel says how many racks will move.
 
+**Discoverability was the bug, not the feature** (v1.13). The rename lived behind a bare pencil
+beside a heading — a control you have to already know about, which is how it came back as a
+direct question. The heading itself is the button now, it underlines on hover, and the panel
+answers the two questions it gets asked next *in the panel*: **how do I add one** (a zone is
+born from its racks, with a link straight into the rack form with that zone chosen) and **how
+do I delete one**. Neither has a button of its own and both are one sentence, so the sentences
+go where the question is asked rather than into documentation nobody opens.
+
 **Removing a zone is renaming it onto another one.** That is not a workaround, it is what the
 model means: a zone cannot exist without racks, so emptying it *is* deleting it. A separate
 delete would have to either orphan the racks or refuse. Renaming onto an existing zone therefore

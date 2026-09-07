@@ -328,3 +328,31 @@ describe('managing a zone', () => {
     expect(r.queryByLabelText(/^Ubah zona Belum ditempatkan/)).toBeNull();
   });
 });
+
+describe('finding zone management at all', () => {
+  const A1 = createLocation('A1', 'Gudang Utama', '', []);
+  const P1 = createLocation('P1', 'Gudang PHBI', '', [A1]);
+
+  it('the zone heading is itself the control, not a pencil beside it', () => {
+    // A bare icon next to a title is a thing you have to already know about — which is how
+    // this got asked about directly.
+    seed([], [A1, P1]);
+    const r = render(Harness);
+    const heading = r.getByRole('button', { name: 'Ubah zona Gudang Utama' });
+    expect(heading.textContent).toContain('Gudang Utama');
+  });
+
+  it('answers "how do I add one" where the question is asked', () => {
+    // A zone has no create button because it cannot exist without racks, so the panel says so
+    // and offers the only thing that does create one.
+    seed([], [A1, P1]);
+    const r = render(Harness);
+
+    fireEvent.click(r.getByRole('button', { name: 'Ubah zona Gudang PHBI' }));
+    fireEvent.click(r.getByText('Tambah rak di zona Gudang PHBI'));
+
+    // …landing in the rack form with that zone already chosen.
+    expect(r.getByRole('dialog', { name: 'Rak baru' })).toBeTruthy();
+    expect((r.getByLabelText('Zona') as HTMLSelectElement).value).toBe('Gudang PHBI');
+  });
+});

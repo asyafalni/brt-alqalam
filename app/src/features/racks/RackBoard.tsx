@@ -61,6 +61,8 @@ export function RackBoard(
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [renamingZone, setRenamingZone] = useState<string | null>(null);
+  /** Which zone a new rack should start in, when it was opened from a zone rather than the header. */
+  const [newRackZone, setNewRackZone] = useState<string | null>(null);
 
   /** Everything the panel holds is per-rack, so closing it clears all of it. */
   const closePanel = () => {
@@ -137,6 +139,7 @@ export function RackBoard(
               setLocations((prev) => renameZone(prev, renamingZone, to));
               setRenamingZone(null);
             }}
+            onAddRack={() => { setNewRackZone(renamingZone); setRenamingZone(null); setEditing('new'); }}
             onCancel={() => setRenamingZone(null)}
           />
         )}
@@ -146,13 +149,17 @@ export function RackBoard(
         open={editing === 'new'}
         title="Rak baru"
         description="Satu QR per rak — bukan per barang."
-        onClose={() => setEditing(null)}
+        onClose={() => { setEditing(null); setNewRackZone(null); }}
       >
         <RackForm
-          initial={{ code: '', name: '', zone: locations[locations.length - 1]?.zone ?? '' }}
+          initial={{
+            code: '',
+            name: '',
+            zone: newRackZone ?? locations[locations.length - 1]?.zone ?? '',
+          }}
           zones={zoneNames}
-          onSave={addRack}
-          onCancel={() => setEditing(null)}
+          onSave={(edit) => { addRack(edit); setNewRackZone(null); }}
+          onCancel={() => { setEditing(null); setNewRackZone(null); }}
         />
       </Sheet>
 
@@ -195,22 +202,26 @@ export function RackBoard(
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-                <div class="flex items-center gap-2">
+                {/* The heading IS the control. A bare pencil floating beside a title is a
+                    thing you have to already know about — asked about directly, and that is
+                    the only evidence a control needs that it is not discoverable. The whole
+                    name is now the button, it underlines on hover, and it carries the pencil
+                    rather than standing next to one. */}
+                {zone.zone === UNASSIGNED.zone ? (
+                  // Not a zone anybody named: it exists precisely because those racks have none.
                   <h2 class="font-bold text-slate-900">{zone.zone}</h2>
-                  {/* The unplaced bucket is not a zone anybody named, so there is nothing to
-                      rename — it exists precisely because those racks have no zone. */}
-                  {zone.zone !== UNASSIGNED.zone && (
-                    <button
-                      type="button"
-                      class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
-                      aria-label={`Ubah zona ${zone.zone}`}
-                      title="Ubah zona"
-                      onClick={() => setRenamingZone(zone.zone)}
-                    >
-                      <Pencil class="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    class="group flex items-center gap-2 rounded-lg text-left"
+                    aria-label={`Ubah zona ${zone.zone}`}
+                    title="Ubah nama zona, atau gabungkan dengan zona lain"
+                    onClick={() => setRenamingZone(zone.zone)}
+                  >
+                    <h2 class="font-bold text-slate-900 group-hover:underline">{zone.zone}</h2>
+                    <Pencil class="h-4 w-4 text-slate-400 group-hover:text-slate-900" />
+                  </button>
+                )}
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   {zone.racks.length} rak ·{' '}
                   {zone.racks.filter((r) => r.status === 'low' || r.status === 'out').length} perlu diurus ·{' '}
@@ -529,10 +540,10 @@ function rackSubtitle(location: Location, now: number): string {
  * says so before it happens rather than surprising somebody with a board that lost a section.
  */
 function ZoneForm(
-  { zone, rackCount, others, onSave, onCancel }:
+  { zone, rackCount, others, onSave, onAddRack, onCancel }:
   {
     zone: string; rackCount: number; others: string[];
-    onSave: (to: string) => void; onCancel: () => void;
+    onSave: (to: string) => void; onAddRack: () => void; onCancel: () => void;
   },
 ) {
   const [name, setName] = useState(zone);
@@ -568,15 +579,35 @@ function ZoneForm(
         </button>
       </div>
 
-      {/* Said plainly, because "how do I delete a zone" is the obvious next question and the
-          answer is not a delete button. */}
-      {others.length > 0 && (
-        <p class="mt-6 border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-500">
-          Mau menghapus zona ini? Ganti namanya menjadi nama zona lain — semua raknya pindah ke
-          sana dan zona ini hilang dengan sendirinya. Zona hanyalah nama yang dibawa oleh
-          rak-raknya, jadi tanpa rak ia memang tidak ada.
-        </p>
-      )}
+      {/* The two questions this panel gets asked next, answered here rather than left to be
+          discovered: how do I add one, and how do I delete one. Neither has a button of its
+          own, and both are one sentence — so the sentences go where the question is asked. */}
+      <div class="mt-6 space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Menambah zona</p>
+          <p class="mt-1 text-xs leading-relaxed text-slate-500">
+            Zona lahir dari raknya: buat rak baru, lalu isi nama zona yang belum ada.
+          </p>
+          <button
+            type="button"
+            class="mt-2 text-sm font-semibold text-slate-900 underline"
+            onClick={onAddRack}
+          >
+            Tambah rak di zona {zone}
+          </button>
+        </div>
+
+        {others.length > 0 && (
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Menghapus zona</p>
+            <p class="mt-1 text-xs leading-relaxed text-slate-500">
+              Ganti namanya menjadi nama zona lain — semua raknya pindah ke sana dan zona ini
+              hilang dengan sendirinya. Zona hanyalah nama yang dibawa oleh rak-raknya, jadi
+              tanpa rak ia memang tidak ada.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
