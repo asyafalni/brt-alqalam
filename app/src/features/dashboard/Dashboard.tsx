@@ -6,20 +6,25 @@
 // green arrow on it.
 
 import { useMemo, useState } from 'octane';
-import { CircleCheck, ClipboardCheck, MapPin, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
+import {
+  CircleCheck, ClipboardCheck, MapPin, Package, ShoppingCart, TriangleAlert, Wrench,
+} from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
 import { racksToCount } from '../../../../domain/cycleCount';
 import type { Route } from '../../state/route';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader } from '../../components/ui';
+import { LazyList, useLazyCount } from '../../components/LazyList';
+import { rupiah } from '../requests/RequestBoard';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { StockAlerts } from '../alerts/StockAlerts';
 import { RackArt, rackArtFor } from '../racks/RackArt';
-import { openRequests } from '../../../../domain/requests';
+import { openRequests, openTotal } from '../../../../domain/requests';
 
-const ALERT_PREVIEW = 6;
+/** How many rows arrive at a time as the column is scrolled. */
+const PAGE = 6;
 
 export function Dashboard(
   { draft, inventory, now, onNavigate }:
@@ -56,6 +61,9 @@ export function Dashboard(
   // A request nobody looks at is a request nobody answers, so it joins the row of things
   // waiting on a person.
   const openRequestCount = openRequests(draft.requests).length;
+  /* Unpriced requests stay out of the sum rather than counting as zero — a total that treats
+     "we do not know yet" as "free" is a number somebody takes to a takmir meeting. */
+  const requestMoney = openTotal(draft.requests);
 
   // Broken and lost were invisible from here, so the only screen anyone opens first said
   // nothing about the two states that need a person to act. Both are derived from the log.
@@ -68,15 +76,13 @@ export function Dashboard(
     };
   }, [inventory.derived]);
 
-  // Enough to act on without turning the first screen into a spreadsheet; the rest is one tap
-  // away. It expands in place rather than sending anyone to another screen, because since the
-  // Stok page stopped duplicating this list there is nowhere else to send them.
-  const [showAllAlerts, setShowAllAlerts] = useState(false);
-  const [showAllDue, setShowAllDue] = useState(false);
-  const shownDue = showAllDue ? due : due.slice(0, ALERT_PREVIEW);
-  const shownAlerts = showAllAlerts
-    ? inventory.notifications
-    : inventory.notifications.slice(0, ALERT_PREVIEW);
+  /* Both columns scroll and grow as they are scrolled, rather than ending in a "see all"
+     button. The button asked whether to read the rest before showing any of it, and answering
+     it re-laid the page out under the cursor; scrolling asks nothing. */
+  const alerts = useLazyCount(inventory.notifications.length, PAGE);
+  const dueScroll = useLazyCount(due.length, PAGE);
+  const shownDue = due.slice(0, dueScroll.count);
+  const shownAlerts = inventory.notifications.slice(0, alerts.count);
 
   const nothingWrong =
     inventory.notifications.length === 0 && counts.out === 0 && assets.broken === 0 && assets.lost === 0;
@@ -240,25 +246,15 @@ export function Dashboard(
                 Stok yang sudah menyentuh atau melewati batas minimumnya.
               </p>
 
-              <StockAlerts
-                notifications={shownAlerts}
-                derived={inventory.derived}
-                categoryNameOf={categoryNameOf}
-                now={now}
-                onOpenItem={(id) => onNavigate({ name: 'item', id })}
-              />
-
-              {inventory.notifications.length > ALERT_PREVIEW && (
-                <button
-                  type="button"
-                  class="mt-auto pt-3 text-left text-sm font-semibold text-slate-900 underline"
-                  onClick={() => setShowAllAlerts(!showAllAlerts)}
-                >
-                  {showAllAlerts
-                    ? 'Tampilkan lebih sedikit'
-                    : `Lihat semua ${inventory.notifications.length}`}
-                </button>
-              )}
+              <LazyList sentinel={alerts.sentinel} done={alerts.done}>
+                <StockAlerts
+                  notifications={shownAlerts}
+                  derived={inventory.derived}
+                  categoryNameOf={categoryNameOf}
+                  now={now}
+                  onOpenItem={(id) => onNavigate({ name: 'item', id })}
+                />
+              </LazyList>
             </section>
           )}
 
@@ -275,6 +271,7 @@ export function Dashboard(
                 Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
               </p>
 
+              <LazyList sentinel={dueScroll.sentinel} done={dueScroll.done}>
               <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
                 {shownDue.map((d) => (
                   <li key={d.location.locationId}>
@@ -306,22 +303,15 @@ export function Dashboard(
                   </li>
                 ))}
               </ul>
-
-              {dueCount > ALERT_PREVIEW && (
-                <button
-                  type="button"
-                  class="mt-auto pt-3 text-left text-sm font-semibold text-slate-900 underline"
-                  onClick={() => setShowAllDue(!showAllDue)}
-                >
-                  {showAllDue ? 'Tampilkan lebih sedikit' : `Lihat semua ${dueCount}`}
-                </button>
-              )}
+              </LazyList>
             </section>
           )}
         </div>
       )}
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Four now, so two rows of two on a tablet rather than three-then-one, which leaves a
+          card stranded on a line of its own. */}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Action
           icon={MapPin}
           title="Peta Rak"
@@ -347,6 +337,17 @@ export function Dashboard(
           onClick={() => onNavigate(counts.unplaced === 0
             ? { name: 'board' }
             : { name: 'board', filter: 'belum-ditempatkan' })}
+        />
+        {/* The badge in the sidebar says a number; this says what the number is ABOUT, and it
+            is the only screen here somebody opens to make a decision rather than to look
+            something up. */}
+        <Action
+          icon={ShoppingCart}
+          title="Pengajuan"
+          body={openRequestCount === 0
+            ? 'Tidak ada yang menunggu diputuskan.'
+            : `${openRequestCount} menunggu diputuskan${requestMoney.total > 0 ? ` · ${rupiah(requestMoney.total)}` : ''}.`}
+          onClick={() => onNavigate({ name: 'pengajuan' })}
         />
       </div>
     </div>
