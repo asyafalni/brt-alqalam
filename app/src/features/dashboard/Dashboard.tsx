@@ -6,7 +6,7 @@
 // green arrow on it.
 
 import { useMemo, useState } from 'octane';
-import { CircleCheck, MapPin, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
+import { CircleCheck, ClipboardCheck, MapPin, Package, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
 import { racksToCount } from '../../../../domain/cycleCount';
 import type { Route } from '../../state/route';
@@ -49,7 +49,8 @@ export function Dashboard(
     [locations, items, inventory.derived],
   );
   const needWalk = racksNeedingAttention(racks);
-  const dueCount = useMemo(() => racksToCount(locations, now).length, [locations, now]);
+  const due = useMemo(() => racksToCount(locations, now), [locations, now]);
+  const dueCount = due.length;
 
   // Broken and lost were invisible from here, so the only screen anyone opens first said
   // nothing about the two states that need a person to act. Both are derived from the log.
@@ -66,6 +67,8 @@ export function Dashboard(
   // away. It expands in place rather than sending anyone to another screen, because since the
   // Stok page stopped duplicating this list there is nowhere else to send them.
   const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [showAllDue, setShowAllDue] = useState(false);
+  const shownDue = showAllDue ? due : due.slice(0, ALERT_PREVIEW);
   const shownAlerts = showAllAlerts
     ? inventory.notifications
     : inventory.notifications.slice(0, ALERT_PREVIEW);
@@ -188,51 +191,107 @@ export function Dashboard(
         </div>
       )}
 
-      {/* The one and only low-stock list.
-          The Stok screen used to carry an identical copy, built from the same selector — two
-          lists of one thing, which mostly raises the question of which is current. This is the
-          screen people open first and the one the bell points at, so it is the one that keeps
-          it, and it carries everything the spec's NOTIFIKASI STOK screen asks for: the name,
-          the current stock, the Setting Minimum, the keterangan, and when it breached. */}
-      {inventory.notifications.length > 0 && (
-        <section class={`${CARD} border-amber-200`}>
-          <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
-            <h2 class="font-bold text-slate-900">Perlu dibeli lagi</h2>
-            <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
-              {inventory.notifications.length}
-            </span>
-            {/* His word for this screen, kept beside ours. The spec calls it Notifikasi Stok;
-                "Perlu dibeli lagi" says what to do about it. Both, so neither of us has to
-                translate (Part XVII). */}
-            <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Notifikasi Stok
-            </span>
-          </div>
-          <p class="mb-3 text-sm text-slate-500">
-            Stok yang sudah menyentuh atau melewati batas minimumnya.
-          </p>
+      {/* Two lists, side by side: the two errands this screen exists to hand somebody.
+          One is "go and buy", the other is "go and count" — different verbs, different places,
+          so they sit beside each other rather than stacked, where the second would live below
+          the fold on a phone and be read by nobody. Stacked below `lg`, where there is no room
+          for two and reading order is the only ordering available. */}
+      {(inventory.notifications.length > 0 || dueCount > 0) && (
+        <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+          {inventory.notifications.length > 0 && (
+            <section class={`${CARD} border-amber-200`}>
+              <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
+                <h2 class="font-bold text-slate-900">Perlu dibeli lagi</h2>
+                <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
+                  {inventory.notifications.length}
+                </span>
+                {/* His word for this screen, kept beside ours. The spec calls it Notifikasi
+                    Stok; "Perlu dibeli lagi" says what to do about it (Part XVII). */}
+                <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Notifikasi Stok
+                </span>
+              </div>
+              <p class="mb-3 text-sm text-slate-500">
+                Stok yang sudah menyentuh atau melewati batas minimumnya.
+              </p>
 
-          <StockAlerts
-            notifications={shownAlerts}
-            derived={inventory.derived}
-            categoryNameOf={categoryNameOf}
-            now={now}
-            onOpenItem={(id) => onNavigate({ name: 'item', id })}
-          />
+              <StockAlerts
+                notifications={shownAlerts}
+                derived={inventory.derived}
+                categoryNameOf={categoryNameOf}
+                now={now}
+                onOpenItem={(id) => onNavigate({ name: 'item', id })}
+              />
 
-          {inventory.notifications.length > ALERT_PREVIEW && (
-            <button
-              type="button"
-              class="mt-3 text-sm font-semibold text-slate-900 underline"
-              onClick={() => setShowAllAlerts(!showAllAlerts)}
-            >
-              {showAllAlerts
-                ? 'Tampilkan lebih sedikit'
-                : `Lihat semua ${inventory.notifications.length}`}
-            </button>
+              {inventory.notifications.length > ALERT_PREVIEW && (
+                <button
+                  type="button"
+                  class="mt-3 text-sm font-semibold text-slate-900 underline"
+                  onClick={() => setShowAllAlerts(!showAllAlerts)}
+                >
+                  {showAllAlerts
+                    ? 'Tampilkan lebih sedikit'
+                    : `Lihat semua ${inventory.notifications.length}`}
+                </button>
+              )}
+            </section>
           )}
-        </section>
+
+          {dueCount > 0 && (
+            <section class={CARD}>
+              <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <ClipboardCheck class="h-5 w-5 shrink-0 text-slate-500" />
+                <h2 class="font-bold text-slate-900">Rak perlu dicek</h2>
+                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-50">
+                  {dueCount}
+                </span>
+              </div>
+              <p class="mb-3 text-sm text-slate-500">
+                Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
+              </p>
+
+              <ul class="divide-y divide-slate-100">
+                {shownDue.map((d) => (
+                  <li key={d.location.locationId}>
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50"
+                      aria-label={`Buka Rak ${d.location.code}`}
+                      onClick={() => onNavigate({ name: 'racks', id: d.location.locationId })}
+                    >
+                      <MapPin class="h-4 w-4 shrink-0 text-slate-400" />
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-bold text-slate-900">
+                          Rak {d.location.code}
+                        </p>
+                        <p class="truncate text-xs text-slate-400">
+                          {d.location.name || d.location.zone}
+                        </p>
+                      </div>
+                      {/* An uncounted rack is UNKNOWN, not overdue, and the two deserve
+                          different words — "belum pernah" is a gap in the register, not a
+                          late chore. */}
+                      <span class="shrink-0 text-xs tabular-nums text-slate-500">
+                        {d.freshness === 'never' ? 'belum pernah' : `${d.daysSince} hari lalu`}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {dueCount > ALERT_PREVIEW && (
+                <button
+                  type="button"
+                  class="mt-3 text-sm font-semibold text-slate-900 underline"
+                  onClick={() => setShowAllDue(!showAllDue)}
+                >
+                  {showAllDue ? 'Tampilkan lebih sedikit' : `Lihat semua ${dueCount}`}
+                </button>
+              )}
+            </section>
+          )}
+        </div>
       )}
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">

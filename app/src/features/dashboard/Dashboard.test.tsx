@@ -38,6 +38,8 @@ const tx = (p: Partial<Txn>): Txn => {
 
 const RAK = { locationId: 'LOC-A1', code: 'A1', name: '', zone: 'Gudang', order: 1, active: true,
   lastCountedTs: Date.now() };
+/** Never counted, so it is due — an uncounted rack is unknown, not "probably fine". */
+const UNCOUNTED = { ...RAK, locationId: 'LOC-B2', code: 'B2', lastCountedTs: undefined };
 
 function seed(items: Item[], txns: Txn[] = [], locations = [RAK]) {
   localStorage.setItem('brt.stocktake.draft.v5',
@@ -139,5 +141,38 @@ describe('Beranda surfaces what needs a person', () => {
     // ("1 rak · 0 perlu didatangi"), so the assertion names the chip GROUP, not the words.
     expect(r.queryByRole('group', { name: 'Perlu diurus' })).toBeNull();
     expect(r.getByText('Semua barang sudah punya rak.')).toBeTruthy();
+  });
+});
+
+describe('the two errands, side by side', () => {
+  // Beranda hands somebody two different jobs: go and buy, and go and count. They are
+  // different verbs in different places, so they sit beside each other rather than stacked —
+  // where the second would be below the fold on a phone and read by nobody.
+  it('lists the racks due for a count, and says which have never been counted', () => {
+    seed(
+      catalog(input({ name: 'Sabun', initialStock: 20, minStock: 5, locationId: UNCOUNTED.locationId })),
+      [],
+      [UNCOUNTED],
+    );
+    const r = render(App);
+
+    expect(r.getByRole('heading', { name: 'Rak perlu dicek' })).toBeTruthy();
+    expect(r.getByText('belum pernah')).toBeTruthy();
+  });
+
+  it('a rack counted recently is not on the list', () => {
+    seed(catalog(input({ name: 'Sabun', initialStock: 20, minStock: 5, locationId: RAK.locationId })));
+    expect(render(App).queryByRole('heading', { name: 'Rak perlu dicek' })).toBeNull();
+  });
+
+  it('a due rack opens straight onto its own panel', () => {
+    seed(
+      catalog(input({ name: 'Sabun', initialStock: 20, minStock: 5, locationId: UNCOUNTED.locationId })),
+      [],
+      [UNCOUNTED],
+    );
+    const r = render(App);
+    fireEvent.click(r.getByLabelText(`Buka Rak ${UNCOUNTED.code}`));
+    expect(r.getByRole('dialog', { name: `Rak ${UNCOUNTED.code}` })).toBeTruthy();
   });
 });
