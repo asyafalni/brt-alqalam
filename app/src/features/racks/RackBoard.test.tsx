@@ -116,7 +116,9 @@ describe('RackBoard — a map of the room', () => {
     expect(within(due).queryByText('B4')).toBeNull();
 
     fireEvent.click(within(due).getByText('B3'));
-    expect(r.getByRole('heading', { name: 'Cek Rak B3' })).toBeTruthy();
+    // The panel names the rack; the count sheet inside it only names the job.
+    expect(r.getByRole('dialog', { name: 'Rak B3' })).toBeTruthy();
+    expect(r.getByRole('heading', { name: 'Cek rak' })).toBeTruthy();
     expect(r.getByLabelText('Hitungan fisik Sabun')).toBeTruthy();
   });
 
@@ -131,7 +133,8 @@ describe('RackBoard — a map of the room', () => {
     type(r.getByLabelText('Hitungan fisik Sabun'), '7');
     fireEvent.click(r.getByText('Simpan hasil hitung'));
 
-    expect(r.getByText('Tutup')).toBeTruthy();          // the panel stayed open on the rack
+    // The panel stayed open on the rack it was counting, rather than dumping you back at the map.
+    expect(r.getByRole('dialog', { name: 'Rak B3' })).toBeTruthy();
     expect(r.getByText('7')).toBeTruthy();              // and now reports what was found
     expect(stored().items[0].initialStock).toBe(7);
     // The rack is no longer unknown — that is what takes it off the rotation.

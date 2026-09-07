@@ -37,9 +37,15 @@ const GOLD = '#F7A81B';
 const QUILL = '#F2EFE9';
 const QUILL_EDGE = '#A9A29A';
 
-/** Ten points on a circle: outer r=42, inner r=20.5, first arm straight up. */
-const STAR = 'M50 9 L62.05 34.42 L89.94 38.02 L69.5 57.33 L74.69 84.98 '
-  + 'L50 71.5 L25.31 84.98 L30.5 57.33 L10.06 38.02 L37.95 34.42 Z';
+/**
+ * Ten points on a circle: outer r=42, inner r=23.5, first arm straight up.
+ *
+ * The inner radius is 56% of the outer, not the 49% a "standard" pentagram uses. The original
+ * is a CHUNKY star — short broad arms, a wide field — and at 49% the arms came out long and
+ * thin, which is most of why the first attempts read as a generic star rather than as this one.
+ */
+const STAR = 'M50 9 L63.81 31.99 L89.94 38.02 L72.35 58.26 L74.69 84.98 '
+  + 'L50 74.5 L25.31 84.98 L27.65 58.26 L10.06 38.02 L36.19 31.99 Z';
 
 /** The star seated in the crescent's cup, same construction at r=5.4/2.3, centred on (51.5,45.5). */
 const CRESCENT_STAR = 'M51.5 40.1 L52.85 43.64 L56.64 43.83 L53.69 46.21 L54.67 49.87 '
@@ -68,11 +74,11 @@ export function Logo(
             curve than it looks. Drawn tighter, the six letters run off the end of the path and
             wrap down the sides of the star, which is exactly what the first attempt did.
 
-            The path is then drawn LONGER than the word needs along that same circle. A
+            The path is drawn LONGER than the word needs along that same circle. A
             `textPath` does not shrink to fit — anything past the end simply stops being
             rendered on the curve and slides down the sides, so the runway has to exceed the
             word, not match it. */}
-        <path id={arcId} d="M18 43.4 A50.8 50.8 0 0 1 82 43.4" fill="none" />
+        <path id={arcId} d="M20 46.5 A40 40 0 0 1 80 46.5" fill="none" />
       </defs>
 
       {/* White field with a heavy green outline, drawn as one stroked path: a round linejoin
@@ -128,8 +134,10 @@ export function Logo(
           fill="none"
           opacity="0.55"
         />
-        {/* The band beneath the book — the base the original rests the whole device on. */}
-        <path d="M28.5 65h43" stroke={BLUE} stroke-width="2.8" stroke-linecap="round" />
+        {/* TWO lines beneath the book, not one band — the original rests the device on a pair
+            of rules, and collapsing them into a single bar lost the thing that reads as water. */}
+        <path d="M28.5 65h43" stroke={BLUE} stroke-width="2.2" stroke-linecap="round" />
+        <path d="M32 69h36" stroke={BLUE} stroke-width="2.2" stroke-linecap="round" />
       </g>
 
       {/* The quill — al-qalam, the pen the masjid is named for. It enters from outside the star

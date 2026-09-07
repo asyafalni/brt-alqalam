@@ -13,7 +13,7 @@ import { Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Tras
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState, racksToCount } from '../../../../domain/cycleCount';
-import type { Category, Item } from '../../../../domain/types';
+import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, FIELD, LABEL, PageHeader, Stat } from '../../components/ui';
@@ -25,6 +25,7 @@ import type { LocationEdit, RemovalBlock } from '../stocktake/draft';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { CountSheet } from './CountSheet';
+import { Sheet } from '../../components/Sheet';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
 const CELL: Record<LocationStatus, string> = {
@@ -52,6 +53,14 @@ export function RackBoard(
   const [editing, setEditing] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+
+  /** Everything the panel holds is per-rack, so closing it clears all of it. */
+  const closePanel = () => {
+    setSelected(null);
+    setCounting(null);
+    setEditing(null);
+    setConfirmRemove(null);
+  };
 
   const addRack = (edit: LocationEdit) => {
     setLocations((prev) => [...prev, createLocation(edit.code, edit.zone, edit.name, prev)]);
@@ -137,11 +146,40 @@ export function RackBoard(
             />
           </div>
 
-          {/* Two columns on a wide screen: the map stays put while the detail changes beside
-              it, so choosing a rack never scrolls the grid out from under you. Stacked on a
-              phone, where there is no room for two and the detail follows the tap. */}
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px] lg:items-start">
+          {/* The map now owns the full width. Detail and counting moved into a panel that
+              slides in from the right, so a rack’s contents no longer compete with the map
+              for the same screen — and on a phone they stop being a block you scroll past
+              the grid to reach. */}
           <div class="space-y-4">
+          {due.length > 0 && (
+            <section class={CARD}>
+              <div class="mb-3 flex items-center gap-3">
+                <ClipboardCheck class="h-5 w-5 text-slate-500" />
+                <h2 class="font-bold text-slate-900">Perlu dicek</h2>
+                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-50">
+                  {due.length}
+                </span>
+              </div>
+              <p class="mb-3 text-sm text-slate-500">
+                Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                {due.slice(0, 6).map((d) => (
+                  <Button
+                    key={d.location.locationId}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => { setSelected(d.location.locationId); setCounting(d.location.locationId); }}
+                  >
+                    {d.location.code}
+                    <span class="ml-1 font-normal text-slate-400">
+                      {d.freshness === 'never' ? 'belum pernah' : `${d.daysSince} hari`}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </section>
+          )}
           {zones.map((zone) => (
             <section key={zone.zone} class={CARD}>
               <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -234,37 +272,12 @@ export function RackBoard(
 
           </div>
 
-          <div class="space-y-4 lg:sticky lg:top-24">
-          {due.length > 0 && (
-            <section class={CARD}>
-              <div class="mb-3 flex items-center gap-3">
-                <ClipboardCheck class="h-5 w-5 text-slate-500" />
-                <h2 class="font-bold text-slate-900">Perlu dicek</h2>
-                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-50">
-                  {due.length}
-                </span>
-              </div>
-              <p class="mb-3 text-sm text-slate-500">
-                Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
-              </p>
-              <div class="flex flex-wrap gap-2">
-                {due.slice(0, 6).map((d) => (
-                  <Button
-                    key={d.location.locationId}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => { setSelected(d.location.locationId); setCounting(d.location.locationId); }}
-                  >
-                    {d.location.code}
-                    <span class="ml-1 font-normal text-slate-400">
-                      {d.freshness === 'never' ? 'belum pernah' : `${d.daysSince} hari`}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            </section>
-          )}
-
+          <Sheet
+            open={selectedRack !== null}
+            title={selectedRack ? `Rak ${selectedRack.location.code}` : ''}
+            description={selectedRack ? rackSubtitle(selectedRack.location, now) : undefined}
+            onClose={closePanel}
+          >
           {counting && selectedRack && (
             <CountSheet
               rack={selectedRack.location}
@@ -279,54 +292,24 @@ export function RackBoard(
             />
           )}
 
-          {!selectedRack && !counting && (
-            <section class={`${CARD} hidden lg:block`}>
-              <MapPin class="mb-2 h-6 w-6 text-slate-300" />
-              <p class="font-semibold text-slate-700">Pilih satu rak</p>
-              <p class="text-sm text-slate-500">Isinya akan tampil di sini.</p>
-            </section>
-          )}
-
           {selectedRack && !counting && (
-            <section class={`${CARD} border-orange-200`}>
-              <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                  <h2 class="font-bold text-slate-900">
-                    Rak {selectedRack.location.code}
-                    {selectedRack.location.name && (
-                      <span class="ml-2 font-normal text-slate-500">{selectedRack.location.name}</span>
-                    )}
-                  </h2>
-                  <p class="text-xs text-slate-400">
-                    {selectedRack.location.zone}
-                    {' · '}
-                    {(() => {
-                      const c = countState(selectedRack.location, now);
-                      if (c.freshness === 'never') return 'belum pernah dicek';
-                      return c.daysSince === 0 ? 'dicek hari ini' : `dicek ${c.daysSince} hari lalu`;
-                    })()}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <Button size="sm" onClick={() => setCounting(selectedRack.location.locationId)}>
-                    Cek rak
-                  </Button>
-                  <button
-                    type="button"
-                    class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-600 hover:bg-slate-100"
-                    aria-label={`Ubah rak ${selectedRack.location.code}`}
-                    onClick={() => setEditing(selectedRack.location.locationId)}
-                  >
-                    <Pencil class="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="text-sm font-semibold text-slate-500 underline"
-                    onClick={() => { setSelected(null); setEditing(null); setConfirmRemove(null); }}
-                  >
-                    Tutup
-                  </button>
-                </div>
+            <section>
+              {selectedRack.location.name && (
+                <p class="mb-3 text-sm text-slate-500">{selectedRack.location.name}</p>
+              )}
+
+              <div class="mb-4 flex items-center gap-2">
+                <Button size="touch" class="flex-1" onClick={() => setCounting(selectedRack.location.locationId)}>
+                  <ClipboardCheck class="h-5 w-5" /> Cek rak
+                </Button>
+                <button
+                  type="button"
+                  class="flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-600 hover:bg-slate-100"
+                  aria-label={`Ubah rak ${selectedRack.location.code}`}
+                  onClick={() => setEditing(selectedRack.location.locationId)}
+                >
+                  <Pencil class="h-5 w-5" />
+                </button>
               </div>
 
               {editing === selectedRack.location.locationId && (
@@ -424,12 +407,20 @@ export function RackBoard(
               </div>
             </section>
           )}
-          </div>
-          </div>
+          </Sheet>
         </>
       )}
     </div>
   );
+}
+
+/** Zone plus how long ago it was counted — the two facts that decide whether to walk there. */
+function rackSubtitle(location: Location, now: number): string {
+  const c = countState(location, now);
+  const checked = c.freshness === 'never'
+    ? 'belum pernah dicek'
+    : c.daysSince === 0 ? 'dicek hari ini' : `dicek ${c.daysSince} hari lalu`;
+  return `${location.zone} · ${checked}`;
 }
 
 /**

@@ -13,7 +13,7 @@ import { differences, summariseCount } from '../../../../domain/cycleCount';
 import type { CountLine } from '../../../../domain/cycleCount';
 import type { Item, Location } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
-import { Button, CARD, CODE, FIELD } from '../../components/ui';
+import { Button, CODE, FIELD } from '../../components/ui';
 
 interface Props {
   rack: Location;
@@ -51,18 +51,18 @@ export function CountSheet(p: Props) {
     p.onApply(counted);
   }
 
+  // No card and no rack name of its own: this renders inside the rack panel, which already
+  // says which shelf this is. Repeating it turned the top of a phone screen into two headings
+  // and a stray "Batal" link before the first number.
   return (
-    <section class={`${CARD} border-slate-900`}>
-      <div class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h2 class="font-bold text-slate-900">Cek Rak {p.rack.code}</h2>
-          <p class="text-xs text-slate-500">
+    <section>
+      <div class="mb-4 flex items-baseline justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">Cek rak</h3>
+          <p class="mt-0.5 text-sm text-slate-500">
             Hitung fisik yang ada di rak. Yang cocok cukup dikonfirmasi.
           </p>
         </div>
-        <button type="button" class="text-sm font-semibold text-slate-500 underline" onClick={p.onCancel}>
-          Batal
-        </button>
       </div>
 
       {p.contents.length === 0 ? (

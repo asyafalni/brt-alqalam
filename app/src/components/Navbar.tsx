@@ -35,7 +35,12 @@ export function Navbar(p: Props) {
         )}
       </button>
 
-      <div class="hidden w-72 items-center gap-3 rounded-[20px] border border-white bg-white/60 px-5 py-3 shadow-sm backdrop-blur-md focus-within:border-slate-900/40 focus-within:ring-4 focus-within:ring-slate-900/5 sm:flex md:w-96">
+      {/* A recessed pill, not a raised white box. On a white bar a white field with a white
+          border read as something stuck on top of the header; filled with the page's own warm
+          ground it reads as a well cut into it. The border is `slate-400` rather than a hairline
+          because a field boundary has to clear 3:1 (WCAG 1.4.11) — a beige fill on a white bar
+          is only 1.28:1 on its own, so the outline is what actually carries the edge. */}
+      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-400 bg-slate-50 px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:bg-white focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
           class="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
