@@ -3,10 +3,10 @@ import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { AssetBoard } from './AssetBoard';
 import { useDraft } from '../../state/useDraft';
 import { useInventory } from '../../state/useInventory';
-import { createItem } from '../stocktake/draft';
+import { createEntry, createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import type { Item, Txn } from '../../../../domain/types';
+import type { Item, StockLine, Txn } from '../../../../domain/types';
 
 // The board's `now` is pinned once per mount (App.tsx), so the harness pins it the same way.
 const NOW = Date.now();
@@ -31,8 +31,22 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   kind: 'equipment', initialStock: 3, minStock: null, ...p,
 });
 
-const catalog = (...inputs: DraftInput[]): Item[] =>
-  inputs.reduce<Item[]>((acc, i) => [...acc, createItem(i, acc)], []);
+
+/**
+ * Builds the items AND their stock lines, because quantity and placement live on lines now.
+ * `lines` is what `seed()` stores, so a fixture that still says `initialStock: 3` produces a
+ * shelf with three of the thing on it.
+ */
+let lines: StockLine[] = [];
+const buildCatalog = (inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, x) => {
+    const built = createEntry(x, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
+const catalog = (...inputs: DraftInput[]): Item[] => buildCatalog(inputs);
 
 // Events are what put an asset in a state — nothing stores "rusak", it is folded from the log.
 let seq = 0;
@@ -45,8 +59,8 @@ const txn = (assetId: string, p: Partial<Txn> & Pick<Txn, 'type'>): Txn => {
 };
 
 function seed(items: Item[], txns: Txn[] = []) {
-  localStorage.setItem('brt.stocktake.draft.v4',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [], txns }));
+  localStorage.setItem('brt.stocktake.draft.v5',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations: [], stock: lines, txns }));
 }
 
 // Three knives and two scales, each unit labelled: ALQ-ITM-0001-001 … ALQ-ITM-0002-002.

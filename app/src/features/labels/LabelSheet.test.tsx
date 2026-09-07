@@ -2,18 +2,35 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { LabelSheet } from './LabelSheet';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { createItem, createLocation } from '../stocktake/draft';
+import { createEntry, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, Location } from '../../../../domain/types';
+import type { Item, Location, StockLine } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
   kind: 'consumable', initialStock: 10, minStock: 5, ...p,
 });
 
-const sheet = (items: Item[], locations: Location[] = []) => {
+
+/** Items and their stock lines together — quantity and placement live on the lines now. */
+let lines: StockLine[] = [];
+const catalog = (...inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, i) => {
+    const built = createEntry(i, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
+
+const sheet = (items: Item[], locations: Location[] = [], stock: StockLine[] = lines) => {
   const Harness = () => (
-    <LabelSheet items={items} categories={SEED_CATEGORIES} locations={locations} />
+    <LabelSheet
+      items={items}
+      categories={SEED_CATEGORIES}
+      locations={locations}
+      stock={stock}
+    />
   );
   return render(Harness);
 };
@@ -34,9 +51,7 @@ describe('LabelSheet', () => {
   });
 
   it('prints one label per rack, and one per unit for labelled durables', () => {
-    const sabun = createItem(input(), []);
-    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), [sabun]);
-    const r = sheet([sabun, pisau]);
+    const r = sheet(catalog(input(), input({ name: 'Pisau', kind: 'equipment', initialStock: 3 })));
 
     setBaseUrl(r, 'https://inventaris.example.com');
     expect(r.getByRole('status').textContent).toContain('4 label');   // 1 rack + 3 units
@@ -45,8 +60,7 @@ describe('LabelSheet', () => {
   });
 
   it('counts sheets, not just labels', () => {
-    const items = Array.from({ length: 25 }, (_, n) =>
-      createItem(input({ name: `Barang ${n + 1}` }), []));
+    const items = catalog(...Array.from({ length: 25 }, (_, n) => input({ name: `Barang ${n + 1}` })));
     const r = sheet(items);
     setBaseUrl(r, 'https://inventaris.example.com');
     expect(r.getByRole('status').textContent).toContain('2 lembar A4'); // 24 fit on the first
@@ -54,7 +68,7 @@ describe('LabelSheet', () => {
 
   it('refuses to print against a dev-server address', () => {
     // happy-dom's location.origin is http://localhost:3000 — exactly the trap.
-    const r = sheet([createItem(input(), [])]);
+    const r = sheet(catalog(input()));
     expect(r.getByRole('alert')).toBeTruthy();
     expect((r.getByText('Cetak') as HTMLButtonElement).disabled).toBe(true);
 
@@ -64,14 +78,14 @@ describe('LabelSheet', () => {
   });
 
   it('draws an opaque quiet zone — a transparent QR on a coloured sticker will not scan', () => {
-    const r = sheet([createItem(input(), [])]);
+    const r = sheet(catalog(input()));
     const svg = r.getByLabelText('ALQ-ITM-0001');
     expect(svg.querySelector('rect')?.getAttribute('fill')).toBe('#fff');
     expect(svg.querySelector('path')?.getAttribute('d')?.startsWith('M')).toBe(true);
   });
 
   it('re-encodes every label when the address changes', () => {
-    const r = sheet([createItem(input(), [])]);
+    const r = sheet(catalog(input()));
     const before = r.getByLabelText('ALQ-ITM-0001').querySelector('path')?.getAttribute('d');
     setBaseUrl(r, 'https://inventaris.example.com');
     expect(r.getByLabelText('ALQ-ITM-0001').querySelector('path')?.getAttribute('d')).not.toBe(before);
@@ -85,10 +99,11 @@ describe('LabelSheet', () => {
 
 describe('LabelSheet — memilih apa yang dicetak', () => {
   const stocked = () => {
-    const sabun = createItem(input({ locationId: A1.locationId }), []);
-    const kain = createItem(input({ name: 'Kain pel', locationId: A1.locationId }), [sabun]);
-    const lampu = createItem(input({ name: 'Lampu', locationId: B2.locationId }), [sabun, kain]);
-    return [sabun, kain, lampu];
+    return catalog(
+      input({ locationId: A1.locationId }),
+      input({ name: 'Kain pel', locationId: A1.locationId }),
+      input({ name: 'Lampu', locationId: B2.locationId }),
+    );
   };
 
   it('prints a rack and everything on it in one action', () => {
@@ -112,8 +127,7 @@ describe('LabelSheet — memilih apa yang dicetak', () => {
   });
 
   it('changes how many sheets a selection needs when the size changes', () => {
-    const items = Array.from({ length: 30 }, (_, n) =>
-      createItem(input({ name: `Barang ${n + 1}` }), []));
+    const items = catalog(...Array.from({ length: 30 }, (_, n) => input({ name: `Barang ${n + 1}` })));
     const r = sheet(items);
     setBaseUrl(r, 'https://inventaris.example.com');
     expect(r.getByRole('status').textContent).toContain('2 lembar A4');   // 24 per sheet

@@ -3,11 +3,11 @@ import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { RackBoard } from './RackBoard';
 import { useDraft } from '../../state/useDraft';
 import { useInventory } from '../../state/useInventory';
-import { createItem, createLocation } from '../stocktake/draft';
+import { createEntry, createItem, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { DAY_MS } from '../../../../domain/cycleCount';
-import type { Item, Location } from '../../../../domain/types';
+import type { Item, Location, StockLine } from '../../../../domain/types';
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.
 const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
@@ -35,18 +35,32 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   kind: 'consumable', initialStock: 10, minStock: null, ...p,
 });
 
-const catalog = (...inputs: DraftInput[]): Item[] =>
-  inputs.reduce<Item[]>((acc, i) => [...acc, createItem(i, acc)], []);
+
+/**
+ * Builds the items AND their stock lines, because quantity and placement live on lines now.
+ * `lines` is what `seed()` stores, so a fixture that still says `initialStock: 3` produces a
+ * shelf with three of the thing on it.
+ */
+let lines: StockLine[] = [];
+const buildCatalog = (inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, x) => {
+    const built = createEntry(x, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
+const catalog = (...inputs: DraftInput[]): Item[] => buildCatalog(inputs);
 
 const B3 = createLocation('B3', 'Gudang Utama', 'Rak sabun', []);
 const B4 = createLocation('B4', 'Gudang Utama', '', [B3]);
 
 function seed(items: Item[], locations: Location[]) {
-  localStorage.setItem('brt.stocktake.draft.v4',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, txns: [] }));
+  localStorage.setItem('brt.stocktake.draft.v5',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns: [] }));
 }
 
-const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v4')!);
+const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v5')!);
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
@@ -135,7 +149,9 @@ describe('RackBoard — a map of the room', () => {
     // The panel stayed open on the rack it was counting, rather than dumping you back at the map.
     expect(r.getByRole('dialog', { name: 'Rak B3' })).toBeTruthy();
     expect(r.getByText('7')).toBeTruthy();              // and now reports what was found
-    expect(stored().items[0].initialStock).toBe(7);
+    // Written to THIS RACK's line, not to the item — the whole reason quantity moved off it.
+    expect(stored().stock.find((l: { locationId: string }) => l.locationId === B3.locationId).initialStock)
+      .toBe(7);
     // The rack is no longer unknown — that is what takes it off the rotation.
     expect(r.queryByText(/belum pernah dicek/)).toBeNull();
     expect(typeof stored().locations[0].lastCountedTs).toBe('number');

@@ -8,16 +8,18 @@
 
 import { useMemo, useState } from 'octane';
 import { Download, Package, Pencil, Trash2 } from '@octanejs/lucide';
-import type { Category, Item, Location } from '../../../../domain/types';
+import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import {
-  createCategory, createItem, createLocation, filterItems, instancesFor, isBlocking, summarise,
-  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, updateItem, validate,
+  createCategory, createEntry, createLocation, filterItems, instancesFor, isBlocking, summarise,
+  toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, toStockCsv, updateEntry,
+  validate,
 } from './draft';
+import { removeItem as removeStockFor, removeLine, totalFor } from '../../../../domain/stock';
 import type { DraftInput } from './draft';
 import { ItemForm } from './ItemForm';
 import { artFor, ItemArt } from '../items/ItemArt';
@@ -30,21 +32,37 @@ const emptyInput = (categories: Category[]): DraftInput => ({
 export function StockTake(
   { draft, search, onSearch }: { draft: Draft; search: string; onSearch: (v: string) => void },
 ) {
-  const { items, categories, locations, setItems, setCategories, setLocations } = draft;
+  const { items, categories, locations, stock, setItems, setCategories, setLocations, setCatalog } = draft;
   const [input, setInput] = useState<DraftInput>(() => emptyInput(categories));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showProblems, setShowProblems] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  /** Which shelf of the row is being edited — a thing can be kept on more than one. */
+  const [editingAt, setEditingAt] = useState('');
   const [exporting, setExporting] = useState(false);
 
   const problems = useMemo(
     () => validate(input, items, editingId ?? undefined),
     [input, items, editingId],
   );
-  const totals = useMemo(() => summarise(items), [items]);
-  const visible = useMemo(() => filterItems(items, search), [items, search]);
-  const labelCount = useMemo(() => items.reduce((n, i) => n + instancesFor(i, 0).length, 0), [items]);
+  const totals = useMemo(() => summarise(items, stock), [items, stock]);
+  /**
+   * ONE ROW PER SHELF, not per item. A stock-take walks the room and writes down "four of
+   * these, here" — so the same thing found on two racks is two entries, and both have to be
+   * visible and separately editable while the walk is happening.
+   */
+  const visible = useMemo(() => {
+    const matching = new Set(filterItems(items, search).map((i) => i.itemId));
+    const byId = new Map(items.map((i) => [i.itemId, i]));
+    return stock
+      .filter((l) => matching.has(l.itemId))
+      .map((l) => ({ line: l, item: byId.get(l.itemId)! }));
+  }, [items, stock, search]);
+  const labelCount = useMemo(
+    () => items.reduce((n, i) => n + instancesFor(i, 0, totalFor(stock, i.itemId)).length, 0),
+    [items, stock],
+  );
 
   const change = <K extends keyof DraftInput>(k: K, v: DraftInput[K]) =>
     setInput((prev) => ({ ...prev, [k]: v }));
@@ -54,27 +72,36 @@ export function StockTake(
     if (problems.filter(isBlocking).length > 0) return;
 
     if (editingId) {
-      setItems((prev) => updateItem(prev, editingId, input));
+      // One write, so the item and its shelf cannot land as two renders with a half-updated
+      // catalog in between.
+      setCatalog((prev) => updateEntry(prev.items, prev.stock, editingId, input, editingAt));
       setEditingId(null);
+      setEditingAt('');
       setInput(emptyInput(categories));
     } else {
-      setItems((prev) => [...prev, createItem(input, prev)]);
-      // Sticky context: walking one shelf means many items sharing a category, unit and kind.
-      // Only the name and the count reset — the difference between 6 taps and 2.
+      setCatalog((prev) => {
+        const { item, stock: next } = createEntry(input, prev.items, prev.stock);
+        return { items: [...prev.items, item], stock: next };
+      });
+      // Sticky context: walking one shelf means many items sharing a category, unit and kind —
+      // and, now, the same rack. Only the name and the count reset; that is the difference
+      // between 6 taps and 2, and shelving is exactly the field that repeats down a shelf.
       setInput((prev) => ({ ...prev, name: '', initialStock: 0, minStock: null }));
     }
     setShowProblems(false);
   }
 
-  function startEdit(item: Item) {
+  function startEdit(item: Item, at = '') {
     setEditingId(item.itemId);
-    setInput(toInput(item));
+    setEditingAt(at);
+    setInput(toInput(item, stock, at));
     setShowProblems(false);
     scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function cancelEdit() {
     setEditingId(null);
+    setEditingAt('');
     setInput(emptyInput(categories));
     setShowProblems(false);
   }
@@ -91,11 +118,27 @@ export function StockTake(
     change('locationId', location.locationId);
   }
 
-  function remove(item: Item) {
-    if (editingId === item.itemId) cancelEdit();
-    setItems((prev) => prev.filter((i) => i.itemId !== item.itemId));
+  /**
+   * Deleting a row deletes ONE SHELF of it — the entry the walk actually made. The item itself
+   * goes only when its last shelf does; otherwise removing a duplicate entry would silently
+   * take the other rack's count with it.
+   */
+  function remove(item: Item, at: string) {
+    if (editingId === item.itemId && editingAt === at) cancelEdit();
+    setCatalog((prev) => {
+      const nextStock = removeLine(prev.stock, item.itemId, at);
+      const orphaned = !nextStock.some((l) => l.itemId === item.itemId);
+      return {
+        items: orphaned ? prev.items.filter((i) => i.itemId !== item.itemId) : prev.items,
+        stock: orphaned ? removeStockFor(nextStock, item.itemId) : nextStock,
+      };
+    });
     setPendingDelete(null);
   }
+
+  /** A row is an item ON a shelf, so its identity needs both. */
+  const rowKey = (item: Item, line: { locationId: string }) =>
+    `${item.itemId}@${line.locationId}`;
 
   function reset() {
     draft.reset();
@@ -111,15 +154,17 @@ export function StockTake(
   // Newest first: the thing just counted is the thing most likely to need a correction.
   const rows = useMemo(() => [...visible].reverse(), [visible]);
 
+  type Row = typeof visible[number];
+
   // Only Barang may grow; every other cell is `whitespace-nowrap`, so an auto-layout table
   // hands its slack to the one column that can use it instead of spreading four columns
   // across a 1440px screen.
-  const columns: Column<Item>[] = [
+  const columns: Column<Row>[] = [
     {
       key: 'barang',
       header: 'Barang',
       mobile: 'title',
-      cell: (i) => {
+      cell: ({ item: i }) => {
         return (
           <div class="flex min-w-0 items-center gap-3">
             <ItemArt art={artFor(i, categoryName(i.categoryId))} size={36} />
@@ -142,7 +187,7 @@ export function StockTake(
       key: 'kategori',
       header: 'Kategori',
       mobile: 'meta',
-      cell: (i) => (
+      cell: ({ item: i, line }) => (
         <span class="flex items-baseline gap-2 whitespace-nowrap">
           <span class="max-w-[12rem] truncate text-sm text-slate-500">{categoryName(i.categoryId)}</span>
           <span class="text-[10px] uppercase tracking-wider text-slate-400">
@@ -155,8 +200,8 @@ export function StockTake(
       key: 'rak',
       header: 'Rak',
       mobile: 'meta',
-      cell: (i) => {
-        const code = rackCode(i.locationId);
+      cell: ({ line }) => {
+        const code = rackCode(line.locationId);
         return code
           ? <span class="whitespace-nowrap text-sm font-medium text-slate-600">{code}</span>
           : <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>;
@@ -167,9 +212,9 @@ export function StockTake(
       header: 'Jumlah',
       align: 'right',
       mobile: 'trailing',
-      cell: (i) => (
+      cell: ({ item: i, line }) => (
         <div class="whitespace-nowrap text-right">
-          <span class="text-sm font-bold tabular-nums text-slate-900">{i.initialStock}</span>{' '}
+          <span class="text-sm font-bold tabular-nums text-slate-900">{line.initialStock}</span>{' '}
           <span class="text-xs text-slate-400">{i.unit}</span>
           {i.minStock != null && <p class="text-[10px] text-slate-400">min {i.minStock}</p>}
         </div>
@@ -182,13 +227,13 @@ export function StockTake(
       // Trailing, not a meta line: on a phone these sit beside the name where a thumb already
       // is. 44px targets, and the delete still costs two deliberate taps.
       mobile: 'trailing',
-      cell: (i) => (pendingDelete === i.itemId ? (
+      cell: ({ item: i, line }) => (pendingDelete === rowKey(i, line) ? (
         <div class="flex flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:justify-end">
           <Button
             size="sm"
             variant="danger"
             class="min-h-[44px] whitespace-nowrap"
-            onClick={() => remove(i)}
+            onClick={() => remove(i, line.locationId)}
             aria-label={`Ya, hapus ${i.name}`}
           >
             Ya, hapus
@@ -207,7 +252,7 @@ export function StockTake(
           <button
             type="button"
             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-600 active:bg-sky-100"
-            onClick={() => startEdit(i)}
+            onClick={() => startEdit(i, line.locationId)}
             aria-label={`Ubah ${i.name}`}
             title="Ubah"
           >
@@ -216,7 +261,7 @@ export function StockTake(
           <button
             type="button"
             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-            onClick={() => setPendingDelete(i.itemId)}
+            onClick={() => setPendingDelete(rowKey(i, line))}
             aria-label={`Hapus ${i.name}`}
             title="Hapus"
           >
@@ -297,7 +342,13 @@ export function StockTake(
         description="Satu berkas per tab. Impor lewat File → Import → Upload."
         onClose={() => setExporting(false)}
       >
-        <ExportPanel items={items} categories={categories} locations={locations} labelCount={labelCount} />
+        <ExportPanel
+          items={items}
+          categories={categories}
+          locations={locations}
+          stock={stock}
+          labelCount={labelCount}
+        />
       </Sheet>
 
       <div class={CARD_FLUSH}>
@@ -316,7 +367,7 @@ export function StockTake(
         <DataTable
           columns={columns}
           rows={rows}
-          keyOf={(i) => i.itemId}
+          keyOf={(r) => rowKey(r.item, r.line)}
           empty={(
             <div class="px-6 py-16 text-center">
               <Package class="mx-auto mb-4 h-10 w-10 text-slate-300" />
@@ -350,8 +401,9 @@ export function StockTake(
  * files are listed with their row counts and taken one at a time.
  */
 function ExportPanel(
-  { items, categories, locations, labelCount }:
-  { items: Item[]; categories: Category[]; locations: Location[]; labelCount: number },
+  { items, categories, locations, stock, labelCount }:
+  { items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[];
+    labelCount: number },
 ) {
   if (items.length === 0) return null;
   const acquiredTs = Date.now();
@@ -360,11 +412,13 @@ function ExportPanel(
   const files = [
     { tab: 'Items', rows: items.length, note: 'katalog barang', csv: () => toItemsCsv(items) },
     { tab: 'Categories', rows: categories.length, note: 'daftar kategori', csv: () => toCategoriesCsv(categories) },
+    // Its own tab, because quantity is per (barang × rak) now — see sheets/README.md.
+    { tab: 'Stock', rows: stock.length, note: 'jumlah per rak', csv: () => toStockCsv(stock) },
     ...(locations.length > 0
       ? [{ tab: 'Locations', rows: locations.length, note: 'rak & tempat', csv: () => toLocationsCsv(locations) }]
       : []),
     ...(labelCount > 0
-      ? [{ tab: 'AssetInstances', rows: labelCount, note: 'unit yang dilabeli satu-satu', csv: () => toInstancesCsv(items, acquiredTs) }]
+      ? [{ tab: 'AssetInstances', rows: labelCount, note: 'unit yang dilabeli satu-satu', csv: () => toInstancesCsv(items, acquiredTs, stock) }]
       : []),
   ];
 

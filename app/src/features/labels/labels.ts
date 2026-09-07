@@ -4,7 +4,8 @@
 // the phone's own camera app, with no app installed and nothing to explain. A bare id would
 // only work inside a scanner we wrote, which is the one situation where the label is least needed.
 
-import type { Category, Item, Location } from '../../../../domain/types';
+import type { Category, Item, Location, StockLine } from '../../../../domain/types';
+import { racksFor, totalFor } from '../../../../domain/stock';
 import { instancesFor } from '../stocktake/draft';
 
 export type LabelKind = 'rack' | 'item' | 'asset';
@@ -57,6 +58,7 @@ export function labelsFor(
   locations: readonly Location[],
   baseUrl: string,
   acquiredTs: number,
+  stock: readonly StockLine[] = [],
 ): LabelSpec[] {
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
 
@@ -72,10 +74,12 @@ export function labelsFor(
   }));
 
   return rackLabels.concat(items.flatMap((item): LabelSpec[] => {
-    const where = item.locationId ?? '';
+    // An item kept on two racks belongs to the first one for grouping. The label itself points
+    // at the ITEM, not at a shelf, so it stays correct wherever the thing is moved to.
+    const where = racksFor(stock, item.itemId).find((id) => id !== '') ?? '';
     if (item.trackBy === 'instance') {
       // One label per physical unit — this is what makes "who has knife #7" answerable.
-      return instancesFor(item, acquiredTs).map((a) => ({
+      return instancesFor(item, acquiredTs, totalFor(stock, item.itemId)).map((a) => ({
         code: a.assetId,
         title: a.label,
         subtitle: categoryName(item.categoryId),

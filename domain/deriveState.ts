@@ -3,7 +3,7 @@
 // Invariant: current stock/status is DERIVED from the append-only log, never stored.
 
 import type {
-  Item, AssetInstance, Txn, DerivedInstance, DerivedItem, DerivedState,
+  Item, AssetInstance, StockLine, Txn, DerivedInstance, DerivedItem, DerivedState,
 } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -30,14 +30,30 @@ export function activeTxns(txns: Txn[]): Txn[] {
 /** Fold events into current state. Pure function of `now`, so time-rules need no cron. */
 export function deriveState(
   items: Item[], instances: AssetInstance[], txns: Txn[], now: number,
+  stock: readonly StockLine[] = [],
 ): DerivedState {
   const T = activeTxns(txns);
 
-  const qty: Record<string, number> = {};
+  // Quantity is folded PER RACK, not per item. The total is a sum taken at the end, which is
+  // the only ordering that lets a rack count reconcile one shelf without touching the others.
+  const byLocation: Record<string, Record<string, number>> = {};
   const outstanding: Record<string, { ts: number; qty: number }[]> = {};
   // The spec's per-item PENGAMBILAN counter: everything ever taken out, positive.
   const taken: Record<string, number> = {};
-  items.forEach((i) => { qty[i.itemId] = i.initialStock; outstanding[i.itemId] = []; taken[i.itemId] = 0; });
+  items.forEach((i) => { byLocation[i.itemId] = {}; outstanding[i.itemId] = []; taken[i.itemId] = 0; });
+  for (const line of stock) {
+    if (!byLocation[line.itemId]) continue;   // a line for an item that no longer exists
+    byLocation[line.itemId][line.locationId] =
+      (byLocation[line.itemId][line.locationId] ?? 0) + line.initialStock;
+  }
+
+  /** A movement with no rack lands on the unplaced pile — visibly wrong, not quietly wrong. */
+  const shelf = (itemId: string, t: Txn) => {
+    const where = t.locationId ?? '';
+    const rows = byLocation[itemId];
+    rows[where] ??= 0;
+    return where;
+  };
 
   const inst: Record<string, DerivedInstance> = {};
   instances.forEach((a) => { inst[a.assetId] = { instance: a, status: 'available' }; });
@@ -70,16 +86,18 @@ export function deriveState(
       }
     }
     // --- quantity items (consumables + quantity-tracked) ---
-    if (t.itemId && qty[t.itemId] !== undefined) {
+    if (t.itemId && byLocation[t.itemId] !== undefined) {
+      const rows = byLocation[t.itemId];
+      const at = shelf(t.itemId, t);
       switch (t.type) {
-        case 'pemakaian':   qty[t.itemId] += t.qtyDelta;                        // delta < 0, permanent
+        case 'pemakaian':   rows[at] += t.qtyDelta;                            // delta < 0, permanent
                             taken[t.itemId] += -t.qtyDelta; break;
         case 'pengambilan':
-        case 'digunakan':   qty[t.itemId] += t.qtyDelta;                        // delta < 0, may return
+        case 'digunakan':   rows[at] += t.qtyDelta;                            // delta < 0, may return
                             taken[t.itemId] += -t.qtyDelta;
                             outstanding[t.itemId].push({ ts: t.ts, qty: -t.qtyDelta }); break;
-        case 'pengembalian': qty[t.itemId] += t.qtyDelta; break;               // delta > 0, restock
-        case 'adjust':       qty[t.itemId] += t.qtyDelta; break;               // admin correction
+        case 'pengembalian': rows[at] += t.qtyDelta; break;                    // delta > 0, restock
+        case 'adjust':       rows[at] += t.qtyDelta; break;                    // admin correction
       }
     }
   }
@@ -90,12 +108,17 @@ export function deriveState(
   // the `outstanding` figure we surface for reconciliation.
   const derivedItems: Record<string, DerivedItem> = {};
   items.forEach((i) => {
-    const q = qty[i.itemId];
+    const rows = byLocation[i.itemId];
+    // The minimum is compared against the TOTAL: nobody wants to be told sabun is low on A1
+    // while there are twelve of them on A3.
+    const q = Object.values(rows).reduce((sum, n) => sum + n, 0);
     const pend = outstanding[i.itemId]
       .filter((o) => now - o.ts <= DAY_MS)
       .reduce((s, o) => s + o.qty, 0);
     const status = q <= 0 ? 'out' : (i.minStock != null && q <= i.minStock ? 'low' : 'available');
-    derivedItems[i.itemId] = { item: i, qty: q, status, outstanding: pend, takenTotal: taken[i.itemId] };
+    derivedItems[i.itemId] = {
+      item: i, qty: q, byLocation: rows, status, outstanding: pend, takenTotal: taken[i.itemId],
+    };
   });
 
   const lowStock = Object.values(derivedItems).filter((d) => d.status !== 'available');

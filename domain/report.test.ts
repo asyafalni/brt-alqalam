@@ -1,19 +1,34 @@
 import { describe, it, expect } from 'vitest';
 import { deriveState } from './deriveState';
 import { buildReport, percent } from './report';
-import type { Item, Location, Txn } from './types';
+import type { Item, Location, StockLine, Txn } from './types';
 
 const NOW = Date.parse('2026-09-06T00:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * Test shorthand: fixtures still say `initialStock` and `locationId` because that is what each
+ * case is about, and the builder turns them into the stock line the domain now takes.
+ *
+ * Creating an item REPLACES its lines rather than adding to them. Several cases here reuse an
+ * explicit id ('ITM-S', 'A', 'B'), and appending silently added one test's opening stock to
+ * the next one's — which showed up as an overdrawn item reading as comfortably in credit.
+ */
+const lines: StockLine[] = [];
+
 let seq = 0;
-const item = (p: Partial<Item> = {}): Item => {
+const item = (p: Partial<Item> & { initialStock?: number; locationId?: string } = {}): Item => {
   seq += 1;
-  return {
+  const { initialStock = 10, locationId = '', ...rest } = p;
+  const i: Item = {
     itemId: `ITM-${seq}`, barcode: `b${seq}`, name: `Barang ${seq}`, categoryId: 'CAT-K',
     kind: 'consumable', unit: 'buah', trackBy: 'quantity',
-    minStock: 5, initialStock: 10, active: true, ...p,
+    minStock: 5, active: true, ...rest,
   };
+  const stale = lines.findIndex((l) => l.itemId === i.itemId);
+  if (stale >= 0) lines.splice(stale, 1);
+  lines.push({ itemId: i.itemId, locationId, initialStock });
+  return i;
 };
 
 const loc = (p: Partial<Location> = {}): Location => ({
@@ -22,7 +37,8 @@ const loc = (p: Partial<Location> = {}): Location => ({
 
 const NAMES: Record<string, string> = { 'CAT-K': 'Kebersihan', 'CAT-L': 'Listrik' };
 const build = (items: Item[], locations: Location[] = [], txns: Txn[] = []) =>
-  buildReport(items, locations, (id) => NAMES[id] ?? id, deriveState(items, [], txns, NOW), NOW);
+  buildReport(items, locations, (id) => NAMES[id] ?? id,
+    deriveState(items, [], txns, NOW, lines), NOW);
 
 describe('buildReport — totals', () => {
   it('counts items and folds their derived quantities, not their starting ones', () => {

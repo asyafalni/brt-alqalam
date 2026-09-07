@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseCsv, toRecords } from './csv';
-import { parseItems, parseTxns, parseInstances, parseLocations, describeIssues } from './parse';
+import { parseItems, parseStock, parseTxns, parseInstances, parseLocations, describeIssues } from './parse';
 
 describe('parseCsv', () => {
   it('handles quotes, embedded commas and newlines', () => {
@@ -18,21 +18,23 @@ describe('parseCsv', () => {
 });
 
 const ITEM_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,keterangan\n';
+const STOCK_HEADER = 'itemId,locationId,initialStock\n';
 
 describe('parseItems', () => {
   it('reads a well-formed row', () => {
     const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,LOC-A1,pemakaian');
     expect(r.quarantined).toEqual([]);
     expect(r.ok[0]).toMatchObject({
-      itemId: 'ITM-S', kind: 'consumable', minStock: 5, initialStock: 10, active: true,
-      locationId: 'LOC-A1', keterangan: 'pemakaian',
+      itemId: 'ITM-S', kind: 'consumable', minStock: 5, active: true, keterangan: 'pemakaian',
     });
   });
 
-  it('treats a blank location as unplaced rather than an error', () => {
+  it('ignores the legacy stock and location columns rather than choking on them', () => {
+    // Quantity and placement moved to the Stock tab. An Items sheet exported before that still
+    // carries both columns, and a catalog that refuses to load is a worse answer than one that
+    // reads the fields it still owns.
     const r = parseItems(ITEM_HEADER + 'ITM-S,b1,Sabun,CAT-K,consumable,galon,quantity,5,10,TRUE,,');
     expect(r.quarantined).toEqual([]);
-    expect(r.ok[0].locationId).toBeUndefined();
     expect(r.ok[0].keterangan).toBeUndefined();
   });
 
@@ -59,12 +61,12 @@ describe('parseItems', () => {
   });
 
   it('accepts a comma decimal separator', () => {
-    const r = parseItems(ITEM_HEADER + 'A,,Sabun,C,consumable,galon,quantity,5,"10,5",');
+    const r = parseStock(STOCK_HEADER + 'A,LOC-A1,"10,5"');
     expect(r.ok[0].initialStock).toBe(10.5);
   });
 
   it('quarantines a bad number instead of coercing it to NaN', () => {
-    const r = parseItems(ITEM_HEADER + 'A,,Sabun,C,consumable,galon,quantity,5,sepuluh,');
+    const r = parseStock(STOCK_HEADER + 'A,LOC-A1,sepuluh');
     expect(r.ok).toHaveLength(0);
     expect(r.quarantined[0]).toMatchObject({ row: 2, field: 'initialstock' });
     expect(r.quarantined[0].message).toContain('bukan angka');
@@ -145,9 +147,32 @@ describe('parseInstances', () => {
   });
 });
 
+describe('parseStock', () => {
+  it('reads how much of one item sits on one rack', () => {
+    const r = parseStock(STOCK_HEADER + 'ITM-S,LOC-A1,4\nITM-S,LOC-A3,6');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok).toEqual([
+      { itemId: 'ITM-S', locationId: 'LOC-A1', initialStock: 4 },
+      { itemId: 'ITM-S', locationId: 'LOC-A3', initialStock: 6 },
+    ]);
+  });
+
+  it('reads a blank rack as the unplaced pile, not as an error', () => {
+    // The stock nobody has put away is the stock most likely to go missing, so it has to be a
+    // line like any other rather than something the parser refuses.
+    const r = parseStock(STOCK_HEADER + 'ITM-S,,3');
+    expect(r.quarantined).toEqual([]);
+    expect(r.ok[0].locationId).toBe('');
+  });
+
+  it('quarantines a line with no item to belong to', () => {
+    expect(parseStock(STOCK_HEADER + ',LOC-A1,3').quarantined[0].field).toBe('itemid');
+  });
+});
+
 describe('describeIssues', () => {
   it('renders issues for the admin banner with sheet row numbers', () => {
-    const r = parseItems(ITEM_HEADER + 'A,,Sabun,C,consumable,galon,quantity,5,sepuluh,');
+    const r = parseStock(STOCK_HEADER + 'A,LOC-A1,sepuluh');
     expect(describeIssues(r.quarantined)).toBe('Baris 2 (initialstock): "sepuluh" bukan angka');
   });
 });

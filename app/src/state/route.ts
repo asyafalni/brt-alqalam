@@ -11,7 +11,8 @@ export type Route =
   | { name: 'opname' }
   | { name: 'label' }
   | { name: 'board' }
-  | { name: 'racks' }
+  /** `id` opens straight onto one rack's panel — the stock list links to it by rack. */
+  | { name: 'racks'; id?: string }
   | { name: 'pindai' }
   | { name: 'item'; id: string }
   | { name: 'laporan' }
@@ -45,7 +46,10 @@ export function parseRoute(hash: string): Route {
   if (path === '/laporan') return { name: 'laporan' };
   if (path === '/aset') return { name: 'aset' };
   if (path === '/board') return { name: 'board' };
-  if (path === '/racks') return { name: 'racks' };
+  if (path === '/racks') {
+    const id = params.get('r');
+    return id ? { name: 'racks', id } : { name: 'racks' };
+  }
   if (path === '/pindai') return { name: 'pindai' };
   return { name: 'beranda' };
 }
@@ -56,7 +60,7 @@ export function routeToHash(route: Route): string {
     case 'laporan': return '#/laporan';
     case 'aset': return '#/aset';
     case 'board': return '#/board';
-    case 'racks': return '#/racks';
+    case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';
     case 'opname': return '#/opname';
     case 'item': return `#/barang?i=${encodeURIComponent(route.id)}`;

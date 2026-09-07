@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'octane';
-import type { Category, Item, Location, Txn } from '../../../domain/types';
+import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
 import { SEED_CATEGORIES } from '../data/seedCategories';
 import { clearDraft, loadDraft, saveDraft } from './persist';
 import { demoDraft } from '../data/demo';
@@ -8,10 +8,16 @@ export interface Draft {
   items: Item[];
   categories: Category[];
   locations: Location[];
+  /** How much of each item sits on which rack — quantity lives here, not on the item. */
+  stock: StockLine[];
   txns: Txn[];
   setItems: (update: (prev: Item[]) => Item[]) => void;
   setCategories: (update: (prev: Category[]) => Category[]) => void;
   setLocations: (update: (prev: Location[]) => Location[]) => void;
+  setStock: (update: (prev: StockLine[]) => StockLine[]) => void;
+  /** Both at once, so adding an item and shelving it cannot land as two renders. */
+  setCatalog: (update: (prev: { items: Item[]; stock: StockLine[] }) =>
+    { items: Item[]; stock: StockLine[] }) => void;
   reset: () => void;
   loadDemo: () => void;
 }
@@ -32,11 +38,17 @@ export function useDraft(): Draft {
     items: state.items,
     categories: state.categories,
     locations: state.locations,
+    stock: state.stock,
     txns: state.txns,
     setItems: (update) => setState((prev) => ({ ...prev, items: update(prev.items) })),
     setCategories: (update) => setState((prev) => ({ ...prev, categories: update(prev.categories) })),
     setLocations: (update) => setState((prev) => ({ ...prev, locations: update(prev.locations) })),
-    reset: () => { clearDraft(); setState({ items: [], categories: SEED_CATEGORIES, locations: [], txns: [] }); },
+    setStock: (update) => setState((prev) => ({ ...prev, stock: update(prev.stock) })),
+    setCatalog: (update) => setState((prev) => ({ ...prev, ...update({ items: prev.items, stock: prev.stock }) })),
+    reset: () => {
+      clearDraft();
+      setState({ items: [], categories: SEED_CATEGORIES, locations: [], stock: [], txns: [] });
+    },
     loadDemo: () => setState(demoDraft()),
   };
 }

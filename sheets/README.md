@@ -2,7 +2,7 @@
 
 **Do not hand-type these headers.** They must match `data/parse.ts` exactly; a mismatch
 quarantines every row. Import each CSV as its own tab, named exactly as the filename
-(`Categories`, `Locations`, `Items`, `AssetInstances`, `Transactions`).
+(`Categories`, `Locations`, `Items`, `Stock`, `AssetInstances`, `Transactions`).
 
 > In Google Sheets: **File → Import → Upload → Insert new sheet(s)**, then rename the tab to the
 > filename. Repeat per file. Delete the example rows once you have real data — they are marked
@@ -14,9 +14,31 @@ quarantines every row. Import each CSV as its own tab, named exactly as the file
 | --- | --- | --- |
 | `Categories` | admin (by hand) | Free-form and editable (design doc Part XI). Seeded with the boss's 8 domains. |
 | `Locations` | admin **and** the stock-take | Racks, shelves and bins — **one QR per rack** (§14.2), never one per bar of soap. `code` is what is painted on the shelf ("B3"); `zone` groups racks into rooms. |
-| `Items` | admin by hand **and** the stock-take screen | The catalog. |
+| `Items` | admin by hand **and** the stock-take screen | The catalog: what a thing **is**. No quantity, no rack. |
+| `Stock` | the stock-take screen, and every cycle count | **How much of an item sits on which rack** — one row per (barang × rak). This is where quantity lives. |
 | `AssetInstances` | admin / label tool | Only for `trackBy: instance` durables — one row per physical unit. |
 | `Transactions` | **the gateway only** | Append-only event log. **Never edit or delete a row here** — corrections are `reversal` rows. |
+
+### Why `Stock` is a separate tab
+
+The same thing is routinely kept on more than one rack, and the item used to carry a single
+`initialStock` and a single `locationId`. That did not merely limit the model, it made cycle
+counting **wrong**: counting rack A1 wrote what you found there over the item's whole quantity,
+so the stock on A3 silently disappeared. Counting is the one mechanism keeping the numbers
+honest, so it has to be per rack — which means quantity has to be per rack too.
+
+Two rows for one item is normal and correct:
+
+```
+itemId,locationId,initialStock
+ITM-0001,LOC-A1,4
+ITM-0001,LOC-A3,6
+```
+
+A **blank `locationId` is the unplaced pile**, not an error — real, visible, and the state most
+likely to end in something going missing. `minStock` stays on the *item*, because the alarm is
+about the thing as a whole: nobody wants to be told sabun is low on A1 while there are twelve
+of them on A3.
 
 ## Column formats the parser accepts
 

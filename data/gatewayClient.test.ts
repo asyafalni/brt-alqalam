@@ -26,9 +26,9 @@ const STATE = {
   locations: [{ locationId: 'LOC-A1', code: 'A1', name: 'Rak sabun', zone: 'Gudang', order: '1', active: 'TRUE' }],
   items: [{
     itemId: 'ITM-0001', barcode: 'ALQ-ITM-0001', name: 'Sabun', categoryId: 'CAT-K',
-    kind: 'consumable', unit: 'galon', trackBy: 'quantity', minStock: '5',
-    initialStock: '12', active: 'TRUE', locationId: 'LOC-A1',
+    kind: 'consumable', unit: 'galon', trackBy: 'quantity', minStock: '5', active: 'TRUE',
   }],
+  stock: [{ itemId: 'ITM-0001', locationId: 'LOC-A1', initialStock: '12' }],
   instances: [],
   txns: [{
     txnId: 'T1', clientTxnId: 'c1', ts: '2026-09-06T10:00:00.000Z', type: 'pemakaian',
@@ -77,9 +77,10 @@ describe('reading state', () => {
 
     expect(snapshot.issues).toEqual([]);
     expect(snapshot.items[0]).toMatchObject({
-      itemId: 'ITM-0001', minStock: 5, initialStock: 12, active: true,
-      kind: 'consumable', locationId: 'LOC-A1',
+      itemId: 'ITM-0001', minStock: 5, active: true, kind: 'consumable',
     });
+    // Quantity and placement arrive as their own rows now, one per rack.
+    expect(snapshot.stock).toEqual([{ itemId: 'ITM-0001', locationId: 'LOC-A1', initialStock: 12 }]);
     expect(snapshot.categories[0].order).toBe(1);
   });
 
@@ -93,7 +94,7 @@ describe('reading state', () => {
   });
 
   it('quarantines a bad row instead of dropping it or poisoning the good ones', async () => {
-    const broken = { ...STATE, items: [...STATE.items, { ...STATE.items[0], itemId: 'ITM-0002', initialStock: 'sepuluh' }] };
+    const broken = { ...STATE, stock: [...STATE.stock, { itemId: 'ITM-0002', locationId: '', initialStock: 'sepuluh' }] };
     const { client } = stub(() => ({ ok: true, state: broken }));
     const snapshot = await client.catalog.load();
 

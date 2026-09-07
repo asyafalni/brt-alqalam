@@ -14,6 +14,7 @@ import { Button, CARD, CARD_FLUSH, CODE, PageHeader } from '../../components/ui'
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import { instancesFor } from '../stocktake/draft';
+import { totalFor } from '../../../../domain/stock';
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
@@ -95,11 +96,21 @@ export function ItemDetail(
   const badge = itemStatusBadge(derived?.status ?? 'available');
   const categoryName = draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '';
   const art = artFor(item, categoryName);
-  const rack = draft.locations.find((l) => l.locationId === item.locationId);
+  /** Every shelf this thing is kept on, with what is on each — the unplaced pile included. */
+  const shelves = useMemo(() => {
+    const rows = derived?.byLocation ?? {};
+    return Object.entries(rows).map(([locationId, qty]) => ({
+      locationId,
+      qty,
+      location: draft.locations.find((l) => l.locationId === locationId),
+    }));
+  }, [derived, draft.locations]);
 
   const instances = useMemo(
-    () => (item.trackBy === 'instance' ? instancesFor(item, now) : []),
-    [item, now],
+    () => (item.trackBy === 'instance'
+      ? instancesFor(item, now, totalFor(draft.stock, item.itemId))
+      : []),
+    [item, now, draft.stock],
   );
 
   // Newest first: what happened last is what someone came here to find out.
@@ -159,7 +170,7 @@ export function ItemDetail(
               <div class="mb-2 flex flex-wrap items-center gap-3">
                 <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
                 <span class="text-2xl font-bold tabular-nums text-slate-900">
-                  {derived?.qty ?? item.initialStock}{' '}
+                  {derived?.qty ?? 0}{' '}
                   <span class="text-base font-normal text-slate-400">{item.unit}</span>
                 </span>
               </div>
@@ -176,27 +187,61 @@ export function ItemDetail(
           </dl>
         </div>
 
-        <button
-          type="button"
-          class={`${CARD} flex flex-col text-left transition-colors hover:bg-slate-50`}
-          onClick={() => onNavigate({ name: 'racks' })}
-        >
-          <div class="mb-1 flex items-center gap-2">
+        {/* Racks, plural. A thing kept on two shelves has two answers to "where is it", and
+            showing only the first would send somebody to whichever one happens to be empty.
+            Each row carries its own quantity, because that is the number they will be
+            standing in front of. */}
+        <div class={`${CARD} flex flex-col`}>
+          <div class="mb-2 flex items-center gap-2">
             <MapPin class="h-4 w-4 shrink-0 text-slate-400" />
             <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Letak</span>
+            {shelves.length > 1 && (
+              <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {shelves.length} rak
+              </span>
+            )}
           </div>
-          {rack ? (
-            <>
-              <p class="truncate text-xl font-bold text-slate-900">Rak {rack.code}</p>
-              <p class="truncate text-sm text-slate-500">{rack.name || rack.zone}</p>
-            </>
-          ) : (
+          {shelves.length === 0 ? (
             <>
               <p class="text-xl font-bold text-slate-900">Belum ditempatkan</p>
               <p class="text-sm text-slate-500">Barang tanpa rak paling sering hilang.</p>
             </>
+          ) : (
+            <ul class="divide-y divide-slate-100">
+              {shelves.map((shelf) => (
+                <li key={shelf.locationId || 'unplaced'}>
+                  <button
+                    type="button"
+                    class="flex w-full items-baseline gap-3 py-2 text-left hover:text-slate-900"
+                    disabled={!shelf.location}
+                    aria-label={shelf.location ? `Buka Rak ${shelf.location.code}` : undefined}
+                    onClick={() => shelf.location
+                      && onNavigate({ name: 'racks', id: shelf.location.locationId })}
+                  >
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-bold text-slate-900">
+                        {shelf.location ? `Rak ${shelf.location.code}` : 'Belum ditempatkan'}
+                      </p>
+                      {shelf.location && (
+                        <p class="truncate text-xs text-slate-500">
+                          {shelf.location.name || shelf.location.zone}
+                        </p>
+                      )}
+                    </div>
+                    {/* Only when it is split. On a single shelf this is the headline figure
+                        said twice, and a number repeated is a number to reconcile. */}
+                    {shelves.length > 1 && (
+                      <span class="shrink-0 text-sm font-bold tabular-nums text-slate-900">
+                        {shelf.qty}
+                        <span class="ml-1 text-xs font-normal text-slate-400">{item.unit}</span>
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </button>
+        </div>
       </div>
 
       {instances.length > 0 && (

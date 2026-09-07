@@ -17,9 +17,9 @@ import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 
 export function Board(
-  { items, categories, locations, inventory, search, onOpenItem }:
+  { items, categories, locations, inventory, search, onOpenItem, onOpenRack }:
   { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory;
-    search: string; onOpenItem: (itemId: string) => void },
+    search: string; onOpenItem: (itemId: string) => void; onOpenRack: (locationId: string) => void },
 ) {
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
@@ -75,17 +75,38 @@ export function Board(
       header: 'Rak',
       mobile: 'meta',
       cell: (d) => {
-        const rack = locations.find((l) => l.locationId === d.item.locationId);
-        return rack ? (
-          <span class="inline-flex items-center gap-1 whitespace-nowrap text-sm text-slate-600">
-            <MapPin class="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span class="font-semibold">{rack.code}</span>
-            <span class="hidden text-slate-400 lg:inline">{rack.zone}</span>
-          </span>
-        ) : (
+        // Racks, plural: the same thing is routinely kept in more than one place, and naming
+        // only the first would send somebody to a shelf that may be the empty one.
+        const here = Object.keys(d.byLocation)
+          .filter((id) => id !== '')
+          .map((id) => locations.find((l) => l.locationId === id))
+          .filter((l): l is Location => l != null);
+
+        if (here.length === 0) {
           // Not blank: an unplaced item is a real, visible state and the thing most likely to
           // go missing, so it says so rather than leaving a gap that reads as a rendering bug.
-          <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>
+          return <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>;
+        }
+        return (
+          <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
+            {here.map((rack) => (
+              <button
+                key={rack.locationId}
+                type="button"
+                class="inline-flex items-center gap-1 whitespace-nowrap rounded hover:text-slate-900 hover:underline"
+                aria-label={`Buka Rak ${rack.code}`}
+                onClick={(e: Event) => { e.stopPropagation(); onOpenRack(rack.locationId); }}
+              >
+                <MapPin class="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span class="font-semibold">{rack.code}</span>
+                {/* Only when it is split. On a single shelf this number is the Stok column
+                    said twice, and a number repeated is a number somebody has to reconcile. */}
+                {here.length > 1 && (
+                  <span class="text-slate-400 tabular-nums">{d.byLocation[rack.locationId]}</span>
+                )}
+              </button>
+            ))}
+          </span>
         );
       },
     },

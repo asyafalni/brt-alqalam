@@ -7,12 +7,15 @@
 // Every read is defensive. A half-written or hand-edited value must not white-screen a tablet
 // in a gudang — we would rather start empty and say so than crash.
 
-import type { Category, Item, Location, Txn } from '../../../domain/types';
+import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
+import { linesFromLegacy } from '../../../domain/stock';
 
 export interface StoredDraft {
   items: Item[];
   categories: Category[];
   locations: Location[];
+  /** How much of each item sits on which rack. Quantity lives here, not on the item. */
+  stock: StockLine[];
   /**
    * Local event log. Empty in real use until the gateway exists — the demo data fills it so
    * the borrowed / broken / lost states are visible at all, since every one of them is a
@@ -21,7 +24,8 @@ export interface StoredDraft {
   txns: Txn[];
 }
 
-const KEY = 'brt.stocktake.draft.v4';
+const KEY = 'brt.stocktake.draft.v5';
+const KEY_V4 = 'brt.stocktake.draft.v5'; // quantity and one rack still on the item
 const KEY_V3 = 'brt.stocktake.draft.v3'; // items + categories + locations, before the log
 const KEY_V2 = 'brt.stocktake.draft.v2'; // items + categories, before racks existed
 const KEY_V1 = 'brt.stocktake.draft.v1'; // a bare Item[], before categories were editable
@@ -38,6 +42,21 @@ const isLocation = (v: unknown): v is Location =>
 const isTxn = (v: unknown): v is Txn =>
   !!v && typeof v === 'object' && typeof (v as Txn).txnId === 'string';
 
+const isStockLine = (v: unknown): v is StockLine =>
+  !!v && typeof v === 'object'
+  && typeof (v as StockLine).itemId === 'string'
+  && typeof (v as StockLine).initialStock === 'number';
+
+/** An item as it was stored before quantity and placement moved to their own rows. */
+type LegacyItem = Item & { initialStock?: number; locationId?: string };
+
+/** The same item with the two migrated fields removed, so nothing reads them by accident. */
+function stripLegacy(i: LegacyItem): Item {
+  const { initialStock, locationId, ...item } = i;
+  void initialStock; void locationId;
+  return item;
+}
+
 function readJson(key: string): unknown {
   try {
     const raw = localStorage.getItem(key);
@@ -50,15 +69,35 @@ function readJson(key: string): unknown {
 export function loadDraft(fallbackCategories: Category[]): StoredDraft {
   // Migrations exist so a half-finished walk survives a schema change. Losing someone's
   // afternoon in the gudang to a version bump would be unforgivable.
-  const v4 = readJson(KEY);
-  if (v4 && typeof v4 === 'object') {
-    const { items, categories, locations, txns } = v4 as Partial<StoredDraft>;
+  const v5 = readJson(KEY);
+  if (v5 && typeof v5 === 'object') {
+    const { items, categories, locations, stock, txns } = v5 as Partial<StoredDraft>;
     return {
       items: Array.isArray(items) ? items.filter(isItem) : [],
       categories: Array.isArray(categories) && categories.some(isCategory)
         ? categories.filter(isCategory)
         : fallbackCategories,
       locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
+      stock: Array.isArray(stock) ? stock.filter(isStockLine) : [],
+      txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
+    };
+  }
+
+  // Before quantity could be split across racks. Every item carried one `initialStock` and one
+  // `locationId`; each becomes a single stock line. This is the migration that matters most —
+  // those two fields ARE somebody's afternoon in the gudang, and dropping them would mean
+  // walking it again.
+  const v4 = readJson(KEY_V4);
+  if (v4 && typeof v4 === 'object') {
+    const { items, categories, locations, txns } = v4 as Partial<StoredDraft>;
+    const legacy = (Array.isArray(items) ? items.filter(isItem) : []) as LegacyItem[];
+    return {
+      items: legacy.map(stripLegacy),
+      categories: Array.isArray(categories) && categories.some(isCategory)
+        ? categories.filter(isCategory)
+        : fallbackCategories,
+      locations: Array.isArray(locations) ? locations.filter(isLocation) : [],
+      stock: linesFromLegacy(legacy),
       txns: Array.isArray(txns) ? txns.filter(isTxn) : [],
     };
   }
@@ -67,8 +106,10 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
   const v3 = readJson(KEY_V3);
   if (v3 && typeof v3 === 'object') {
     const { items, categories, locations } = v3 as Partial<StoredDraft>;
+    const legacy = (Array.isArray(items) ? items.filter(isItem) : []) as LegacyItem[];
     return {
-      items: Array.isArray(items) ? items.filter(isItem) : [],
+      items: legacy.map(stripLegacy),
+      stock: linesFromLegacy(legacy),
       categories: Array.isArray(categories) && categories.some(isCategory)
         ? categories.filter(isCategory)
         : fallbackCategories,
@@ -81,8 +122,10 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
   const v2 = readJson(KEY_V2);
   if (v2 && typeof v2 === 'object') {
     const { items, categories } = v2 as Partial<StoredDraft>;
+    const legacy = (Array.isArray(items) ? items.filter(isItem) : []) as LegacyItem[];
     return {
-      items: Array.isArray(items) ? items.filter(isItem) : [],
+      items: legacy.map(stripLegacy),
+      stock: linesFromLegacy(legacy),
       categories: Array.isArray(categories) && categories.some(isCategory)
         ? categories.filter(isCategory)
         : fallbackCategories,
@@ -93,9 +136,18 @@ export function loadDraft(fallbackCategories: Category[]): StoredDraft {
 
   // Before categories became editable. Keep the walk, not the schema.
   const v1 = readJson(KEY_V1);
-  if (Array.isArray(v1)) return { items: v1.filter(isItem), categories: fallbackCategories, locations: [], txns: [] };
+  if (Array.isArray(v1)) {
+    const legacy = v1.filter(isItem) as LegacyItem[];
+    return {
+      items: legacy.map(stripLegacy),
+      categories: fallbackCategories,
+      locations: [],
+      stock: linesFromLegacy(legacy),
+      txns: [],
+    };
+  }
 
-  return { items: [], categories: fallbackCategories, locations: [], txns: [] };
+  return { items: [], categories: fallbackCategories, locations: [], stock: [], txns: [] };
 }
 
 export function saveDraft(draft: StoredDraft): void {
@@ -109,6 +161,7 @@ export function saveDraft(draft: StoredDraft): void {
 export function clearDraft(): void {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(KEY_V4);
     localStorage.removeItem(KEY_V3);
     localStorage.removeItem(KEY_V2);
     localStorage.removeItem(KEY_V1);

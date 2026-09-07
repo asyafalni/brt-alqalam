@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { Board } from './Board';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { createItem, createLocation, instancesFor } from '../stocktake/draft';
+import { createEntry, createLocation, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, Location } from '../../../../domain/types';
+import type { Item, Location, StockLine } from '../../../../domain/types';
 import { deriveState } from '../../../../domain/deriveState';
 import { deriveNotifications } from '../../../../domain/notifications';
 
@@ -17,17 +17,34 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
 
 const A1 = createLocation('A1', 'Gudang Utama', '', []);
 
-const catalog = (...i: DraftInput[]): Item[] =>
-  i.reduce<Item[]>((acc, x) => [...acc, createItem(x, acc)], []);
+/**
+ * Builds the items AND their stock lines, because quantity lives on lines now. `lines` is read
+ * by the harness right after, so a fixture that says `initialStock: 3` still produces a row
+ * with three of the thing on it.
+ */
+let lines: StockLine[] = [];
+const catalog = (...inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, x) => {
+    const built = createEntry(x, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
 
 function board(
   items: Item[],
   search = '',
   onOpenItem: (id: string) => void = () => {},
   locations: Location[] = [A1],
+  stock: StockLine[] = lines,
+  onOpenRack: (id: string) => void = () => {},
 ) {
   const H = () => {
-    const instances = items.flatMap((i) => instancesFor(i, NOW));
+    const instances = items.flatMap(
+      (i) => instancesFor(i, NOW, stock.filter((l) => l.itemId === i.itemId)
+        .reduce((n, l) => n + l.initialStock, 0)),
+    );
     return (
       <Board
         items={items}
@@ -35,11 +52,12 @@ function board(
         locations={locations}
         search={search}
         onOpenItem={onOpenItem}
+        onOpenRack={onOpenRack}
         inventory={{
           instances,
           txns: [],
-          derived: deriveState(items, instances, [], NOW),
-          notifications: deriveNotifications(items, [], NOW),
+          derived: deriveState(items, instances, [], NOW, stock),
+          notifications: deriveNotifications(items, [], NOW, stock),
           offline: true,
         }}
       />
@@ -124,14 +142,36 @@ describe('where a thing is', () => {
   // "We own 12 galon sabun" does not help anybody who cannot find them; "Rak A1" does. It was
   // one tap away on the item screen, which is one tap too many while standing in the gudang.
   it('names the rack on the row itself', () => {
-    const r = board(catalog(input({ name: 'Sabun', locationId: A1.locationId })));
+    const items = catalog(input({ name: 'Sabun', locationId: A1.locationId }));
+    const r = board(items, '', () => {}, [A1]);
     expect(desk(r).getByText('A1')).toBeTruthy();
+  });
+
+  it('names EVERY rack a thing is kept on, not just the first', () => {
+    // Naming one would send somebody to whichever shelf happens to be the empty one.
+    const items = catalog(input({ name: 'Sabun', locationId: A1.locationId }));
+    const B2 = createLocation('B2', 'Gudang PHBI', '', [A1]);
+    const r = board(items, '', () => {}, [A1, B2], [
+      ...lines,
+      { itemId: items[0].itemId, locationId: B2.locationId, initialStock: 6 },
+    ]);
+    expect(desk(r).getByText('A1')).toBeTruthy();
+    expect(desk(r).getByText('B2')).toBeTruthy();
+  });
+
+  it('opens the rack when its code is tapped', () => {
+    const items = catalog(input({ name: 'Sabun', locationId: A1.locationId }));
+    const opened: string[] = [];
+    const r = board(items, '', () => {}, [A1], lines, (id) => opened.push(id));
+    fireEvent.click(desk(r).getByLabelText('Buka Rak A1'));
+    expect(opened).toEqual([A1.locationId]);
   });
 
   it('says so out loud when an item has no rack, rather than leaving a gap', () => {
     // An unplaced item is the one most likely to go missing, so a blank cell is the wrong
     // answer — it reads as a rendering bug rather than as a real, actionable state.
-    const r = board(catalog(input({ name: 'Sabun' })));
+    const items = catalog(input({ name: 'Sabun' }));
+    const r = board(items, '', () => {}, [A1]);
     expect(desk(r).getByText('belum ditempatkan')).toBeTruthy();
   });
 });

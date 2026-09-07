@@ -13,12 +13,15 @@ const loc = (p: Partial<Location> = {}): Location => ({
 });
 
 let seq = 0;
-const item = (p: Partial<Item> = {}): Item => {
+const item = (p: Partial<Item> & { initialStock?: number } = {}): Item => {
   seq += 1;
+  // `initialStock` is fixture shorthand: quantity lives on stock lines now, and these cases
+  // are about the counting arithmetic rather than about where a thing is shelved.
+  const { initialStock, ...rest } = p;
   return {
     itemId: `ITM-${seq}`, barcode: `b${seq}`, name: `Barang ${seq}`, categoryId: 'CAT-K',
     kind: 'consumable', unit: 'buah', trackBy: 'quantity',
-    minStock: 5, initialStock: 10, active: true, ...p,
+    minStock: 5, active: true, ...rest,
   };
 };
 

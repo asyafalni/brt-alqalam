@@ -2,20 +2,35 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@octanejs/testing-library';
 import { App } from '../../App';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { createItem, createLocation } from '../stocktake/draft';
+import { createEntry, createItem, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, Location } from '../../../../domain/types';
+import type { Item, Location, StockLine } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
   kind: 'consumable', initialStock: 12, minStock: 5, ...p,
 });
 const A1: Location = createLocation('A1', 'Gudang Utama', '', []);
-const catalog = (...i: DraftInput[]): Item[] => i.reduce<Item[]>((a, x) => [...a, createItem(x, a)], []);
+
+/**
+ * Builds the items AND their stock lines, because quantity and placement live on lines now.
+ * `lines` is what `seed()` stores, so a fixture that still says `initialStock: 3` produces a
+ * shelf with three of the thing on it.
+ */
+let lines: StockLine[] = [];
+const buildCatalog = (inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, x) => {
+    const built = createEntry(x, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
+const catalog = (...inputs: DraftInput[]): Item[] => buildCatalog(inputs);
 
 function seed(items: Item[], locations: Location[] = [A1]) {
-  localStorage.setItem('brt.stocktake.draft.v4',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, txns: [] }));
+  localStorage.setItem('brt.stocktake.draft.v5',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns: [] }));
 }
 const at = (hash: string) => { location.hash = hash; };
 

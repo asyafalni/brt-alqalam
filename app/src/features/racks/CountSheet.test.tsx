@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { CountSheet } from './CountSheet';
-import { createItem } from '../stocktake/draft';
+import { createEntry } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import { deriveState } from '../../../../domain/deriveState';
-import type { Item, Location } from '../../../../domain/types';
+import type { Item, Location, StockLine } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.
@@ -17,14 +17,24 @@ const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   kind: 'consumable', initialStock: 10, minStock: null, ...p,
 });
 
-/** Built the way the stock-take builds it, so ids and derived stock are the real ones. */
-const catalog = (...inputs: DraftInput[]): Item[] =>
-  inputs.reduce<Item[]>((acc, i) => [...acc, createItem(i, acc)], []);
+/**
+ * Built the way the stock-take builds it, so ids and derived stock are the real ones — and
+ * shelved on the rack being counted, because the sheet compares against what is ON THIS RACK.
+ */
+let lines: StockLine[] = [];
+const catalog = (...inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, i) => {
+    const built = createEntry({ ...i, locationId: 'LOC-B3' }, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
 
 /** The sheet only reads `derived.items`; the rest of the log is empty until the gateway exists. */
 const inventoryFor = (items: Item[]): Inventory => ({
   instances: [], txns: [], notifications: [], offline: true,
-  derived: deriveState(items, [], [], TS0),
+  derived: deriveState(items, [], [], TS0, lines),
 });
 
 const rak: Location = {

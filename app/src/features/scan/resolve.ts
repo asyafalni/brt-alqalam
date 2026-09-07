@@ -4,8 +4,9 @@
 // state it is in, before any action. That is what stops a duplicate scan becoming a duplicate
 // withdrawal, and what makes an unknown label say so instead of failing silently.
 
-import type { AssetInstance, Category, DerivedState, Item, Location } from '../../../../domain/types';
+import type { AssetInstance, Category, DerivedState, Item, Location, StockLine } from '../../../../domain/types';
 import { rollupLocations } from '../../../../domain/locations';
+import { contentsOf, totalFor } from '../../../../domain/stock';
 import type { LocationSummary } from '../../../../domain/locations';
 import { instancesFor } from '../stocktake/draft';
 
@@ -23,6 +24,7 @@ export function resolveScan(
   locations: readonly Location[],
   derived: DerivedState,
   acquiredTs: number,
+  stock: readonly StockLine[] = [],
 ): Resolution {
   if (target === 'location') {
     const location = locations.find((l) => l.locationId === id);
@@ -32,7 +34,7 @@ export function resolveScan(
       found: true,
       kind: 'rack',
       rack,
-      contents: items.filter((i) => (i.locationId ?? '') === id),
+      contents: contentsOf(stock, items, id).map((r) => r.item),
     };
   }
 
@@ -45,7 +47,8 @@ export function resolveScan(
     // Instances are derived from the item, so the item that owns this assetId is found by
     // regenerating them — no second collection to fall out of sync with the labels.
     for (const item of items) {
-      const instance = instancesFor(item, acquiredTs).find((a) => a.assetId === id);
+      const instance = instancesFor(item, acquiredTs, totalFor(stock, item.itemId))
+        .find((a) => a.assetId === id);
       if (instance) {
         return {
           found: true,
@@ -70,7 +73,7 @@ export function resolveScan(
     kind: 'thing',
     item,
     categoryName: categoryName(item.categoryId),
-    qty: d?.qty ?? item.initialStock,
+    qty: d?.qty ?? 0,
     status: d?.status ?? 'available',
   };
 }

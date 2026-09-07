@@ -2,15 +2,30 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { App } from '../../App';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
-import { createItem } from '../stocktake/draft';
+import { createEntry, createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
-import type { Item, Txn } from '../../../../domain/types';
+import type { Item, StockLine, Txn } from '../../../../domain/types';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
   kind: 'consumable', initialStock: 12, minStock: 5, ...p,
 });
-const catalog = (...i: DraftInput[]): Item[] => i.reduce<Item[]>((a, x) => [...a, createItem(x, a)], []);
+
+/**
+ * Builds the items AND their stock lines, because quantity and placement live on lines now.
+ * `lines` is what `seed()` stores, so a fixture that still says `initialStock: 3` produces a
+ * shelf with three of the thing on it.
+ */
+let lines: StockLine[] = [];
+const buildCatalog = (inputs: DraftInput[]): Item[] => {
+  lines = [];
+  return inputs.reduce<Item[]>((acc, x) => {
+    const built = createEntry(x, acc, lines);
+    lines = built.stock;
+    return [...acc, built.item];
+  }, []);
+};
+const catalog = (...inputs: DraftInput[]): Item[] => buildCatalog(inputs);
 
 let n = 0;
 // Ascending ts, deliberately: the reducer folds in time order, so a descending clock would
@@ -25,8 +40,8 @@ const RAK = { locationId: 'LOC-A1', code: 'A1', name: '', zone: 'Gudang', order:
   lastCountedTs: Date.now() };
 
 function seed(items: Item[], txns: Txn[] = [], locations = [RAK]) {
-  localStorage.setItem('brt.stocktake.draft.v4',
-    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, txns }));
+  localStorage.setItem('brt.stocktake.draft.v5',
+    JSON.stringify({ items, categories: SEED_CATEGORIES, locations, stock: lines, txns }));
 }
 const at = (hash: string) => { location.hash = hash; };
 

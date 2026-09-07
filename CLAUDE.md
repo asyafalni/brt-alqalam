@@ -1439,3 +1439,56 @@ rail, white bar, beige page) with nothing explaining the middle one. The bar is 
 own colour, translucent with a blur so content scrolling under it stays legible. The search
 field inverts accordingly: white on beige, like every card on the page, with a `slate-400`
 outline because a form field's boundary must clear 3:1 and white-on-beige is 1.28:1 by itself.
+
+# Part XXI — Stock is per rack (v1.11)
+
+## 86. The question that broke the model
+
+> **"Kadang satu jenis barang disimpan pada beberapa rak, apakah ini kita support?"**
+
+No — and the way it failed was worse than "unsupported". `Item` carried one `initialStock` and
+one `locationId`, and `applyCount` wrote a rack count back to the item's **whole** quantity. So
+counting rack A1 and finding four there would have overwritten the total, and whatever sat on
+A3 would have vanished from the register. **Cycle counting is the one mechanism keeping the
+numbers honest (§15.1), so an item split across racks made the honest act the destructive one.**
+
+That is why this was a fork rather than a feature request, and why the cheap option — a list of
+racks on the item with a single total — was argued against rather than offered neutrally: it
+keeps the bug and hides it.
+
+## 87. The model
+
+**`Item` is the catalog: what a thing IS.** No quantity, no rack.
+**`StockLine { itemId, locationId, initialStock }` is how much of it sits on which rack**, one
+row per (barang × rak), and `locationId: ''` is the unplaced pile — a line like any other,
+because the stock nobody has put away is the stock most likely to go missing (§0).
+
+- **`Txn.locationId`** says which shelf a movement came off. Optional in the type only so a log
+  written before this parses; such rows fold onto the unplaced pile, which is *visibly* wrong
+  rather than quietly wrong.
+- **`deriveState` folds per rack and sums at the end.** `DerivedItem` keeps `qty` as the total
+  and gains `byLocation`.
+- **`minStock` stays on the item.** The alarm is about the thing as a whole: nobody wants to be
+  told sabun is low on A1 while there are twelve of them on A3.
+- **A rack's colour comes from what is on THAT rack.** An item that is low overall but has
+  twenty here does not earn a walk; one that has run out here does, whatever the total says.
+- **A shelf drawn down to zero keeps its line.** "We keep sabun here and it has run out" is not
+  "sabun was never kept here", and only the first belongs on a shopping list.
+- **Instances are numbered by the item TOTAL**, not per rack — a knife is one numbered knife
+  wherever it is kept, and re-shelving it must not renumber a label already printed.
+
+New: `domain/stock.ts` (15 tests), a `Stock` sheet tab, `parseStock`, and a **v4→v5 draft
+migration** — the one that matters most, because `initialStock` and `locationId` on a saved
+draft *are* somebody's afternoon in the gudang.
+
+## 88. What it changed on screen
+
+- **Opname is one row per shelf**, not per item: a walk writes down "four of these, here", so
+  the same thing found on two racks is two entries, separately editable. Editing one moves it
+  and clears where it came from; deleting one removes that shelf, and the item only when its
+  last shelf goes.
+- **Stok names every rack an item is on**, each tappable straight into that rack's panel, with
+  the per-rack figure shown *only when it is split* — on a single shelf that number is the Stok
+  column said twice, and a number repeated is a number to reconcile.
+- **The item page lists every shelf** with its own quantity, same rule.
+- **Cek rak compares against what is on THAT rack**, and writes back to that rack's line.

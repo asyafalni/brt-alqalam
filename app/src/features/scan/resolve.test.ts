@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveState } from '../../../../domain/deriveState';
-import type { Item, Location, Txn } from '../../../../domain/types';
+import type { Item, Location, StockLine, Txn } from '../../../../domain/types';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createItem, instancesFor } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
@@ -15,19 +15,30 @@ const TS0 = Date.parse('2026-09-06T00:00:00Z');
 const sabun = createItem(input(), []);
 const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), [sabun]);
 const items: Item[] = [sabun, pisau];
-const instances = items.flatMap((i) => instancesFor(i, TS0));
 
-const derive = (txns: Txn[] = []) => deriveState(items, instances, txns, TS0);
+// Quantity is per rack now. Unplaced by default; the `placed` fixture below shelves the sabun.
+const stock: StockLine[] = [
+  { itemId: sabun.itemId, locationId: '', initialStock: 10 },
+  { itemId: pisau.itemId, locationId: '', initialStock: 3 },
+];
+const instances = items.flatMap(
+  (i) => instancesFor(i, TS0, stock.find((l) => l.itemId === i.itemId)?.initialStock ?? 0),
+);
+
+const derive = (txns: Txn[] = []) => deriveState(items, instances, txns, TS0, stock);
 const tx = (p: Partial<Txn>): Txn =>
   ({ txnId: 'T1', clientTxnId: 'c1', ts: TS0, type: 'adjust', qtyDelta: 0, actorUserId: 'u', ...p });
 
 const rak: Location = {
   locationId: 'LOC-B3', code: 'B3', name: 'Rak sabun', zone: 'Gudang Utama', order: 1, active: true,
 };
-const placed: Item[] = [{ ...sabun, locationId: 'LOC-B3' }, pisau];
+const placedStock: StockLine[] = [
+  { itemId: sabun.itemId, locationId: 'LOC-B3', initialStock: 10 },
+  { itemId: pisau.itemId, locationId: '', initialStock: 3 },
+];
 
 const scan = (target: 'item' | 'asset' | 'location', id: string, txns: Txn[] = []) =>
-  resolveScan(target, id, items, SEED_CATEGORIES, [rak], derive(txns), TS0);
+  resolveScan(target, id, items, SEED_CATEGORIES, [rak], derive(txns), TS0, stock);
 
 describe('resolveScan — the scan guard', () => {
   it('resolves a rack label by itemId or by the printed barcode', () => {
@@ -115,8 +126,10 @@ describe('status vocabulary', () => {
 
 describe('scanning a rack — the label that actually goes on a shelf', () => {
   it('answers "what is on this rack"', () => {
-    const derived = deriveState(placed, instances, [], TS0);
-    const r = resolveScan('location', 'LOC-B3', placed, SEED_CATEGORIES, [rak], derived, TS0);
+    const derived = deriveState(items, instances, [], TS0, placedStock);
+    const r = resolveScan(
+      'location', 'LOC-B3', items, SEED_CATEGORIES, [rak], derived, TS0, placedStock,
+    );
 
     expect(r.found).toBe(true);
     if (r.found && r.kind === 'rack') {
@@ -127,15 +140,17 @@ describe('scanning a rack — the label that actually goes on a shelf', () => {
   });
 
   it('shows the worst status on the shelf, since that is what earns the walk', () => {
-    const empty: Item[] = [{ ...sabun, locationId: 'LOC-B3', initialStock: 0 }];
-    const derived = deriveState(empty, [], [], TS0);
-    const r = resolveScan('location', 'LOC-B3', empty, SEED_CATEGORIES, [rak], derived, TS0);
+    const emptyShelf: StockLine[] = [{ itemId: sabun.itemId, locationId: 'LOC-B3', initialStock: 0 }];
+    const derived = deriveState([sabun], [], [], TS0, emptyShelf);
+    const r = resolveScan(
+      'location', 'LOC-B3', [sabun], SEED_CATEGORIES, [rak], derived, TS0, emptyShelf,
+    );
     if (r.found && r.kind === 'rack') expect(r.rack.status).toBe('out');
     expect(statusBadge(r).label).toBe('Habis');
   });
 
   it('an unknown rack label says so rather than showing an empty shelf', () => {
-    const r = resolveScan('location', 'LOC-ZZ', placed, SEED_CATEGORIES, [rak], derive(), TS0);
+    const r = resolveScan('location', 'LOC-ZZ', items, SEED_CATEGORIES, [rak], derive(), TS0, stock);
     expect(r).toMatchObject({ found: false, reason: 'unknown' });
   });
 });

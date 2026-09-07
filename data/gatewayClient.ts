@@ -11,7 +11,8 @@ import type {
   SessionToken, TransactionLog, TransactionRepository, TxnPage,
 } from './ports';
 import {
-  buildCategory, buildInstance, buildItem, buildLocation, buildTxn, normaliseKeys, parseRecords,
+  buildCategory, buildInstance, buildItem, buildLocation, buildStockLine, buildTxn, normaliseKeys,
+  parseRecords,
 } from './parse';
 import type { ParseIssue } from './parse';
 import type { Category, Item, Txn } from '../domain/types';
@@ -40,6 +41,7 @@ interface StatePayload {
   categories?: Record<string, unknown>[];
   locations?: Record<string, unknown>[];
   items?: Record<string, unknown>[];
+  stock?: Record<string, unknown>[];
   instances?: Record<string, unknown>[];
   txns?: Record<string, unknown>[];
 }
@@ -95,6 +97,7 @@ export function createGatewayClient(config: GatewayConfig) {
     const locations = parseRecords(rows(state.locations), buildLocation);
     const items = parseRecords(rows(state.items), buildItem);
     const instances = parseRecords(rows(state.instances), buildInstance);
+    const stock = parseRecords(rows(state.stock), buildStockLine);
     const txns = parseRecords(rows(state.txns), buildTxn);
 
     // Locations ride along on the snapshot; the port predates them, and widening it is a
@@ -104,8 +107,12 @@ export function createGatewayClient(config: GatewayConfig) {
     return {
       categories: categories.ok as Category[],
       items: items.ok as Item[],
+      stock: stock.ok,
       instances: instances.ok,
-      issues: [...categories.quarantined, ...locations.quarantined, ...items.quarantined, ...instances.quarantined],
+      issues: [
+        ...categories.quarantined, ...locations.quarantined, ...items.quarantined,
+        ...stock.quarantined, ...instances.quarantined,
+      ],
       txns: txns.ok,
       txnIssues: txns.quarantined,
     };
@@ -115,7 +122,10 @@ export function createGatewayClient(config: GatewayConfig) {
     async load(): Promise<CatalogSnapshot> {
       const { state } = await call<{ state: StatePayload }>({ method: 'GET', query: { op: 'state' } });
       const read = readState(state);
-      return { categories: read.categories, items: read.items, instances: read.instances, issues: read.issues };
+      return {
+        categories: read.categories, items: read.items, stock: read.stock,
+        instances: read.instances, issues: read.issues,
+      };
     },
   };
 

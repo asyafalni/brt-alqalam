@@ -150,6 +150,7 @@ export function App() {
               inventory={inventory}
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
+              onOpenRack={(id) => navigate({ name: 'racks', id })}
             />
           )}
           {route.name === 'racks' && (
@@ -158,6 +159,7 @@ export function App() {
               inventory={inventory}
               search={search}
               now={now}
+              openRack={route.id}
               onOpenItem={(id) => navigate({ name: 'item', id })}
             />
           )}
@@ -183,7 +185,12 @@ export function App() {
           )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>
-              <LabelSheet items={draft.items} categories={draft.categories} locations={draft.locations} />
+              <LabelSheet
+                items={draft.items}
+                categories={draft.categories}
+                locations={draft.locations}
+                stock={draft.stock}
+              />
             </Suspense>
           )}
           {route.name === 'scan' && (
@@ -193,6 +200,7 @@ export function App() {
               items={draft.items}
               categories={draft.categories}
               locations={draft.locations}
+              stock={draft.stock}
               inventory={inventory}
               now={now}
               onBack={() => navigate({ name: 'beranda' })}

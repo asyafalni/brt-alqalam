@@ -94,7 +94,7 @@ function group(
     const key = keyOf(item);
     const row = acc.get(key) ?? { key, label: labelOf(key), items: 0, units: 0 };
     row.items += 1;
-    row.units += derived.items[item.itemId]?.qty ?? item.initialStock;
+    row.units += derived.items[item.itemId]?.qty ?? 0;
     acc.set(key, row);
   }
   // Largest first: a report is read from the top, and the biggest group is the story.
@@ -109,16 +109,30 @@ export function buildReport(
   now: number,
   movementAvailable = false,
 ): Report {
-  const totalUnits = items.reduce((n, i) => n + (derived.items[i.itemId]?.qty ?? i.initialStock), 0);
+  const totalUnits = items.reduce((n, i) => n + (derived.items[i.itemId]?.qty ?? 0), 0);
 
-  const zoneOf = (item: Item) =>
-    locations.find((l) => l.locationId === item.locationId)?.zone ?? '';
+  const zoneById = new Map(locations.map((l) => [l.locationId, l.zone]));
+  /**
+   * An item spread across two zones belongs to both, so this reports where MOST of it is.
+   * Splitting a row across zones would double-count the item in a composition whose whole
+   * point is that its slices add up to the catalog.
+   */
+  const zoneOf = (item: Item) => {
+    const rows = Object.entries(derived.items[item.itemId]?.byLocation ?? {});
+    if (rows.length === 0) return '';
+    const [where] = rows.reduce((best, row) => (row[1] > best[1] ? row : best));
+    return zoneById.get(where) ?? '';
+  };
+
+  /** Placed somewhere, anywhere — one shelf is enough to stop it being lost in the mess. */
+  const isPlaced = (item: Item) =>
+    Object.keys(derived.items[item.itemId]?.byLocation ?? {}).some((k) => k !== '');
 
   const racks = rollupLocations(locations, items, derived);
   const counted = locations.filter((l) => l.active && countState(l, now).freshness !== 'never').length;
   const activeRacks = locations.filter((l) => l.active).length;
 
-  const placed = items.filter((i) => i.locationId).length;
+  const placed = items.filter(isPlaced).length;
   const withMinimum = items.filter((i) => i.minStock != null).length;
 
   const negativeStock = items.filter((i) => (derived.items[i.itemId]?.qty ?? 0) < 0).length;
@@ -150,7 +164,7 @@ export function buildReport(
       label: d.instance.label,
       itemName: item?.name ?? d.instance.itemId,
       categoryName: item ? categoryName(item.categoryId) : '',
-      zone: locations.find((l) => l.locationId === item?.locationId)?.zone ?? '',
+      zone: item ? zoneOf(item) : '',
       since: d.since,
     };
   };

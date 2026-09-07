@@ -8,11 +8,12 @@
 // captioned blocks per zone, with one hot accent reserved for selection — not for status,
 // since orange already means `rusak`.
 
-import { useMemo, useState } from 'octane';
+import { useEffect, useMemo, useState } from 'octane';
 import { Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2 } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState } from '../../../../domain/cycleCount';
+import { contentsOf } from '../../../../domain/stock';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -43,11 +44,14 @@ const ZONE_NOTE: Record<LocationStatus, string> = {
 };
 
 export function RackBoard(
-  { draft, inventory, search, now, onOpenItem }:
-  { draft: Draft; inventory: Inventory; search: string; now: number; onOpenItem: (id: string) => void },
+  { draft, inventory, search, now, openRack, onOpenItem }:
+  { draft: Draft; inventory: Inventory; search: string; now: number; openRack?: string;
+    onOpenItem: (id: string) => void },
 ) {
   const { items, categories, locations, setLocations } = draft;
-  const [selected, setSelected] = useState<string | null>(null);
+  // Seeded from the route so a rack link on the stock list lands with the panel already open.
+  const [selected, setSelected] = useState<string | null>(openRack ?? null);
+  useEffect(() => { if (openRack) setSelected(openRack); }, [openRack]);
   const [counting, setCounting] = useState<string | null>(null);
   /** `'new'` while adding; a locationId while editing that rack. One form, two jobs. */
   const [editing, setEditing] = useState<string | null>(null);
@@ -84,16 +88,17 @@ export function RackBoard(
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
   const selectedRack = racks.find((r) => r.location.locationId === selected) ?? null;
 
+  // What is kept on THIS rack, from the stock lines — an item on two racks belongs to both.
   const contents = selectedRack
-    ? items.filter((i) => (i.locationId ?? '') === selectedRack.location.locationId)
+    ? contentsOf(draft.stock, items, selectedRack.location.locationId).map((r) => r.item)
     : [];
 
   const q = search.trim().toLowerCase();
   const matchesSearch = (rack: LocationSummary) =>
     q === '' ||
     `${rack.location.code} ${rack.location.name} ${rack.location.zone}`.toLowerCase().includes(q) ||
-    items.some((i) =>
-      (i.locationId ?? '') === rack.location.locationId && i.name.toLowerCase().includes(q));
+    contentsOf(draft.stock, items, rack.location.locationId)
+      .some((r) => r.item.name.toLowerCase().includes(q));
 
   return (
     <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
@@ -138,7 +143,10 @@ export function RackBoard(
               tint={attention > 0 ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'}
             />
             <Stat
-              value={items.filter((i) => !i.locationId).length}
+              value={items.filter((i) => {
+                const rows = inventory.derived.items[i.itemId]?.byLocation ?? {};
+                return !Object.keys(rows).some((id) => id !== '');
+              }).length}
               label="Belum ditempatkan"
               tint="bg-slate-100 text-slate-500"
             />
@@ -247,7 +255,7 @@ export function RackBoard(
                       >
                         <RotateCcw class="h-4 w-4" /> Aktifkan lagi
                       </button>
-                      {blocksDelete(l, items) === null && (
+                      {blocksDelete(l, items, draft.stock) === null && (
                         <button
                           type="button"
                           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-400 text-slate-500 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
@@ -279,7 +287,9 @@ export function RackBoard(
               inventory={inventory}
               onCancel={() => setCounting(null)}
               onApply={(counted) => {
-                draft.setItems((prev) => applyCount(prev, counted));
+                // One rack's opening quantities, not the item's total. This line is the whole
+                // reason quantity moved off the item.
+                draft.setStock((prev) => applyCount(prev, counting, counted));
                 draft.setLocations((prev) => markCounted(prev, counting, Date.now()));
                 setCounting(null);
               }}
@@ -324,8 +334,8 @@ export function RackBoard(
               {confirmRemove === selectedRack.location.locationId && (
                 <RemoveRack
                   code={selectedRack.location.code}
-                  archiveBlock={blocksArchive(selectedRack.location.locationId, items)}
-                  deleteBlock={blocksDelete(selectedRack.location, items)}
+                  archiveBlock={blocksArchive(selectedRack.location.locationId, items, draft.stock)}
+                  deleteBlock={blocksDelete(selectedRack.location, items, draft.stock)}
                   onArchive={() => {
                     setLocations((prev) => archiveLocation(prev, selectedRack.location.locationId));
                     setConfirmRemove(null);
@@ -365,7 +375,8 @@ export function RackBoard(
                         </div>
                         <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
                           <span class="w-20 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
-                            {d?.qty ?? i.initialStock}{' '}
+                            {/* What is on THIS shelf, not the item's total across the gudang. */}
+                            {d?.byLocation[selectedRack.location.locationId] ?? 0}{' '}
                             <span class="text-xs font-normal text-slate-400">{i.unit}</span>
                           </span>
                         </button>

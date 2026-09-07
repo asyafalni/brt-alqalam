@@ -8,7 +8,7 @@
 // (`TransactionLog`), reads come from a projection derived by folding that log
 // (`domain/deriveState`). There is no update path anywhere, by design.
 
-import type { AssetInstance, Category, Condition, Direction, Item, Txn } from '../domain/types';
+import type { AssetInstance, Category, Condition, Direction, Item, StockLine, Txn } from '../domain/types';
 import type { ParseIssue } from './parse';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,9 @@ import type { ParseIssue } from './parse';
 export interface CatalogSnapshot {
   categories: Category[];
   items: Item[];
+  /** How much of each item sits on which rack. Separate from the item since one thing can be
+   *  kept on several racks, and a cycle count has to reconcile one shelf at a time. */
+  stock: StockLine[];
   instances: AssetInstance[];
   issues: ParseIssue[];
 }

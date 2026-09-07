@@ -20,7 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'octane';
 import { Printer, QrCode, Search } from '@octanejs/lucide';
-import type { Category, Item, Location } from '../../../../domain/types';
+import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import { Button, CARD, FIELD, LABEL } from '../../components/ui';
 import { qrSvg, qrViewBox } from './qr';
 import {
@@ -39,8 +39,8 @@ const KIND_LABEL: Record<LabelKind, string> = {
 };
 
 export function LabelSheet(
-  { items, categories, locations }:
-  { items: Item[]; categories: Category[]; locations: Location[] },
+  { items, categories, locations, stock }:
+  { items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[] },
 ) {
   const [baseUrl, setBaseUrl] = useState(() => location.origin);
   const [query, setQuery] = useState('');
@@ -48,8 +48,8 @@ export function LabelSheet(
 
   const acquiredTs = useMemo(() => Date.now(), []);
   const labels = useMemo(
-    () => labelsFor(items, categories, locations, baseUrl, acquiredTs),
-    [items, categories, locations, baseUrl, acquiredTs],
+    () => labelsFor(items, categories, locations, baseUrl, acquiredTs, stock),
+    [items, categories, locations, baseUrl, acquiredTs, stock],
   );
   const groups = useMemo(() => groupLabels(labels, locations), [labels, locations]);
 

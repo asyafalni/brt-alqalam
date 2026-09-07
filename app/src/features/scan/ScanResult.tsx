@@ -1,5 +1,5 @@
 import { useMemo } from 'octane';
-import type { Category, Item, Location } from '../../../../domain/types';
+import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE } from '../../components/ui';
 import { itemStatusBadge, PILL, resolveScan, statusBadge } from './resolve';
@@ -10,6 +10,7 @@ interface Props {
   items: Item[];
   categories: Category[];
   locations: Location[];
+  stock: StockLine[];
   inventory: Inventory;
   now: number;
   onBack: () => void;
@@ -17,8 +18,10 @@ interface Props {
 
 export function ScanResult(p: Props) {
   const resolution = useMemo(
-    () => resolveScan(p.target, p.id, p.items, p.categories, p.locations, p.inventory.derived, p.now),
-    [p.target, p.id, p.items, p.categories, p.locations, p.inventory.derived, p.now],
+    () => resolveScan(
+      p.target, p.id, p.items, p.categories, p.locations, p.inventory.derived, p.now, p.stock,
+    ),
+    [p.target, p.id, p.items, p.categories, p.locations, p.inventory.derived, p.now, p.stock],
   );
 
   if (!resolution.found) {
@@ -74,7 +77,8 @@ export function ScanResult(p: Props) {
                     <span class="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">{i.name}</span>
                     <span class={`${PILL} ${chip.chip}`}>{chip.label}</span>
                     <span class="w-20 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
-                      {d?.qty ?? i.initialStock}{' '}
+                      {/* What is on this rack, not the item's total across the gudang. */}
+                      {d?.byLocation[p.id] ?? 0}{' '}
                       <span class="text-xs font-normal text-slate-400">{i.unit}</span>
                     </span>
                   </li>

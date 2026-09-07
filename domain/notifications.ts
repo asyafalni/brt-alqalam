@@ -3,7 +3,7 @@
 // Setting Minimum (minStock), report the breach timestamp = the transaction that pushed
 // it there, plus current stock, the threshold, and the keterangan that caused it.
 
-import type { Item, Txn } from './types';
+import type { Item, StockLine, Txn } from './types';
 import { activeTxns } from './deriveState';
 
 export interface StockNotification {
@@ -24,7 +24,9 @@ export interface StockNotification {
 
 const QTY_TYPES = new Set(['pemakaian', 'pengambilan', 'pengembalian', 'digunakan', 'adjust']);
 
-export function deriveNotifications(items: Item[], txns: Txn[], now: number): StockNotification[] {
+export function deriveNotifications(
+  items: Item[], txns: Txn[], now: number, stock: readonly StockLine[] = [],
+): StockNotification[] {
   const T = activeTxns(txns);
   const out: StockNotification[] = [];
 
@@ -33,7 +35,11 @@ export function deriveNotifications(items: Item[], txns: Txn[], now: number): St
     const min = item.minStock;
     if (min == null) continue; // Setting Minimum "(-)" → no notification for this item
 
-    let qty = item.initialStock;
+    // The alarm is about the item as a whole, so the replay starts from the sum of every
+    // rack's opening line — a thing that is low is low wherever it happens to be shelved.
+    let qty = stock
+      .filter((l) => l.itemId === item.itemId)
+      .reduce((n, l) => n + l.initialStock, 0);
     let breachTs: number | null = null;
     let breachKet = '';
 

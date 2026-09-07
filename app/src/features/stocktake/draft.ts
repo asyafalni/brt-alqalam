@@ -7,9 +7,18 @@
 // The draft IS `domain/Item[]`. Nothing new is invented: what the marbot types is exactly
 // what the Items sheet holds, so the export round-trips through the real parser.
 
-import type { AssetInstance, Category, Item, Kind, Location, TrackBy } from '../../../../domain/types';
+import type {
+  AssetInstance, Category, Item, Kind, Location, StockLine, TrackBy,
+} from '../../../../domain/types';
+import { linesAt, setLine, totalFor } from '../../../../domain/stock';
 
-/** What the operator actually fills in. Everything else is derived. */
+/**
+ * What the operator actually fills in. Everything else is derived.
+ *
+ * `initialStock` and `locationId` stay HERE even though they left `Item`: the form is a form,
+ * and what it collects is one item plus the first shelf it was found on. Splitting that into
+ * two screens would add a step to the flow whose whole budget is ~10 seconds an item.
+ */
 export interface DraftInput {
   name: string;
   categoryId: string;
@@ -52,10 +61,21 @@ export function createItem(input: DraftInput, existing: readonly Item[]): Item {
     unit: input.unit.trim(),
     trackBy: input.trackBy ?? (input.kind === 'consumable' ? 'quantity' : 'instance'),
     minStock: input.minStock,
-    initialStock: input.initialStock,
     active: true,
-    ...(input.locationId ? { locationId: input.locationId } : {}),
     ...(input.artId ? { artId: input.artId } : {}),
+  };
+}
+
+/** The item plus the shelf it was found on — what one pass of the form actually produces. */
+export function createEntry(
+  input: DraftInput,
+  existing: readonly Item[],
+  stock: readonly StockLine[],
+): { item: Item; stock: StockLine[] } {
+  const item = createItem(input, existing);
+  return {
+    item,
+    stock: setLine(stock, item.itemId, input.locationId ?? '', input.initialStock),
   };
 }
 
@@ -93,7 +113,8 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 // Export — must match sheets/Items.csv exactly, because it is imported into that tab.
 // ---------------------------------------------------------------------------
 
-const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,artId';
+const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId';
+const STOCK_HEADER = 'itemId,locationId,initialStock';
 
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
@@ -107,26 +128,34 @@ export function toItemsCsv(items: readonly Item[]): string {
     i.unit,
     i.trackBy,
     i.minStock == null ? '(-)' : String(i.minStock),
-    String(i.initialStock),
     i.active ? 'TRUE' : 'FALSE',
-    i.locationId ?? '',
     i.artId ?? '',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';
 }
 
+/** One row per (barang × rak). A blank locationId is the unplaced pile, not a missing value. */
+export function toStockCsv(stock: readonly StockLine[]): string {
+  const rows = stock.map((l) =>
+    [l.itemId, l.locationId, String(l.initialStock)].map(cell).join(','));
+  return [STOCK_HEADER, ...rows].join('\n') + '\n';
+}
+
 // ---------------------------------------------------------------------------
 // Asset instances — DERIVED, not stored.
 //
-// An instance-tracked durable with initialStock N is exactly N physical units, each
-// needing its own QR label. Deriving them from the item means there is no second
-// collection to keep in sync: edit the count from 20 to 18 and the last two simply
-// stop existing. That is correct during a stock-take, where nothing has a history yet.
+// An instance-tracked durable with N units is exactly N physical things, each needing its own
+// QR label. Deriving them means there is no second collection to keep in sync: edit the count
+// from 20 to 18 and the last two simply stop existing. That is correct during a stock-take,
+// where nothing has a history yet.
+//
+// The count is the item's TOTAL across every rack, not one shelf's worth: a knife is one
+// numbered knife wherever it is currently kept, and re-shelving it must not renumber it.
 // ---------------------------------------------------------------------------
 
-export function instancesFor(item: Item, acquiredTs: number): AssetInstance[] {
+export function instancesFor(item: Item, acquiredTs: number, count: number): AssetInstance[] {
   if (item.trackBy !== 'instance') return [];
-  return Array.from({ length: Math.max(0, Math.trunc(item.initialStock)) }, (_, n) => ({
+  return Array.from({ length: Math.max(0, Math.trunc(count)) }, (_, n) => ({
     assetId: `${item.barcode}-${String(n + 1).padStart(3, '0')}`,
     itemId: item.itemId,
     label: `${item.name} #${n + 1}`,
@@ -137,9 +166,11 @@ export function instancesFor(item: Item, acquiredTs: number): AssetInstance[] {
 
 const INSTANCES_HEADER = 'assetId,itemId,label,acquiredTs,active';
 
-export function toInstancesCsv(items: readonly Item[], acquiredTs: number): string {
+export function toInstancesCsv(
+  items: readonly Item[], acquiredTs: number, stock: readonly StockLine[],
+): string {
   const rows = items
-    .flatMap((i) => instancesFor(i, acquiredTs))
+    .flatMap((i) => instancesFor(i, acquiredTs, totalFor(stock, i.itemId)))
     .map((a) => [a.assetId, a.itemId, a.label, new Date(a.acquiredTs).toISOString(), a.active ? 'TRUE' : 'FALSE']
       .map(cell).join(','));
   return [INSTANCES_HEADER, ...rows].join('\n') + '\n';
@@ -238,8 +269,12 @@ export type RemovalBlock =
 export function blocksArchive(
   locationId: string,
   items: readonly Item[],
+  stock: readonly StockLine[],
 ): RemovalBlock | null {
-  const held = items.filter((i) => (i.locationId ?? '') === locationId);
+  const byId = new Map(items.map((i) => [i.itemId, i]));
+  const held = linesAt(stock, locationId)
+    .map((l) => byId.get(l.itemId))
+    .filter((i): i is Item => i != null);
   if (held.length === 0) return null;
   // Named, not just counted: "3 barang" tells somebody they are stuck; naming them tells them
   // what to go and move.
@@ -250,8 +285,9 @@ export function blocksArchive(
 export function blocksDelete(
   location: Location,
   items: readonly Item[],
+  stock: readonly StockLine[],
 ): RemovalBlock | null {
-  return blocksArchive(location.locationId, items)
+  return blocksArchive(location.locationId, items, stock)
     ?? (location.lastCountedTs == null ? null : { kind: 'has-history' });
 }
 
@@ -298,17 +334,47 @@ export function updateItem(items: readonly Item[], itemId: string, input: DraftI
       unit: input.unit.trim(),
       trackBy: input.trackBy ?? (input.kind === 'consumable' ? 'quantity' : 'instance'),
       minStock: input.minStock,
-      initialStock: input.initialStock,
-      locationId: input.locationId || undefined,
+      ...(input.artId ? { artId: input.artId } : {}),
     });
 }
 
-/** Reverse of `createItem` — load an existing row back into the form for editing. */
-export function toInput(item: Item): DraftInput {
+/**
+ * Editing a row edits ONE shelf of it — the one the form was opened on.
+ *
+ * `was` is where the line started, so moving a thing from A1 to A3 clears A1 rather than
+ * leaving a ghost quantity behind on a shelf the operator just emptied.
+ */
+export function updateEntry(
+  items: readonly Item[],
+  stock: readonly StockLine[],
+  itemId: string,
+  input: DraftInput,
+  was: string,
+): { items: Item[]; stock: StockLine[] } {
+  const at = input.locationId ?? '';
+  const moved = at === was
+    ? stock
+    : stock.filter((l) => !(l.itemId === itemId && l.locationId === was));
+  return {
+    items: updateItem(items, itemId, input),
+    stock: setLine(moved, itemId, at, input.initialStock),
+  };
+}
+
+/**
+ * Reverse of `createItem` — load an existing row back into the form.
+ *
+ * `locationId` picks WHICH shelf is being edited; without it the form would show one rack's
+ * quantity and save it over another's.
+ */
+export function toInput(
+  item: Item, stock: readonly StockLine[], locationId = '',
+): DraftInput {
+  const line = stock.find((l) => l.itemId === item.itemId && l.locationId === locationId);
   return {
     name: item.name, categoryId: item.categoryId, unit: item.unit, kind: item.kind,
-    initialStock: item.initialStock, minStock: item.minStock, trackBy: item.trackBy,
-    locationId: item.locationId,
+    initialStock: line?.initialStock ?? 0, minStock: item.minStock, trackBy: item.trackBy,
+    locationId, artId: item.artId,
   };
 }
 
@@ -320,11 +386,14 @@ export function filterItems(items: readonly Item[], query: string): Item[] {
 }
 
 /** Progress line for the header — the only number that matters while walking. */
-export function summarise(items: readonly Item[]): { count: number; categories: number; units: number } {
+export function summarise(
+  items: readonly Item[], stock: readonly StockLine[],
+): { count: number; categories: number; units: number } {
   return {
     count: items.length,
     categories: new Set(items.map((i) => i.categoryId)).size,
-    units: items.reduce((s, i) => s + i.initialStock, 0),
+    // Every shelf of every item — the walk's running total, not one rack's.
+    units: stock.reduce((s, l) => s + l.initialStock, 0),
   };
 }
 
@@ -333,20 +402,34 @@ export function summarise(items: readonly Item[]): { count: number; categories: 
 // ---------------------------------------------------------------------------
 
 /**
- * ⚠️ This edits `initialStock`, and that is correct ONLY during the opname phase, where the
+ * ⚠️ This edits opening quantities, and that is correct ONLY during the opname phase, where the
  * catalog is still being established and there is no history to preserve.
  *
  * Once the gateway exists, a recount MUST become an appended `adjust` event instead —
  * derive-don't-mutate (WORKING-AGREEMENT). Rewriting a starting figure after transactions
  * exist would silently invalidate every number folded from it. Do not "simplify" this by
  * keeping the mutation.
+ *
+ * IT WRITES TO ONE RACK, and that is the entire reason quantity left the item. Counting A1 used
+ * to overwrite the item's whole figure, so whatever sat on A3 vanished from the register the
+ * moment somebody did the right thing and counted a shelf.
  */
-export function applyCount(items: readonly Item[], counted: ReadonlyMap<string, number>): Item[] {
-  return items.map((i) => {
-    const found = counted.get(i.itemId);
-    return found == null || found === i.initialStock ? i : { ...i, initialStock: found };
-  });
+export function applyCount(
+  stock: readonly StockLine[], locationId: string, counted: ReadonlyMap<string, number>,
+): StockLine[] {
+  let next = [...stock];
+  for (const [itemId, found] of counted) {
+    if (lineAtHas(next, itemId, locationId, found)) continue;
+    next = setLine(next, itemId, locationId, found);
+  }
+  return next;
 }
+
+const lineAtHas = (
+  stock: readonly StockLine[], itemId: string, locationId: string, qty: number,
+): boolean => stock.some(
+  (l) => l.itemId === itemId && l.locationId === locationId && l.initialStock === qty,
+);
 
 /** Stamp the rack as checked, so the rotation knows what to offer next. */
 export function markCounted(

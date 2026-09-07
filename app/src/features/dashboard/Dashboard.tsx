@@ -33,7 +33,12 @@ export function Dashboard(
     available: derived.filter((d) => d.status === 'available').length,
     low: derived.filter((d) => d.status === 'low').length,
     out: derived.filter((d) => d.status === 'out').length,
-    unplaced: items.filter((i) => !i.locationId).length,
+    // Unplaced means "no shelf anywhere", not "one of its shelves is blank": an item kept on
+    // A1 and also sitting in the unplaced pile is placed, and does not belong on this list.
+    unplaced: items.filter((i) => {
+      const rows = inventory.derived.items[i.itemId]?.byLocation ?? {};
+      return !Object.keys(rows).some((id) => id !== '');
+    }).length,
     // Below zero means more was recorded leaving than ever arrived. Not a rounding
     // artefact — the log and the shelf disagree, and only a physical recount settles it.
     negative: derived.filter((d) => d.qty < 0).length,

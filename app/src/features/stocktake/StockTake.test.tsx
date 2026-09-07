@@ -3,8 +3,8 @@ import { render, fireEvent, cleanup, within } from '@octanejs/testing-library';
 import { StockTake } from './StockTake';
 import { useState } from 'octane';
 import { useDraft } from '../../state/useDraft';
-import { toItemsCsv, toInstancesCsv } from './draft';
-import { parseItems, parseInstances } from '../../../../data/parse';
+import { toItemsCsv, toInstancesCsv, toStockCsv } from './draft';
+import { parseItems, parseInstances, parseStock } from '../../../../data/parse';
 
 // The draft and the search box are owned above the screen (App / Navbar), so tests
 // supply them the same way.
@@ -32,7 +32,7 @@ function addItem(r: R, name: string, qty: string) {
   fireEvent.click(r.getByText('Tambah barang'));
 }
 
-const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v4')!);
+const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v5')!);
 
 beforeEach(() => localStorage.clear());
 afterEach(() => cleanup());
@@ -112,14 +112,17 @@ describe('durables must be asked how they are tracked', () => {
     fireEvent.click(r.getByText('Barang tetap'));
     fireEvent.click(r.getByText('Hitung jumlahnya'));
     addItem(r, 'Terpal', '10');
-    expect(toInstancesCsv(stored().items, 0).trim()).toBe('assetId,itemId,label,acquiredTs,active');
+    expect(toInstancesCsv(stored().items, 0, stored().stock).trim())
+      .toBe('assetId,itemId,label,acquiredTs,active');
   });
 
   it('labelling one-by-one yields one QR-able unit per count', () => {
     const r = render(Harness);
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '3');
-    const parsed = parseInstances(toInstancesCsv(stored().items, Date.parse('2026-09-06T00:00:00Z')));
+    const parsed = parseInstances(
+      toInstancesCsv(stored().items, Date.parse('2026-09-06T00:00:00Z'), stored().stock),
+    );
     expect(parsed.quarantined).toEqual([]);
     expect(parsed.ok.map((a) => a.label)).toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
   });
@@ -263,7 +266,11 @@ describe('export', () => {
     addItem(r, 'Sabun', '12');
     const parsed = parseItems(toItemsCsv(stored().items));
     expect(parsed.quarantined).toEqual([]);
-    expect(parsed.ok[0]).toMatchObject({ name: 'Sabun', initialStock: 12, kind: 'consumable' });
+    expect(parsed.ok[0]).toMatchObject({ name: 'Sabun', kind: 'consumable' });
+    // Quantity travels on the Stock tab now, one row per rack.
+    const lines = parseStock(toStockCsv(stored().stock));
+    expect(lines.quarantined).toEqual([]);
+    expect(lines.ok[0]).toMatchObject({ itemId: parsed.ok[0].itemId, initialStock: 12 });
   });
 });
 

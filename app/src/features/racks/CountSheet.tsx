@@ -29,7 +29,9 @@ export function CountSheet(p: Props) {
   const lines: CountLine[] = useMemo(
     () => p.contents.map((item) => ({
       item,
-      expected: p.inventory.derived.items[item.itemId]?.qty ?? item.initialStock,
+      // What we believe is ON THIS RACK — not the item's total, which is the number a count
+      // of one shelf must never be compared against.
+      expected: p.inventory.derived.items[item.itemId]?.byLocation[p.rack.locationId] ?? 0,
       counted: counts[item.itemId] ?? null,
     })),
     [p.contents, p.inventory.derived, counts],

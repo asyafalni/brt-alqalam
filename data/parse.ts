@@ -10,7 +10,7 @@
 // a plausible-looking lie. Losing a row quietly is worse than showing an error, because the
 // whole point of the system is that the numbers can be believed.
 
-import type { AssetInstance, Category, Item, Kind, Location, MovementType, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
+import type { AssetInstance, Category, Item, Kind, Location, MovementType, StockLine, TrackBy, Txn, Condition, InstanceStatus } from '../domain/types';
 import { parseCsv, toRecords } from './csv';
 
 export interface ParseIssue {
@@ -219,11 +219,7 @@ export const buildItem = (r: Record<string, string>): Item => {
       unit: req(r, 'unit'),
       trackBy: trackBy(r, k),
       minStock: minStock(r),
-      initialStock: num(r, 'initialstock', 0),
       active: bool(r, 'active', true),
-      // Blank is a real state, not an error: a catalog built before locations existed has
-      // none, and "belum ditempatkan" is exactly the mess we want visible.
-      ...(r['locationid'] ? { locationId: r['locationid'] } : {}),
       // The spec's per-row KETERANGAN on MENU STOK. Optional, and validated when present.
       ...(r['keterangan'] ? { keterangan: oneOf<MovementType>(r, 'keterangan', MOVEMENTS) } : {}),
       // Not validated against a list here: the drawings are the app's, not the domain's, and
@@ -231,6 +227,19 @@ export const buildItem = (r: Record<string, string>): Item => {
       ...(r['artid'] ? { artId: r['artid'] } : {}),
     };
 };
+
+/**
+ * One row of the Stock tab: how much of an item sits on one rack.
+ *
+ * A blank `locationId` is not an error. It is the unplaced pile — a real, visible state, and
+ * the one most likely to end in something going missing (§0), so it parses as an ordinary line
+ * rather than being rejected or silently dropped.
+ */
+export const buildStockLine = (r: Record<string, string>): StockLine => ({
+  itemId: req(r, 'itemid'),
+  locationId: r['locationid'] ?? '',
+  initialStock: num(r, 'initialstock', 0),
+});
 
 export const buildInstance = (r: Record<string, string>): AssetInstance => ({
     assetId: req(r, 'assetid'),
@@ -251,6 +260,9 @@ export const buildTxn = (r: Record<string, string>): Txn => {
     };
     // Optional columns: absent is fine, present-but-wrong is not.
     if (r['itemid']) t.itemId = r['itemid'];
+    // Which rack the quantity came off. A log written before stock was per-rack has no such
+    // column; those rows fold onto the unplaced pile, which is visible rather than invented.
+    if (r['locationid']) t.locationId = r['locationid'];
     if (r['assetid']) t.assetId = r['assetid'];
     if (r['recipient']) t.recipient = r['recipient'];
     if (r['note']) t.note = r['note'];
@@ -277,5 +289,6 @@ export const describeIssues = (issues: ParseIssue[]): string =>
 export const parseCategories = (csv: string): ParseResult<Category> => parseRows(csv, buildCategory);
 export const parseLocations = (csv: string): ParseResult<Location> => parseRows(csv, buildLocation);
 export const parseItems = (csv: string): ParseResult<Item> => parseRows(csv, buildItem);
+export const parseStock = (csv: string): ParseResult<StockLine> => parseRows(csv, buildStockLine);
 export const parseInstances = (csv: string): ParseResult<AssetInstance> => parseRows(csv, buildInstance);
 export const parseTxns = (csv: string): ParseResult<Txn> => parseRows(csv, buildTxn);

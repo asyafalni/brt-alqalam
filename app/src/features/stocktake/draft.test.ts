@@ -4,6 +4,7 @@ import {
   blocksArchive,
   blocksDelete,
   createCategory,
+  createEntry,
   createItem,
   createLocation,
   deleteLocation,
@@ -18,12 +19,15 @@ import {
   toInput,
   toInstancesCsv,
   toItemsCsv,
+  toStockCsv,
+  updateEntry,
   updateItem,
   validate,
 } from './draft';
 import type { DraftInput } from './draft';
-import { parseItems, parseInstances, parseCategories } from '../../../../data/parse';
+import { parseItems, parseInstances, parseCategories, parseStock } from '../../../../data/parse';
 import type { Item } from '../../../../domain/types';
+import { totalFor } from '../../../../domain/stock';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
@@ -100,7 +104,8 @@ describe('CSV export', () => {
 
   it('emits the exact header the Items sheet tab expects', () => {
     expect(toItemsCsv([]).trim())
-      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,initialStock,active,locationId,artId');
+      // No `initialStock` or `locationId`: those are the Stock tab now, one row per rack.
+      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId');
   });
 
   it('round-trips a chosen drawing, and leaves it blank when the guess is being trusted', () => {
@@ -112,22 +117,30 @@ describe('CSV export', () => {
     expect(parsed.ok[1].artId).toBeUndefined();   // blank means "keep guessing"
   });
 
-  it('round-trips the rack an item sits on, and leaves it blank when unplaced', () => {
-    const placed = createItem(input({ locationId: 'LOC-B3' }), []);
-    const loose = createItem(input(), [placed]);
-    const parsed = parseItems(toItemsCsv([placed, loose]));
+  it('round-trips the rack and quantity through the Stock tab, unplaced included', () => {
+    // Quantity and placement are their own rows now: one per (barang × rak). A blank rack is
+    // the unplaced pile, and it has to survive the trip because it is the state most likely to
+    // end in something going missing.
+    const a = createEntry(input({ initialStock: 4, locationId: 'LOC-B3' }), [], []);
+    const b = createEntry(input({ initialStock: 6, locationId: 'LOC-B9' }), [a.item], a.stock);
+    const c = createEntry(input({ initialStock: 2 }), [a.item, b.item], b.stock);
 
+    const parsed = parseStock(toStockCsv(c.stock));
     expect(parsed.quarantined).toEqual([]);
-    expect(parsed.ok[0].locationId).toBe('LOC-B3');
-    expect(parsed.ok[1].locationId).toBeUndefined();  // "belum ditempatkan" survives the trip
+    expect(parsed.ok.map((l) => [l.locationId, l.initialStock]))
+      .toEqual([['LOC-B3', 4], ['LOC-B9', 6], ['', 2]]);
+  });
+
+  it('emits the exact header the Stock sheet tab expects', () => {
+    expect(toStockCsv([]).trim()).toBe('itemId,locationId,initialStock');
   });
 });
 
 describe('summarise', () => {
   it('counts rows, distinct categories and total units', () => {
-    const a = createItem(input({ initialStock: 10 }), []);
-    const b = createItem(input({ categoryId: 'CAT-PHBI', initialStock: 4 }), [a]);
-    expect(summarise([a, b])).toEqual({ count: 2, categories: 2, units: 14 });
+    const a = createEntry(input({ initialStock: 10 }), [], []);
+    const b = createEntry(input({ categoryId: 'CAT-PHBI', initialStock: 4 }), [a.item], a.stock);
+    expect(summarise([a.item, b.item], b.stock)).toEqual({ count: 2, categories: 2, units: 14 });
   });
 });
 
@@ -135,29 +148,41 @@ describe('asset instances are derived from the item, not stored', () => {
   const TS0 = Date.parse('2026-09-06T00:00:00Z');
 
   it('an instance-tracked durable yields one labelled unit per count', () => {
-    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 3 }), []);
-    const inst = instancesFor(pisau, TS0);
+    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment' }), []);
+    const inst = instancesFor(pisau, TS0, 3);
     expect(inst.map((a) => a.assetId)).toEqual(['ALQ-ITM-0001-001', 'ALQ-ITM-0001-002', 'ALQ-ITM-0001-003']);
     expect(inst.map((a) => a.label)).toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
   });
 
   it('quantity-tracked things get no instances — consumables and counted durables alike', () => {
-    const sabun = createItem(input({ kind: 'consumable', initialStock: 10 }), []);
-    const terpal = createItem(input({ kind: 'equipment', trackBy: 'quantity', initialStock: 10 }), []);
-    expect(instancesFor(sabun, TS0)).toEqual([]);
-    expect(instancesFor(terpal, TS0)).toEqual([]);
+    const sabun = createItem(input({ kind: 'consumable' }), []);
+    const terpal = createItem(input({ kind: 'equipment', trackBy: 'quantity' }), []);
+    expect(instancesFor(sabun, TS0, 10)).toEqual([]);
+    expect(instancesFor(terpal, TS0, 10)).toEqual([]);
   });
 
   it('lowering the count simply drops the last units', () => {
-    const before = createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 5 }), []);
-    const after = updateItem([before], before.itemId, { ...toInput(before), initialStock: 3 })[0];
-    expect(instancesFor(after, TS0).map((a) => a.assetId))
-      .toEqual(instancesFor(before, TS0).slice(0, 3).map((a) => a.assetId));
+    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment' }), []);
+    expect(instancesFor(pisau, TS0, 3).map((a) => a.assetId))
+      .toEqual(instancesFor(pisau, TS0, 5).slice(0, 3).map((a) => a.assetId));
+  });
+
+  it('numbers a unit by the item TOTAL, so re-shelving one does not renumber it', () => {
+    // A knife is one numbered knife wherever it is currently kept. Numbering per rack would
+    // give two different shelves a "#1", and the labels are already printed.
+    const pisau = createItem(input({ name: 'Pisau', kind: 'equipment' }), []);
+    const split = [
+      { itemId: pisau.itemId, locationId: 'LOC-P1', initialStock: 2 },
+      { itemId: pisau.itemId, locationId: 'LOC-P2', initialStock: 1 },
+    ];
+    expect(instancesFor(pisau, TS0, totalFor(split, pisau.itemId)).map((a) => a.label))
+      .toEqual(['Pisau #1', 'Pisau #2', 'Pisau #3']);
   });
 
   it('exports instances in the shape the AssetInstances tab parses', () => {
-    const items = [createItem(input({ name: 'Pisau', kind: 'equipment', initialStock: 2 }), [])];
-    const parsed = parseInstances(toInstancesCsv(items, TS0));
+    const built = createEntry(input({ name: 'Pisau', kind: 'equipment', initialStock: 2 }), [], []);
+    const items = [built.item];
+    const parsed = parseInstances(toInstancesCsv(items, TS0, built.stock));
     expect(parsed.quarantined).toEqual([]);
     expect(parsed.ok).toHaveLength(2);
     expect(parsed.ok[0].acquiredTs).toBe(TS0);
@@ -190,23 +215,38 @@ describe('categories are free-form and editable', () => {
 
 describe('editing a row in place', () => {
   it('keeps the id and barcode — they may already be on a printed label', () => {
-    const before = createItem(input({ name: 'Sabun' }), []);
-    const after = updateItem([before], before.itemId, { ...toInput(before), name: 'Sabun cair', initialStock: 7 })[0];
-    expect(after.itemId).toBe(before.itemId);
-    expect(after.barcode).toBe(before.barcode);
-    expect(after).toMatchObject({ name: 'Sabun cair', initialStock: 7 });
+    const { item, stock } = createEntry(input({ name: 'Sabun', initialStock: 4 }), [], []);
+    const next = updateEntry([item], stock, item.itemId,
+      { ...toInput(item, stock), name: 'Sabun cair', initialStock: 7 }, '');
+    expect(next.items[0].itemId).toBe(item.itemId);
+    expect(next.items[0].barcode).toBe(item.barcode);
+    expect(next.items[0].name).toBe('Sabun cair');
+    expect(totalFor(next.stock, item.itemId)).toBe(7);
+  });
+
+  it('moves a thing between racks instead of leaving a ghost on the old one', () => {
+    // Editing a row edits ONE shelf. Without clearing where it came from, a move would read
+    // as "four here AND four there" — the register inventing stock nobody has.
+    const { item, stock } = createEntry(
+      input({ name: 'Sabun', initialStock: 4, locationId: 'LOC-A1' }), [], [],
+    );
+    const next = updateEntry([item], stock, item.itemId,
+      { ...toInput(item, stock, 'LOC-A1'), locationId: 'LOC-A3' }, 'LOC-A1');
+    expect(next.stock.map((l) => [l.locationId, l.initialStock])).toEqual([['LOC-A3', 4]]);
   });
 
   it('re-derives trackBy when the kind changes', () => {
-    const before = createItem(input({ kind: 'consumable' }), []);
-    const after = updateItem([before], before.itemId, { ...toInput(before), kind: 'equipment', trackBy: undefined })[0];
+    const { item, stock } = createEntry(input({ kind: 'consumable' }), [], []);
+    const after = updateItem([item], item.itemId,
+      { ...toInput(item, stock), kind: 'equipment', trackBy: undefined })[0];
     expect(after.trackBy).toBe('instance');
   });
 
   it('does not flag the row being edited as a duplicate of itself', () => {
-    const existing = [createItem(input({ name: 'Sapu' }), [])];
-    expect(validate(toInput(existing[0]), existing)).toHaveLength(1);            // as a new row: warned
-    expect(validate(toInput(existing[0]), existing, existing[0].itemId)).toEqual([]); // as an edit: fine
+    const { item, stock } = createEntry(input({ name: 'Sapu' }), [], []);
+    const existing = [item];
+    expect(validate(toInput(item, stock), existing)).toHaveLength(1);            // as a new row: warned
+    expect(validate(toInput(item, stock), existing, item.itemId)).toEqual([]);   // as an edit: fine
   });
 });
 
@@ -264,32 +304,32 @@ describe('editLocation', () => {
 
 describe('archiving and deleting a rack', () => {
   const A1 = createLocation('A1', 'Gudang Utama', '', []);
-  const stored = createItem(
+  const held = createEntry(
     { name: 'Sabun', categoryId: 'CAT-K', unit: 'galon', kind: 'consumable', initialStock: 4, minStock: 1, locationId: A1.locationId },
-    [],
+    [], [],
   );
 
   it('will not archive a rack that still holds things, and says what they are', () => {
-    const block = blocksArchive(A1.locationId, [stored]);
+    const block = blocksArchive(A1.locationId, [held.item], held.stock);
     expect(block).toEqual({ kind: 'holds-items', count: 1, names: ['Sabun'] });
   });
 
   it('archives an empty rack without erasing it', () => {
-    expect(blocksArchive(A1.locationId, [])).toBeNull();
+    expect(blocksArchive(A1.locationId, [], [])).toBeNull();
     const [archived] = archiveLocation([A1], A1.locationId);
     expect(archived.active).toBe(false);
     expect(restoreLocation([archived], A1.locationId)[0].active).toBe(true);
   });
 
   it('deletes only a rack that never became real', () => {
-    expect(blocksDelete(A1, [])).toBeNull();
+    expect(blocksDelete(A1, [], [])).toBeNull();
     expect(deleteLocation([A1], A1.locationId)).toEqual([]);
   });
 
   it('refuses to delete a rack that has ever been counted, even when empty', () => {
     // Archiving keeps the history honest; deleting would rewrite a walk somebody actually did.
     const counted = { ...A1, lastCountedTs: 1_700_000_000_000 };
-    expect(blocksArchive(counted.locationId, [])).toBeNull();
-    expect(blocksDelete(counted, [])).toEqual({ kind: 'has-history' });
+    expect(blocksArchive(counted.locationId, [], [])).toBeNull();
+    expect(blocksDelete(counted, [], [])).toEqual({ kind: 'has-history' });
   });
 });

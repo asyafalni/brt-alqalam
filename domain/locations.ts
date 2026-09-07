@@ -33,12 +33,19 @@ export function rollupLocations(
   items: readonly Item[],
   derived: DerivedState,
 ): LocationSummary[] {
+  // Membership now comes from the DERIVED per-rack quantities rather than from a `locationId`
+  // on the item, because an item can sit on several racks at once. A rack holds an item when
+  // it has a line for it — including a line that has been drawn down to zero, which is still
+  // information: "we keep sabun here and it has run out" is not the same as "sabun was never
+  // kept here", and only the first earns a walk.
   const byLocation = new Map<string, Item[]>();
   for (const item of items) {
-    const key = item.locationId ?? '';
-    const bucket = byLocation.get(key);
-    if (bucket) bucket.push(item);
-    else byLocation.set(key, [item]);
+    const rows = derived.items[item.itemId]?.byLocation ?? {};
+    for (const key of Object.keys(rows)) {
+      const bucket = byLocation.get(key);
+      if (bucket) bucket.push(item);
+      else byLocation.set(key, [item]);
+    }
   }
 
   const summarise = (location: Location): LocationSummary => {
@@ -51,10 +58,17 @@ export function rollupLocations(
     for (const item of here) {
       const d = derived.items[item.itemId];
       if (!d) continue;
-      unitCount += d.qty;
-      if (d.status === 'low') lowCount += 1;
-      if (d.status === 'out') outCount += 1;
-      if (SEVERITY[d.status] > SEVERITY[status]) status = d.status;
+      const qtyHere = d.byLocation[location.locationId] ?? 0;
+      unitCount += qtyHere;
+      // The rack's colour is about what is ON THIS RACK. An item that is low overall but has
+      // twenty of them here does not make this shelf worth a walk; one that has run out here
+      // does, whatever the total says.
+      const statusHere: LocationStatus = qtyHere <= 0
+        ? 'out'
+        : (item.minStock != null && d.qty <= item.minStock ? 'low' : 'available');
+      if (statusHere === 'low') lowCount += 1;
+      if (statusHere === 'out') outCount += 1;
+      if (SEVERITY[statusHere] > SEVERITY[status]) status = statusHere;
     }
 
     return { location, status, itemCount: here.length, unitCount, lowCount, outCount };

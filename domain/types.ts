@@ -53,10 +53,18 @@ export interface Location {
   lastCountedTs?: number;
 }
 
+/**
+ * The catalog entry: what a thing IS. Not how much of it there is, and not where.
+ *
+ * Quantity and placement moved out to `StockLine` when it turned out the same thing routinely
+ * sits on more than one rack — see that type for why the split is load-bearing rather than
+ * tidy. `minStock` stays here because the alarm is about the item as a whole: nobody wants to
+ * be told that sabun is low on A1 while there are twelve of them on A3.
+ */
 export interface Item {
   itemId: string; barcode: string; name: string;
   categoryId: string; kind: Kind; unit: string; trackBy: TrackBy; // trackBy defaults from kind (consumable->quantity, equipment->instance), overridable
-  minStock: number | null; initialStock: number; active: boolean; // minStock null = Setting Minimum "(-)" → no low-stock notification
+  minStock: number | null; active: boolean; // minStock null = Setting Minimum "(-)" → no low-stock notification
   /**
    * The keterangan this item normally moves under — the spec's per-row KETERANGAN column on
    * MENU STOK. NOTIFIKASI STOK sources its own KETERANGAN column from here, not from the
@@ -73,9 +81,29 @@ export interface Item {
    * so an old sheet naming a retired drawing degrades to the default instead of breaking.
    */
   artId?: string;
-  /** Optional: a catalog built before locations existed has none, and that is a real state
-   *  worth seeing — "belum ditempatkan" is exactly the mess we are trying to surface. */
-  locationId?: string;
+}
+
+/**
+ * How much of one item sits on one rack.
+ *
+ * WHY THIS EXISTS AS ITS OWN THING. The item used to carry `initialStock` and one `locationId`,
+ * which quietly assumed each thing lives in exactly one place. It does not — the owner reports
+ * that a single item is routinely split across racks — and the assumption did not merely limit
+ * the model, it made the cycle count WRONG: counting rack A1 wrote what you found there back
+ * over the item's whole quantity, so the stock on A3 silently disappeared from the register.
+ * Counting is the one mechanism keeping the numbers honest, so it has to be per rack, which
+ * means the quantity has to be per rack too.
+ *
+ * `locationId` is `''` for stock nobody has placed yet. That is a real, visible state and the
+ * one most likely to end in something going missing (§0), so it is a line like any other
+ * rather than an absence.
+ */
+export interface StockLine {
+  itemId: string;
+  /** `''` = belum ditempatkan. */
+  locationId: string;
+  /** What the opname counted here. Movements are folded on top of it, never into it. */
+  initialStock: number;
 }
 
 export interface AssetInstance {
@@ -86,12 +114,29 @@ export interface AssetInstance {
 export interface Txn {
   txnId: string; clientTxnId: string; ts: number; type: MovementType;
   itemId?: string; assetId?: string; qtyDelta: number;
+  /**
+   * WHICH RACK the quantity moved on or off. Blank means the unplaced pile.
+   *
+   * Required in practice for a quantity item once the same thing can sit on two racks: without
+   * it a withdrawal has no shelf to come off, and the per-rack numbers are guesses. Optional in
+   * the type only so a log written before this existed still parses — such rows fold onto the
+   * unplaced line, which is visibly wrong rather than quietly wrong.
+   */
+  locationId?: string;
   recipient?: string; actorUserId: string; condition?: Condition;
   note?: string; reversesTxnId?: string; toStatus?: InstanceStatus; // toStatus: explicit target for an admin status_change
 }
 
 export interface DerivedItem {
-  item: Item; qty: number; status: 'available' | 'low' | 'out'; outstanding: number;
+  item: Item;
+  /** Total across every rack. This is what the minimum is compared against. */
+  qty: number;
+  /**
+   * The same total, split by rack — keyed by `locationId`, with `''` for unplaced stock.
+   * A rack count reconciles one of these, never the total.
+   */
+  byLocation: Record<string, number>;
+  status: 'available' | 'low' | 'out'; outstanding: number;
   /**
    * Everything ever taken out of this item, as a positive running total — the spec's
    * PENGAMBILAN counter on MENU STOK, which HISTORI DATA's AMBIL column is sourced from.

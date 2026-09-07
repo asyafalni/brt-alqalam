@@ -2,7 +2,7 @@
 // opname has happened. Explicitly loaded by the operator, never auto-seeded: a register
 // that quietly invents its own contents is worse than an empty one.
 
-import type { Category, Item, Location, Txn } from '../../../domain/types';
+import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
 import { SEED_CATEGORIES } from './seedCategories';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -94,7 +94,7 @@ const SEEDS: Seed[] = [
  * tersedia / menipis / habis. These entries make the whole status language visible, and give
  * the per-item history something to show.
  */
-function demoTxns(items: Item[]): Txn[] {
+function demoTxns(items: Item[], stock: StockLine[]): Txn[] {
   const byName = (name: string) => items.find((i) => i.name === name);
   const txns: Txn[] = [];
   let n = 0;
@@ -121,7 +121,11 @@ function demoTxns(items: Item[]): Txn[] {
     ['Saklar', 30, 2], ['Baterai AA', 11, 2], ['Kantong daging', 40, 8],
   ] as [string, number, number][]) {
     const item = byName(name);
-    if (item) add(days, { type: 'pemakaian', itemId: item.itemId, qtyDelta: -qty });
+    if (!item) continue;
+    // Every movement names the rack it came off. Without one it would fold onto the unplaced
+    // pile, and the demo would show negative stock on a shelf nobody has.
+    const from = stock.find((l) => l.itemId === item.itemId)?.locationId ?? '';
+    add(days, { type: 'pemakaian', itemId: item.itemId, qtyDelta: -qty, locationId: from });
   }
 
   // On loan — the answer to "who has it", which is the whole point of tracking a borrower.
@@ -167,9 +171,13 @@ function demoTxns(items: Item[]): Txn[] {
   return txns.sort((a, b) => a.ts - b.ts);
 }
 
-export function demoDraft(): { items: Item[]; categories: Category[]; locations: Location[]; txns: Txn[] } {
+export function demoDraft(): {
+  items: Item[]; categories: Category[]; locations: Location[]; stock: StockLine[]; txns: Txn[];
+} {
+  const stock: StockLine[] = [];
   const items: Item[] = SEEDS.map((s, n) => {
     const itemId = `ITM-${String(n + 1).padStart(4, '0')}`;
+    stock.push({ itemId, locationId: s.loc ?? '', initialStock: s.qty });
     return {
       itemId,
       barcode: `ALQ-${itemId}`,
@@ -179,10 +187,17 @@ export function demoDraft(): { items: Item[]; categories: Category[]; locations:
       unit: s.unit,
       trackBy: s.trackBy ?? (s.kind === 'consumable' ? 'quantity' : 'instance'),
       minStock: s.min,
-      initialStock: s.qty,
       active: true,
-      ...(s.loc ? { locationId: s.loc } : {}),
+
     };
   });
-  return { items, categories: SEED_CATEGORIES, locations: DEMO_LOCATIONS, txns: demoTxns(items) };
+  // One item deliberately kept on two racks, because that is now a supported and normal shape
+  // and a demo that never shows it would leave the case untested by eye.
+  const sabun = items.find((i) => i.name === 'Sabun cuci tangan');
+  if (sabun) stock.push({ itemId: sabun.itemId, locationId: 'LOC-K2', initialStock: 4 });
+
+  return {
+    items, categories: SEED_CATEGORIES, locations: DEMO_LOCATIONS, stock,
+    txns: demoTxns(items, stock),
+  };
 }
