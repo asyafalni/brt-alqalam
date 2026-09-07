@@ -34,6 +34,10 @@ design — it is **three things only a human can find out**, plus the build.
 - **The scanner works on a real phone** (2026-09-07, against https://brt-alqalam.fly.dev). Camera
   opens over HTTPS, a QR decodes, the deep link resolves, and a movement is recorded. §15.4 had
   flagged this as needing an explicit device test; it has now had one.
+- **Android is the platform that matters** (owner, 2026-09-07): the marbot rarely use iOS. The
+  scanner is already built that way — native `BarcodeDetector` first, jsQR `import()`ed only in
+  the branch after it, so the 130kB fallback never downloads on an Android phone. The iPhone test
+  §15.4 asks for stays on the list for admins and the boss; it no longer gates the daily flow.
 - **The inferred keterangan survives contact with a person.** The same *Ambil* button logged a
   `pemakaian` on a consumable and a `peminjaman` on a durable, with nobody choosing a word —
   which is the whole bet of Part XVI decision 2, and the first time it has been taken by a human

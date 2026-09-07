@@ -418,6 +418,13 @@ src/
 ### 15.4 QR & mobile specifics
 - **QR, not 1D barcodes** — faster on phones, encodes asset id + type + location.
 - Scan via a JS lib that works on all phones (`@zxing/browser` or `html5-qrcode`); use the native `BarcodeDetector` API as progressive enhancement where present (Android). **iOS Safari needs the JS fallback — test on iPhone explicitly.**
+  > ⚠️ **PRIORITY CORRECTED 2026-09-07 (owner, from the field): Android first. The marbot rarely
+  > use iOS.** So the native `BarcodeDetector` is not "progressive enhancement" here — it is the
+  > path the actual operators take, and the JS decoder is the exception. The code already reflects
+  > this by construction: `useScanner` tries the native detector first and `import()`s jsQR only
+  > after that branch returns, so the 130kB fallback chunk never reaches an Android device at all.
+  > The explicit iPhone test stays on the list — admins, the boss and outside borrowers may well
+  > be on iOS — but it is no longer the risk that gates the daily flow.
 - **Deep-link QRs** (`…/scan?a=ALQ-PHBI-0007`) so even the phone's native camera app opens the right screen.
 - Installable PWA, camera permission, one-handed operation.
 
@@ -1647,8 +1654,10 @@ with reality either:
 
 - **One person, who wrote the thing.** Not a marbot, in a gudang, in a hurry, with wet hands. The
   speed budget (§58: ~10 seconds, ≤6 taps) is still unmeasured against anybody real.
-- **One device.** iOS Safari is the risky half of §15.4 and remains untested unless that phone was
-  an iPhone. The typed-code fallback exists precisely because this may still fail somewhere.
+- **One device, and it was ANDROID.** Which the owner then confirmed is the right one to care
+  about: the marbot rarely use iOS (§15.4, corrected). That demotes the iPhone test from "the
+  risk that gates the daily flow" to "still worth doing, for admins and the boss" — it does not
+  delete it, and the typed-code fallback stays for wherever this fails next.
 - **One machine's data.** localStorage per device, no gateway — so a QR resolves only on a phone
   that already loaded the catalog. Scanning from a second device shows "Katalog masih kosong",
   which reads like a broken sticker and is not one. This is the sharpest reason Stages 1–3 exist.
