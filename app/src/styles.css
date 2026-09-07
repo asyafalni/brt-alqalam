@@ -181,19 +181,49 @@ textarea:focus-visible {
 .label--stack .label-text { width: 100%; }
 .label--stack .label-subtitle { display: none; }  /* no room, and the code is the identifier */
 
+/* A shelf BOARD, printed at 99×70 for one reason: to be read from the far end of the gudang.
+   It is a LANDSCAPE label and both halves get to be big — the QR is scanned up close, the name
+   is read from across the room, and 99mm is wide enough for both.
+
+   Two wrong answers on the way here, both worth naming. As a plain `row` the QR took the full
+   height (66 of the 99mm) and left the name ~27mm and an ellipsis, so the thing the size exists
+   for was the thing that got cut. Stacking it fixed the name and shrank the QR to a stamp with
+   dead space under it. The QR is now CAPPED rather than filling or floating: two thirds of the
+   height, which is ~46mm — comfortably scannable — and the remaining ~46mm of width goes to a
+   name that wraps. */
+.label--board { gap: 3mm; }
+.label--board .label-qr {
+  width: auto;
+  height: 66%;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+}
+.label--board .label-text { flex: 1 1 auto; min-width: 0; }
+
 /* Type scales with the sticker, because the sizes exist for different reading distances.
    A fixed 3mm name is right on a 37mm rack label, cramped on a 25mm tag, and absurd on a
-   99×70mm shelf board that is meant to be read from the far end of the gudang — the whole
-   point of printing one that size. Clamped at both ends so the extremes stay sane. */
+   99×70mm shelf board. Clamped at both ends so the extremes stay sane. */
 .label-title {
-  display: block; overflow: hidden; font-weight: 700;
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+  font-weight: 700;
   font-size: clamp(2.6mm, calc(var(--label-h) * 0.115), 9mm);
-  text-overflow: ellipsis; white-space: nowrap;
+  /* WRAPS now, rather than ending in an ellipsis. A truncated name on a sticker is a sticker
+     that has to be peeled off and read from the app, which is the opposite of its job.
+     `anywhere` so a single long word breaks instead of overflowing. */
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
+.label--board .label-title {
+  -webkit-line-clamp: 3;
+  font-size: clamp(4mm, calc(var(--label-w) * 0.075), 10mm);
+  line-height: 1.1;
+}
+.label--board .label-subtitle { -webkit-line-clamp: 2; }
 .label-subtitle {
-  display: block; overflow: hidden; color: #444;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1;
+  overflow: hidden; color: #444;
   font-size: clamp(2mm, calc(var(--label-h) * 0.07), 5mm);
-  text-overflow: ellipsis; white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .label-code {
   display: block; margin-top: 0.5mm; letter-spacing: 0.02em;

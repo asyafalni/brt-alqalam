@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'octane';
 import {
-  Archive, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
+  Archive, Boxes, ClipboardCheck, MapPin, Package, Pencil, Plus, RotateCcw, Trash2,
 } from '@octanejs/lucide';
 import { groupByZone, rollupLocations, racksNeedingAttention, UNASSIGNED } from '../../../../domain/locations';
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
@@ -31,6 +31,7 @@ import { artFor, ItemArt } from '../items/ItemArt';
 import { RACK_ART_IDS, RACK_ART_LABEL, RackArt, rackArtFor } from './RackArt';
 import { CountSheet } from './CountSheet';
 import { Sheet } from '../../components/Sheet';
+import { RackContents } from './RackContents';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
 const CELL: Record<LocationStatus, string> = {
@@ -62,6 +63,8 @@ export function RackBoard(
   /** `'new'` while adding; a locationId while editing that rack. One form, two jobs. */
   const [editing, setEditing] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  /** Which rack's membership is being edited — what is kept here, not how much of it. */
+  const [arranging, setArranging] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [renamingZone, setRenamingZone] = useState<string | null>(null);
   /** Which zone a new rack should start in, when it was opened from a zone rather than the header. */
@@ -407,6 +410,18 @@ export function RackBoard(
                 <Button size="touch" class="flex-1" onClick={() => setCounting(selectedRack.location.locationId)}>
                   <ClipboardCheck class="h-5 w-5" /> Cek rak
                 </Button>
+                {/* Membership, beside the recount. Cek rak fixes the numbers on a shelf; this
+                    fixes which things are on it, and until now that could only be done from
+                    each item's own form. */}
+                <button
+                  type="button"
+                  class="flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-600 hover:bg-slate-100"
+                  aria-label={`Atur isi rak ${selectedRack.location.code}`}
+                  title="Atur isi rak"
+                  onClick={() => setArranging(selectedRack.location.locationId)}
+                >
+                  <Boxes class="h-5 w-5" />
+                </button>
                 <button
                   type="button"
                   class="flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border border-slate-400 bg-white text-slate-600 hover:bg-slate-100"
@@ -537,6 +552,31 @@ export function RackBoard(
             </section>
           )}
           </Sheet>
+
+      <Sheet
+        open={arranging !== null}
+        title="Atur isi rak"
+        description={arranging
+          ? `Rak ${locations.find((l) => l.locationId === arranging)?.code ?? ''}`
+          : undefined}
+        onClose={() => setArranging(null)}
+      >
+        {arranging && (() => {
+          const rack = locations.find((l) => l.locationId === arranging);
+          return rack ? (
+            <RackContents
+              rack={rack}
+              racks={locations}
+              items={items}
+              stock={draft.stock}
+              derived={inventory.derived}
+              categoryName={categoryName}
+              onChange={draft.setStock}
+              onDone={() => setArranging(null)}
+            />
+          ) : null;
+        })()}
+      </Sheet>
         </>
       )}
     </div>

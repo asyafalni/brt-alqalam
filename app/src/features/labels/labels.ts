@@ -146,7 +146,7 @@ export function groupLabels(
 
 // --- Sheet formats ------------------------------------------------------------------------
 
-export type LabelLayout = 'row' | 'stack';
+export type LabelLayout = 'row' | 'stack' | 'board';
 
 /** Sticker sheet geometry. Sizes are the common A4 label formats sold locally. */
 export interface SheetFormat {
@@ -188,13 +188,14 @@ export const SHEET_FORMATS: SheetFormat[] = [
     columns: 3, rows: 8, width: 70, height: 37, layout: 'row',
   },
   {
-    // `row`, not `stack`: on a board this size the rack *name* is the thing being read from a
-    // distance and the QR is for scanning up close, so the name gets the width. Stacking would
-    // hand 70mm of height to a code nobody reads with their eyes.
+    /* `board`, its own layout. As a `row` the QR claimed the full height — 66 of the 99mm —
+       and left the name about 27mm, so on the one size printed BECAUSE it has to be read from
+       across the gudang, the name was the thing that got cut off. The QR now takes a modest
+       band at the top and the name gets the whole width underneath, wrapping. */
     id: 'jumbo',
     name: 'Rak jumbo',
     purpose: 'Papan rak besar — terbaca dari ujung gudang.',
-    columns: 2, rows: 4, width: 99, height: 70, layout: 'row',
+    columns: 2, rows: 4, width: 99, height: 70, layout: 'board',
   },
 ];
 

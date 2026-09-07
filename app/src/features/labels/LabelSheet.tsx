@@ -26,7 +26,7 @@ import { qrSvg, qrViewBox } from './qr';
 import {
   groupLabels, isUnprintableBaseUrl, labelsFor, perSheet, SHEET_FORMATS, sheetCount, suggestFormat,
 } from './labels';
-import type { LabelKind, LabelSpec, SheetFormat } from './labels';
+import type { LabelKind, LabelLayout, LabelSpec, SheetFormat } from './labels';
 
 /** Per frame. Small enough that one frame stays under a few milliseconds on a cheap tablet. */
 const CHUNK = 12;
@@ -461,7 +461,7 @@ function Chip({ children, onClick, muted }: { children?: unknown; onClick: () =>
   );
 }
 
-function Label({ spec, layout }: { spec: LabelSpec; layout: 'row' | 'stack' }) {
+function Label({ spec, layout }: { spec: LabelSpec; layout: LabelLayout }) {
   const qr = useMemo(() => qrSvg(spec.url), [spec.url]);
   const box = qrViewBox(qr);
 

@@ -360,3 +360,84 @@ describe('finding zone management at all', () => {
     expect((r.getByLabelText('Zona') as HTMLSelectElement).value).toBe('Gudang PHBI');
   });
 });
+
+describe('managing WHAT is kept on a rack', () => {
+  // Until this existed the rack side was read-only for membership: Cek rak could fix the
+  // numbers on a shelf but never which things were on it, and placement could only be changed
+  // from each item's own form — no help to somebody standing at the rack holding something.
+  const two = () => catalog(
+    input({ name: 'Sabun', initialStock: 10, locationId: B3.locationId }),
+    input({ name: 'Karbol', initialStock: 4, locationId: B4.locationId }),
+  );
+
+  const openArrange = () => {
+    const r = render(Harness);
+    fireEvent.click(r.getAllByLabelText(/^Rak B3/)[0]);
+    fireEvent.click(r.getByLabelText('Atur isi rak B3'));
+    return r;
+  };
+
+  it('adds an item that was never recorded here', () => {
+    seed(two(), [B3, B4]);
+    const r = openArrange();
+
+    fireEvent.change(r.getByLabelText('Simpan barang lain di rak ini'), {
+      target: { value: stored().items[1].itemId },
+    });
+    type(r.getByLabelText('Ada berapa di rak ini sekarang?'), '3');
+    fireEvent.click(r.getByText('Simpan di rak ini'));
+
+    expect(stored().stock).toContainEqual({
+      itemId: 'ITM-0002', locationId: B3.locationId, initialStock: 3,
+    });
+  });
+
+  it('accepts zero — "kept here and run out" is a real state', () => {
+    // It is exactly the state a shopping list is made from, and it is not the same as never
+    // having been kept here (§87).
+    seed(two(), [B3, B4]);
+    const r = openArrange();
+
+    fireEvent.change(r.getByLabelText('Simpan barang lain di rak ini'), {
+      target: { value: 'ITM-0002' },
+    });
+    fireEvent.click(r.getByText('Simpan di rak ini'));
+
+    expect(stored().stock).toContainEqual({
+      itemId: 'ITM-0002', locationId: B3.locationId, initialStock: 0,
+    });
+  });
+
+  it('moves an item to another rack, quantity intact', () => {
+    seed(two(), [B3, B4]);
+    const r = openArrange();
+
+    fireEvent.click(r.getByLabelText('Pindahkan Sabun'));
+    fireEvent.change(r.getByLabelText('Pindahkan ke'), { target: { value: B4.locationId } });
+
+    const after = stored().stock;
+    expect(after.find((l: StockLine) => l.itemId === 'ITM-0001'))
+      .toEqual({ itemId: 'ITM-0001', locationId: B4.locationId, initialStock: 10 });
+  });
+
+  it('ends the line when something is no longer kept here', () => {
+    seed(two(), [B3, B4]);
+    const r = openArrange();
+
+    fireEvent.click(r.getByLabelText('Hapus Sabun dari rak ini'));
+
+    expect(stored().stock.some((l: StockLine) => l.itemId === 'ITM-0001')).toBe(false);
+    // The catalog is untouched: not kept here is not the same as not owned.
+    expect(stored().items).toHaveLength(2);
+  });
+
+  it('does not offer an item that is already kept here', () => {
+    // A second line for the same item on the same rack is a number to reconcile.
+    seed(two(), [B3, B4]);
+    const r = openArrange();
+    const options = [...r.getByLabelText('Simpan barang lain di rak ini')
+      .querySelectorAll('option')].map((o) => o.textContent);
+    expect(options).not.toContain('Sabun');
+    expect(options).toContain('Karbol');
+  });
+});
