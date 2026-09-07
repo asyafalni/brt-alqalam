@@ -190,11 +190,15 @@ textarea:focus-visible {
    for was the thing that got cut. Stacking it fixed the name and shrank the QR to a stamp with
    dead space under it. The QR is now CAPPED rather than filling or floating: two thirds of the
    height, which is ~46mm — comfortably scannable — and the remaining ~46mm of width goes to a
-   name that wraps. */
-.label--board { gap: 3mm; }
+   name that wraps.
+
+   The cap is 82%, not 66%: at two thirds the code still read as small on a board this size,
+   and a rack name is short — "Rak A1" needs a fraction of the width the subtitle does — so the
+   text half can afford to give some back. */
+.label--board { gap: 2.5mm; }
 .label--board .label-qr {
   width: auto;
-  height: 66%;
+  height: 82%;
   aspect-ratio: 1;
   flex: 0 0 auto;
 }
@@ -215,7 +219,7 @@ textarea:focus-visible {
 }
 .label--board .label-title {
   -webkit-line-clamp: 3;
-  font-size: clamp(4mm, calc(var(--label-w) * 0.075), 10mm);
+  font-size: clamp(4mm, calc(var(--label-w) * 0.068), 9mm);
   line-height: 1.1;
 }
 .label--board .label-subtitle { -webkit-line-clamp: 2; }
