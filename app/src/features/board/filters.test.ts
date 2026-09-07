@@ -14,7 +14,7 @@ const row = (
 });
 
 const rack = (locationId: string, code: string): Location => ({
-  locationId, code, name: '', zone: 'Gudang', active: true,
+  locationId, code, name: '', zone: 'Gudang', order: 0, active: true,
 });
 
 describe('matchesFilter', () => {

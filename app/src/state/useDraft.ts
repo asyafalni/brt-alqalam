@@ -2,6 +2,7 @@ import { useEffect, useState } from 'octane';
 import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
 import type { PurchaseRequest } from '../../../domain/requests';
 import { SEED_CATEGORIES } from '../data/seedCategories';
+import type { StoredDraft } from './persist';
 import { clearDraft, loadDraft, saveDraft } from './persist';
 import { demoDraft } from '../data/demo';
 
@@ -19,6 +20,8 @@ export interface Draft {
   setLocations: (update: (prev: Location[]) => Location[]) => void;
   setStock: (update: (prev: StockLine[]) => StockLine[]) => void;
   setRequests: (update: (prev: PurchaseRequest[]) => PurchaseRequest[]) => void;
+  /** Append-only in practice: every caller adds to the log, none rewrites it. */
+  setTxns: (update: (prev: Txn[]) => Txn[]) => void;
   /**
    * The log and the requests in one write.
    *
@@ -43,6 +46,15 @@ export interface Draft {
     { items: Item[]; stock: StockLine[] }) => void;
   reset: () => void;
   loadDemo: () => void;
+  /**
+   * Replace whole tabs from an import, leaving the ones that were not supplied alone.
+   *
+   * One write, because a restore that lands as five renders would show a catalog without its
+   * stock lines in between — briefly, but long enough for the autosave to persist it.
+   */
+  loadFrom: (parts: Partial<Pick<
+    StoredDraft, 'items' | 'categories' | 'locations' | 'stock' | 'requests'
+  >>) => void;
 }
 
 /**
@@ -69,6 +81,7 @@ export function useDraft(): Draft {
     setLocations: (update) => setState((prev) => ({ ...prev, locations: update(prev.locations) })),
     setStock: (update) => setState((prev) => ({ ...prev, stock: update(prev.stock) })),
     setRequests: (update) => setState((prev) => ({ ...prev, requests: update(prev.requests) })),
+    setTxns: (update) => setState((prev) => ({ ...prev, txns: update(prev.txns) })),
     setRepair: (update) => setState((prev) => ({
       ...prev,
       ...update({ txns: prev.txns, requests: prev.requests }),
@@ -85,5 +98,6 @@ export function useDraft(): Draft {
       });
     },
     loadDemo: () => setState(demoDraft()),
+    loadFrom: (parts) => setState((prev) => ({ ...prev, ...parts })),
   };
 }

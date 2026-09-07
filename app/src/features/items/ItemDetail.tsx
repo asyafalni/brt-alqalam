@@ -4,7 +4,9 @@
 // because "what is this and what has happened to it" is one question however you arrived at it.
 
 import { useMemo, useState } from 'octane';
-import { ArrowLeft, History, MapPin, Package, Pencil, QrCode } from '@octanejs/lucide';
+import {
+  ArrowDownLeft, ArrowLeft, ArrowUpRight, History, MapPin, Package, Pencil, QrCode,
+} from '@octanejs/lucide';
 import { keteranganLabel } from '../../../../domain/keterangan';
 import type { Location, Txn } from '../../../../domain/types';
 import type { Route } from '../../state/route';
@@ -17,6 +19,7 @@ import type { Column } from '../../components/DataTable';
 import { instancesFor } from '../stocktake/draft';
 import { moveLine, setLine, totalFor, UNPLACED } from '../../../../domain/stock';
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
+import type { MovementTarget } from '../movement/MovementSheet';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
 import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
@@ -75,8 +78,13 @@ const HISTORY: Column<Txn>[] = [
 ];
 
 export function ItemDetail(
-  { id, draft, inventory, now, onNavigate }:
-  { id: string; draft: Draft; inventory: Inventory; now: number; onNavigate: (r: Route) => void },
+  { id, draft, inventory, now, onNavigate, onMove }:
+  {
+    id: string; draft: Draft; inventory: Inventory; now: number;
+    onNavigate: (r: Route) => void;
+    /** The tap path to recording a movement, for when scanning is not to hand. */
+    onMove: (target: MovementTarget) => void;
+  },
 ) {
   const item = draft.items.find((i) => i.itemId === id || i.barcode === id);
 
@@ -178,6 +186,19 @@ export function ItemDetail(
         subtitle={categoryName || item.categoryId}
         action={
           <div class="flex gap-2">
+            {/* Ahead of Ubah and Label, because this is the thing that happens fifty times a
+                week while those happen once. Quantity items only — a loan needs a borrower,
+                and that flow is deliberately not built yet (§60). */}
+            {item.trackBy === 'quantity' && (
+              <>
+                <Button onClick={() => onMove({ item, direction: 'keluar' })}>
+                  <ArrowUpRight class="h-4 w-4" /> Ambil
+                </Button>
+                <Button variant="secondary" onClick={() => onMove({ item, direction: 'masuk' })}>
+                  <ArrowDownLeft class="h-4 w-4" /> Kembalikan
+                </Button>
+              </>
+            )}
             <Button variant="secondary" onClick={() => onNavigate({ name: 'opname' })}>
               <Pencil class="h-4 w-4" /> Ubah
             </Button>

@@ -37,6 +37,8 @@ import { StockTake } from './features/stocktake/StockTake';
 
 import { Board } from './features/board/Board';
 import { ScanResult } from './features/scan/ScanResult';
+import { MovementSheet } from './features/movement/MovementSheet';
+import type { MovementTarget } from './features/movement/MovementSheet';
 
 
 export function App() {
@@ -49,6 +51,9 @@ export function App() {
      Notifikasi Stok is a thing to glance at and act on, not a destination, and sending someone
      to Beranda from the middle of a stock-take costs them their place. */
   const [alertsOpen, setAlertsOpen] = useState(false);
+  /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
+     hoisting it means one implementation instead of three that drift. */
+  const [moving, setMoving] = useState<MovementTarget | null>(null);
 
   // Pinned per mount: `deriveState` is a pure function of `now`, so a moving clock would
   // recompute the whole fold on every keystroke.
@@ -174,6 +179,7 @@ export function App() {
               search={search}
               now={now}
               openRack={route.id}
+              onMove={setMoving}
               onOpenItem={(id) => navigate({ name: 'item', id })}
             />
           )}
@@ -184,6 +190,7 @@ export function App() {
               inventory={inventory}
               now={now}
               onNavigate={navigate}
+              onMove={setMoving}
             />
           )}
           {route.name === 'aset' && (
@@ -233,6 +240,7 @@ export function App() {
               inventory={inventory}
               now={now}
               onBack={() => navigate({ name: 'beranda' })}
+              onMove={setMoving}
             />
           )}
           {route.name === 'scan-empty' && (
@@ -281,6 +289,16 @@ export function App() {
             />
           )}
         </Sheet>
+
+        <MovementSheet
+          target={moving}
+          derived={moving ? inventory.derived.items[moving.item.itemId] : undefined}
+          locations={draft.locations}
+          /* Appended, never edited: the stock number is folded back out of this log, so a
+             movement is a new fact rather than a correction of the old one. */
+          onCommit={(txn) => { draft.setTxns((prev) => [...prev, txn]); setMoving(null); }}
+          onClose={() => setMoving(null)}
+        />
       </div>
 
       <BottomNav

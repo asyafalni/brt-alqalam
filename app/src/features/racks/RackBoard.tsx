@@ -16,6 +16,7 @@ import { groupByZone, rollupLocations, racksNeedingAttention, UNASSIGNED } from 
 import type { LocationSummary, LocationStatus } from '../../../../domain/locations';
 import { countState } from '../../../../domain/cycleCount';
 import { contentsOf } from '../../../../domain/stock';
+import type { MovementTarget } from '../movement/MovementSheet';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -47,9 +48,11 @@ const ZONE_NOTE: Record<LocationStatus, string> = {
 };
 
 export function RackBoard(
-  { draft, inventory, search, now, openRack, onOpenItem }:
+  { draft, inventory, search, now, openRack, onOpenItem, onMove }:
   { draft: Draft; inventory: Inventory; search: string; now: number; openRack?: string;
-    onOpenItem: (id: string) => void },
+    onOpenItem: (id: string) => void;
+    /** Standing at the shelf is the best moment to record taking something off it. */
+    onMove: (target: MovementTarget) => void },
 ) {
   const { items, categories, locations, setLocations } = draft;
   // Seeded from the route so a rack link on the stock list lands with the panel already open.
@@ -460,25 +463,47 @@ export function RackBoard(
                     const d = inventory.derived.items[i.itemId];
                     const badge = itemStatusBadge(d?.status ?? 'available');
                     return (
-                      <li key={i.itemId}>
+                      <li key={i.itemId} class="flex items-center gap-2 pr-[var(--card-pad)]">
                         <button
                           type="button"
-                          class="flex w-full items-center gap-3 px-[var(--card-pad)] py-3 text-left hover:bg-slate-50"
+                          class="flex min-w-0 flex-1 items-center gap-3 py-3 pl-[var(--card-pad)] text-left hover:bg-slate-50"
                           aria-label={`Buka ${i.name}`}
                           onClick={() => onOpenItem(i.itemId)}
                         >
-                        <ItemArt art={artFor(i, categoryName(i.categoryId))} size={30} />
-                        <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
-                          <p class={CODE}>{categoryName(i.categoryId)}</p>
-                        </div>
-                        <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
-                          <span class="w-20 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
+                          <ItemArt art={artFor(i, categoryName(i.categoryId))} size={30} />
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-bold text-slate-900">{i.name}</p>
+                            <p class={CODE}>{categoryName(i.categoryId)}</p>
+                          </div>
+                          {/* The status PILL is gone from this row and its colour has moved
+                              onto the number. In a panel this narrow the pill, the quantity and
+                              the Ambil button did not fit, and the pill was the one saying
+                              something already said: "0 botol" is what habis means. */}
+                          <span
+                            class={`shrink-0 whitespace-nowrap text-right text-sm font-bold tabular-nums ${badge.text}`}
+                            title={badge.label}
+                          >
                             {/* What is on THIS shelf, not the item's total across the gudang. */}
                             {d?.byLocation[selectedRack.location.locationId] ?? 0}{' '}
                             <span class="text-xs font-normal text-slate-400">{i.unit}</span>
                           </span>
                         </button>
+                        {/* Outside the row button, not inside it: a button in a button is not
+                            valid HTML and the inner one stops being reachable by keyboard. */}
+                        {i.trackBy === 'quantity' && (
+                          <Button
+                            size="sm"
+                            class="min-h-11 shrink-0"
+                            aria-label={`Ambil ${i.name}`}
+                            onClick={() => onMove({
+                              item: i,
+                              direction: 'keluar',
+                              locationId: selectedRack.location.locationId,
+                            })}
+                          >
+                            Ambil
+                          </Button>
+                        )}
                       </li>
                     );
                   })}

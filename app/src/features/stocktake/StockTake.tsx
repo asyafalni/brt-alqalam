@@ -23,6 +23,7 @@ import {
 } from './draft';
 import { removeItem as removeStockFor, removeLine, totalFor } from '../../../../domain/stock';
 import type { DraftInput } from './draft';
+import { ImportPanel } from './ImportPanel';
 import { ItemForm } from './ItemForm';
 import { artFor, ItemArt } from '../items/ItemArt';
 
@@ -284,6 +285,17 @@ export function StockTake(
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-sm font-semibold text-slate-700">Hapus semua {items.length} barang?</span>
               <Button variant="danger" class="min-h-[44px]" onClick={reset}>Ya, hapus</Button>
+              {/* Offered HERE and nowhere else: loading the demo throws away everything, which
+                  is the same act this panel already exists to confirm. Until now it was only
+                  reachable from the empty state, so anybody with a draft — including one loaded
+                  from an older demo — had no way back to a fresh sample. */}
+              <Button
+                variant="secondary"
+                class="min-h-[44px]"
+                onClick={() => { draft.loadDemo(); setConfirmReset(false); }}
+              >
+                Ganti dengan contoh data
+              </Button>
               <Button variant="secondary" class="min-h-[44px]" onClick={() => setConfirmReset(false)}>
                 Batal
               </Button>
@@ -340,7 +352,7 @@ export function StockTake(
 
       <Sheet
         open={exporting}
-        title="Ekspor ke Google Sheet"
+        title="Ekspor & impor"
         description="Satu berkas per tab. Impor lewat File → Import → Upload."
         onClose={() => setExporting(false)}
       >
@@ -352,6 +364,13 @@ export function StockTake(
           requests={draft.requests}
           labelCount={labelCount}
         />
+
+        {/* Under the export, in the same panel, because they are two halves of one thing: the
+            export was a one-way door until this existed. */}
+        <div class="mt-6 border-t border-slate-200 pt-5">
+          <h3 class="mb-1 text-sm font-bold text-slate-900">Muat dari CSV</h3>
+          <ImportPanel onApply={draft.loadFrom} />
+        </div>
       </Sheet>
 
       <div class={CARD_FLUSH}>

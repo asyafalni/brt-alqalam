@@ -100,26 +100,36 @@ export interface StatusBadge {
   chip: string;
   /** Solid fill, for the rail down the side of a list row. */
   rail: string;
+  /**
+   * Text colour alone, for rows too narrow to carry a pill — the status rides on a number that
+   * is already there instead of a chip that needs its own width.
+   *
+   * `available` is deliberately NEUTRAL rather than green. Colour in this UI means "look at
+   * this" (§66), and painting the ordinary state would make the loudest thing on screen the
+   * one needing no attention.
+   */
+  text: string;
 }
 
 const ITEM_STATUS: Record<string, StatusBadge> = {
-  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500' },
-  low: { label: 'Menipis', chip: 'bg-amber-50 text-amber-700 border-amber-100', rail: 'bg-amber-500' },
-  out: { label: 'Habis', chip: 'bg-red-50 text-red-700 border-red-100', rail: 'bg-red-500' },
+  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500', text: 'text-slate-900' },
+  low: { label: 'Menipis', chip: 'bg-amber-50 text-amber-700 border-amber-100', rail: 'bg-amber-500', text: 'text-amber-700' },
+  out: { label: 'Habis', chip: 'bg-red-50 text-red-700 border-red-100', rail: 'bg-red-500', text: 'text-red-700' },
 };
 
 const INSTANCE_STATUS: Record<string, StatusBadge> = {
-  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500' },
+  available: { label: 'Tersedia', chip: 'bg-green-50 text-green-700 border-green-100', rail: 'bg-green-500', text: 'text-slate-900' },
   // Extensions beyond the template's three, same shape, distinct families.
-  out: { label: 'Dipinjam', chip: 'bg-sky-50 text-sky-700 border-sky-100', rail: 'bg-sky-500' },
-  broken: { label: 'Rusak', chip: 'bg-orange-50 text-orange-700 border-orange-100', rail: 'bg-orange-500' },
+  out: { label: 'Dipinjam', chip: 'bg-sky-50 text-sky-700 border-sky-100', rail: 'bg-sky-500', text: 'text-sky-700' },
+  broken: { label: 'Rusak', chip: 'bg-orange-50 text-orange-700 border-orange-100', rail: 'bg-orange-500', text: 'text-orange-700' },
   // Deeper than rusak on purpose: hilang is a terminal write-off, not a repair queue item.
-  lost: { label: 'Hilang', chip: 'bg-rose-50 text-rose-800 border-rose-200', rail: 'bg-rose-700' },
-  retired: { label: 'Pensiun', chip: 'bg-slate-100 text-slate-600 border-slate-200', rail: 'bg-slate-400' },
+  lost: { label: 'Hilang', chip: 'bg-rose-50 text-rose-800 border-rose-200', rail: 'bg-rose-700', text: 'text-rose-800' },
+  retired: { label: 'Pensiun', chip: 'bg-slate-100 text-slate-600 border-slate-200', rail: 'bg-slate-400', text: 'text-slate-500' },
 };
 
 const UNKNOWN: StatusBadge = {
   label: 'Tidak diketahui', chip: 'bg-slate-100 text-slate-600 border-slate-200', rail: 'bg-slate-400',
+  text: 'text-slate-500',
 };
 
 export const itemStatusBadge = (status: string): StatusBadge => ITEM_STATUS[status] ?? UNKNOWN;

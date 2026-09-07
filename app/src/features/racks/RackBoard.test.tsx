@@ -26,6 +26,7 @@ function Harness() {
       search=""
       now={NOW}
       onOpenItem={() => {}}
+      onMove={() => {}}
     />
   );
 }
@@ -106,7 +107,10 @@ describe('RackBoard — a map of the room', () => {
     fireEvent.click(cell());
     expect(cell().getAttribute('aria-pressed')).toBe('true');
     expect(r.getByText('Sabun')).toBeTruthy();
-    expect(r.getByText('Tersedia')).toBeTruthy();
+    // The status pill is gone from these rows; the quantity carries it in its colour, so the
+    // row is asserted on the number somebody actually walked over to read.
+    expect(r.getByText('10')).toBeTruthy();
+    expect(r.getByLabelText('Ambil Sabun')).toBeTruthy();
 
     fireEvent.click(cell());
     expect(cell().getAttribute('aria-pressed')).toBe('false');
