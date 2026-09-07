@@ -99,6 +99,12 @@ the gateway maintains: stock levels, low-stock, and status *counts* only.
      Apps Script deployment using Google account sign-in (free, `Session.getActiveUser()` gives a
      verified email), keeping Clerk as the user/PIN store only. That bends the "Clerk for auth"
      constraint, so it would be your call.
+> **Identifiers: enable Email AND Username.** Admins sign in with email — that is how Clerk
+> sends invites and resets. Marbot never sign in at all; their record exists only to hold a name
+> and `privateMetadata.pinHash`. But Clerk cannot create a user with *no* identifier, so without
+> usernames every marbot would need an invented email address — fake data inside the identity
+> store, which always comes due later. With both enabled Clerk asks for **one**, not both.
+
 3. **Create the three roles**: `admin_utama` (permanent, undeletable — your boss), `admin`,
    `anggota`. Admins sign in with a password; **anggota never sign in** — they use a PIN at the
    kiosk.
@@ -243,8 +249,13 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 - [ ] **Stage 1** — create the spreadsheet, import the four tabs from `sheets/`, **don't publish**
 - [ ] **Stage 1** — send me the spreadsheet ID
 - [x] **Stage 2** — ~~check Clerk → Configure → JWT Templates~~ **available on the free plan**
-- [ ] **Stage 2** — create the app, the three roles, and the user records
-- [ ] **Stage 2** — send me the publishable key (`pk_...`); keep `sk_...` for Stage 3
+- [x] **Stage 2** — app created, **Email + Username** both enabled *(a marbot may have no email,
+      and Clerk cannot create a user with no identifier at all — see below)*
+- [x] **Stage 2** — JWT template `gateway`, custom **HS256** signing key, claims `uid`/`role`/`name`
+- [x] **Stage 2** — publishable key collected → `app/src/data/clerk.ts` *(committed; it is base64
+      of the instance domain, not a credential)*
+- [ ] **Stage 2** — create the three roles and the user records
+- [ ] **Stage 1** — send me the spreadsheet ID *(the only thing still blocking the gateway)*
 - [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
 - [ ] **Stage 3** — deploy as *Execute as: Me* + *Who has access: Anyone*, send me the URL
 - [ ] **Stage 4** — decide which device is the kiosk, and where it physically lives
