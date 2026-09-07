@@ -87,6 +87,30 @@ describe('buildReport — data health, the part management actually needs', () =
     expect(r.health).toMatchObject({ racksCounted: 1, racksNeverCounted: 1 });
   });
 
+  it('counts stock folded below zero — the log and the shelf disagree', () => {
+    const sabun = item({ itemId: 'ITM-S', initialStock: 2, locationId: 'LOC-A1', minStock: 1 });
+    const overdrawn: Txn = {
+      txnId: 't', clientTxnId: 'c', ts: NOW, type: 'pemakaian',
+      itemId: 'ITM-S', qtyDelta: -5, actorUserId: 'u',
+    };
+    const r = build([sabun], [loc()], [overdrawn]);
+    expect(r.health.negativeStock).toBe(1);
+    expect(r.totalUnits).toBe(-3);   // reported, never clamped: a hidden contradiction is worse
+  });
+
+  it('a register that contradicts itself cannot score as tidy', () => {
+    const good = item({ itemId: 'A', initialStock: 5, locationId: 'LOC-A1', minStock: 1 });
+    const bad = item({ itemId: 'B', initialStock: 1, locationId: 'LOC-A1', minStock: 1 });
+    const overdrawn: Txn = {
+      txnId: 't', clientTxnId: 'c', ts: NOW, type: 'pemakaian',
+      itemId: 'B', qtyDelta: -9, actorUserId: 'u',
+    };
+    const clean = build([good, bad], [loc()]);
+    const dirty = build([good, bad], [loc()], [overdrawn]);
+    expect(clean.health.score).toBe(1);
+    expect(dirty.health.score).toBeLessThan(clean.health.score);
+  });
+
   it('scores placement and monitoring equally — both halves of a useful register', () => {
     const perfect = build([item({ locationId: 'LOC-A1', minStock: 5 })], [loc()]);
     expect(perfect.health.score).toBe(1);

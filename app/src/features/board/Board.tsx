@@ -31,6 +31,7 @@ export function Board(
     .filter((d) => q === '' || `${d.item.name} ${d.item.unit}`.toLowerCase().includes(q));
 
   const totalUnits = rows.reduce((n, d) => n + d.qty, 0);
+  const negative = rows.filter((d) => d.qty < 0);
 
   // Only the name column is allowed to grow. Everything else is `whitespace-nowrap`, so in an
   // auto-layout table the browser hands the slack to the column that can use it — which is what
@@ -107,12 +108,39 @@ export function Board(
         subtitle="Dihitung dari stok awal ditambah seluruh riwayat — bukan angka yang disimpan."
       />
 
+      {/* The old copy claimed the log was empty, which stopped being true the moment demo
+          data arrived with a history. A banner that states something false about the data it
+          sits above is worse than no banner. */}
       {offline && (
         <div class={`${CARD} border-slate-200`}>
           <p class="text-sm leading-relaxed text-slate-600">
             <span class="font-bold text-slate-900">Belum terhubung ke gateway.</span>{' '}
-            Riwayat transaksi masih kosong, jadi yang tampil adalah stok awal hasil opname.
+            {inventory.txns.length === 0
+              ? 'Riwayat transaksi masih kosong, jadi yang tampil adalah stok awal hasil opname.'
+              : `Angka di bawah dihitung dari ${inventory.txns.length} catatan yang tersimpan di perangkat ini saja — belum tersinkron ke mana pun.`}
           </p>
+        </div>
+      )}
+
+      {/* Louder than low stock, and deliberately above it: this says the numbers themselves
+          are wrong, not that something needs buying. */}
+      {negative.length > 0 && (
+        <div class={`${CARD} border-red-300 bg-red-50/40`} role="alert">
+          <div class="flex items-start gap-3">
+            <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+            <div class="min-w-0">
+              <p class="font-bold text-slate-900">
+                {negative.length} barang tercatat minus.
+              </p>
+              <p class="text-sm leading-relaxed text-slate-600">
+                Tercatat keluar lebih banyak daripada yang pernah ada, jadi catatan dan rak
+                tidak cocok. Hitung ulang raknya untuk memperbaikinya.
+              </p>
+              <p class="mt-1 text-sm font-semibold text-slate-900">
+                {negative.map((d) => `${d.item.name} (${d.qty})`).join(' · ')}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

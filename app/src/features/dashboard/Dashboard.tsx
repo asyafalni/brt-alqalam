@@ -31,6 +31,9 @@ export function Dashboard(
     low: derived.filter((d) => d.status === 'low').length,
     out: derived.filter((d) => d.status === 'out').length,
     unplaced: items.filter((i) => !i.locationId).length,
+    // Below zero means more was recorded leaving than ever arrived. Not a rounding
+    // artefact — the log and the shelf disagree, and only a physical recount settles it.
+    negative: derived.filter((d) => d.qty < 0).length,
   }), [items, derived]);
 
   const racks = useMemo(
@@ -83,17 +86,23 @@ export function Dashboard(
       {/* Tappable, because a count nobody can act on is just anxiety. Each chip goes straight
           to the screen that fixes it. Hidden entirely when there is nothing to act on — an
           empty row of zeroes trains people to ignore the whole area. */}
-      {(counts.out > 0 || counts.low > 0 || assets.broken > 0 || assets.lost > 0
-        || needWalk > 0 || counts.unplaced > 0) && (
+      {(counts.out > 0 || counts.low > 0 || counts.negative > 0 || assets.broken > 0
+        || assets.lost > 0 || needWalk > 0 || counts.unplaced > 0) && (
         // One scrolling row, not a wrapping block: wrapped, four chips took three rows and
         // pushed everything below the fold on a phone; scrolled, they cost one.
         // A labelled group, not a bare row of buttons: a screen reader otherwise announces
         // four unrelated controls with no idea what connects them.
+        // The right-hand mask hints that the row scrolls; without it a chip is simply cut
+        // off mid-word at the screen edge and reads as a rendering bug.
         <div
           role="group"
           aria-label="Perlu diurus"
-          class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+          class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:mx-0 sm:flex-wrap sm:px-0 sm:[mask-image:none]"
         >
+          {/* First, because it is the only chip that says the numbers themselves are wrong. */}
+          {counts.negative > 0 && (
+            <Chip tone="red" label={`${counts.negative} stok minus`} onClick={() => onNavigate({ name: 'board' })} />
+          )}
           {counts.out > 0 && (
             <Chip tone="red" label={`${counts.out} habis`} onClick={() => onNavigate({ name: 'board' })} />
           )}
@@ -146,6 +155,23 @@ export function Dashboard(
         <Kpi value={counts.out} label="Habis" tone="red" />
       </div>
 
+      {counts.negative > 0 && (
+        <div class={`${CARD} border-red-300 bg-red-50/40`} role="alert">
+          <div class="flex items-start gap-3">
+            <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+            <div>
+              <p class="font-bold text-slate-900">
+                {counts.negative} barang tercatat minus.
+              </p>
+              <p class="text-sm text-slate-600">
+                Tercatat keluar lebih banyak daripada yang pernah ada — berarti catatan dan rak
+                tidak cocok. Hitung ulang raknya lewat <strong>Cek rak</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {inventory.notifications.length > 0 && (
         <section class={`${CARD} border-amber-200`}>
           <div class="mb-3 flex items-center gap-3">
@@ -161,13 +187,20 @@ export function Dashboard(
               const badge = itemStatusBadge(d?.status ?? 'low');
               const Icon = d ? itemIcon(d.item, categoryNameOf(d.item.categoryId)) : Package;
               return (
-                <li key={n.itemId} class="flex items-center gap-3 py-2.5">
-                  <Icon class="h-4 w-4 shrink-0 text-slate-400" />
-                  <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
-                  <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
-                  <span class="w-24 shrink-0 text-right text-sm tabular-nums text-slate-500">
-                    sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
-                  </span>
+                // Stacked on a phone so the name gets the full width: truncating "Kantong
+                // daging" to "Kantong dagi…" to protect a pill is the wrong trade — the name
+                // is the only part that tells you what to go and buy.
+                <li key={n.itemId} class="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+                  <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <Icon class="h-4 w-4 shrink-0 text-slate-400" />
+                    <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
+                  </div>
+                  <div class="flex items-center gap-3 pl-7 sm:pl-0">
+                    <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
+                    <span class="shrink-0 text-sm tabular-nums text-slate-500 sm:w-24 sm:text-right">
+                      sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
+                    </span>
+                  </div>
                 </li>
               );
             })}
@@ -231,7 +264,10 @@ function Chip(
   return (
     <button
       type="button"
-      class={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${CHIP_TONE[tone]}`}
+      // shrink-0 and whitespace-nowrap are load-bearing: inside a flex row a chip would
+      // otherwise compress and wrap its own two words onto separate lines, turning a pill
+      // into a tall oval. Seen on a 390px screen, not reasoned about.
+      class={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${CHIP_TONE[tone]}`}
       onClick={onClick}
     >
       {label}
@@ -241,6 +277,7 @@ function Chip(
 
 const TONE = {
   ink: 'bg-slate-900 text-slate-50',
+  zero: 'bg-slate-100 text-slate-400',
   green: 'bg-green-50 text-green-600',
   amber: 'bg-amber-50 text-amber-600',
   red: 'bg-red-50 text-red-600',
@@ -249,13 +286,23 @@ const TONE = {
 function Kpi(
   { value, label, sub, tone }: { value: number; label: string; sub?: string; tone: keyof typeof TONE },
 ) {
+  // A zero wearing a warning colour is backwards: "0 habis" is good news, and an amber or red
+  // badge on it teaches people to ignore the colour when it finally means something.
+  const shade = value === 0 && tone !== 'ink' ? TONE.zero : TONE[tone];
+
   return (
-    <div class={CARD}>
-      <div class={`mb-2 inline-flex h-10 min-w-10 items-center justify-center rounded-xl px-2 text-lg font-bold tabular-nums ${TONE[tone]}`}>
+    // Badge beside the label on a phone, stacked above it from `sm`. Four stacked cards cost
+    // most of a 390px screen for four numbers; side by side they cost a third of that.
+    <div class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white p-3 shadow-sm sm:block sm:p-5">
+      <div class={`inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-xl px-2 text-base font-bold tabular-nums sm:mb-2 sm:h-10 sm:min-w-10 sm:text-lg ${shade}`}>
         {value}
       </div>
-      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      {sub && <p class={CODE}>{sub}</p>}
+      <div class="min-w-0">
+        <p class="truncate text-[10px] font-semibold uppercase leading-tight tracking-wider text-slate-500 sm:text-xs">
+          {label}
+        </p>
+        {sub && <p class={`${CODE} truncate`}>{sub}</p>}
+      </div>
     </div>
   );
 }

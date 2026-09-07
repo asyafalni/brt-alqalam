@@ -28,6 +28,13 @@ export interface DataHealth {
   /** Racks physically counted at least once. An uncounted rack is unknown, not fine. */
   racksCounted: number;
   racksNeverCounted: number;
+  /**
+   * Items whose folded quantity is below zero. Not a rounding artefact — it means more was
+   * recorded leaving than ever arrived, so the log and the shelf disagree. It is the loudest
+   * possible signal that the register needs a physical recount, and it must never be hidden
+   * or clamped away: a quietly-corrected number is a wrong number nobody investigates.
+   */
+  negativeStock: number;
   /** 0–1. The share of items that are both placed and monitored. */
   score: number;
 }
@@ -83,6 +90,8 @@ export function buildReport(
   const placed = items.filter((i) => i.locationId).length;
   const withMinimum = items.filter((i) => i.minStock != null).length;
 
+  const negativeStock = items.filter((i) => (derived.items[i.itemId]?.qty ?? 0) < 0).length;
+
   const health: DataHealth = {
     placed,
     unplaced: items.length - placed,
@@ -90,9 +99,14 @@ export function buildReport(
     withoutMinimum: items.length - withMinimum,
     racksCounted: counted,
     racksNeverCounted: activeRacks - counted,
+    negativeStock,
     // Placement and monitoring weighted equally: knowing where a thing is and knowing when it
-    // runs low are the two halves of a register being useful at all.
-    score: (share(placed, items.length) + share(withMinimum, items.length)) / 2,
+    // runs low are the two halves of a register being useful at all. Anything counted below
+    // zero is subtracted outright — a register that contradicts itself cannot score well on
+    // tidiness, however completely it is filled in.
+    score: Math.max(0,
+      (share(placed, items.length) + share(withMinimum, items.length)) / 2
+      - share(negativeStock, items.length)),
   };
 
   const STATUS_LABEL: Record<string, string> = { available: 'Tersedia', low: 'Menipis', out: 'Habis' };

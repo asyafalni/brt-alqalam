@@ -84,6 +84,35 @@ describe('Beranda surfaces what needs a person', () => {
     expect(render(App).getByText(/0 dipinjam · 1 rusak · 0 hilang/)).toBeTruthy();
   });
 
+  it('calls out stock folded below zero — the loudest thing a register can say', () => {
+    // More recorded leaving than ever arrived. Not "we ran out": the books contradict
+    // themselves, and only a physical recount settles it.
+    const items = catalog(input({ name: 'Sabun', initialStock: 2, minStock: 1, locationId: 'LOC-A1' }));
+    seed(items, [tx({ type: 'pemakaian', itemId: items[0].itemId, qtyDelta: -5 })]);
+    const r = render(App);
+
+    const chips = r.getByRole('group', { name: 'Perlu diurus' });
+    expect(within(chips).getByText('1 stok minus')).toBeTruthy();
+    expect(r.getByText('1 barang tercatat minus.')).toBeTruthy();
+    expect(r.getByText(/Hitung ulang raknya/)).toBeTruthy();
+  });
+
+  it('says nothing about minus stock when the books add up', () => {
+    const items = catalog(input({ name: 'Sabun', initialStock: 10, minStock: 1, locationId: 'LOC-A1' }));
+    seed(items, [tx({ type: 'pemakaian', itemId: items[0].itemId, qtyDelta: -3 })]);
+    const r = render(App);
+    expect(r.queryByText(/tercatat minus/)).toBeNull();
+  });
+
+  it('does not paint a zero as a warning — that teaches people to ignore the colour', () => {
+    seed(catalog(input({ initialStock: 20, minStock: 5, locationId: 'LOC-A1' })));
+    const r = render(App);
+
+    const habis = r.getByText('Habis').closest('div')!.parentElement!;
+    expect(habis.querySelector('[class*="bg-red"]')).toBeNull();
+    expect(habis.querySelector('[class*="bg-slate-100"]')).toBeTruthy();
+  });
+
   it('shows no chip row at all when there is nothing to act on', () => {
     // Everything placed, stocked and monitored, and the rack checked today — so there is
     // genuinely nothing to tap. A row of zeroes would train people to ignore the whole area.

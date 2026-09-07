@@ -29,10 +29,13 @@ interface Seed {
   qty: number; min: number | null; loc?: string; trackBy?: 'quantity' | 'instance';
 }
 
+// Starting quantities must survive the demo history below: an item consumed past zero
+// produces negative stock, which is a real production signal (the log disagrees with the
+// shelf) but nonsense in a demo, where it just looks like the app cannot count.
 const SEEDS: Seed[] = [
   { name: 'Sabun cuci tangan', cat: 'CAT-KEBERSIHAN', unit: 'galon', kind: 'consumable', qty: 12, min: 5, loc: 'LOC-A1' },
-  { name: 'Pembersih lantai', cat: 'CAT-KEBERSIHAN', unit: 'botol', kind: 'consumable', qty: 3, min: 6, loc: 'LOC-A1' },
-  { name: 'Karbol wangi', cat: 'CAT-KEBERSIHAN', unit: 'botol', kind: 'consumable', qty: 0, min: 4, loc: 'LOC-A1' },
+  { name: 'Pembersih lantai', cat: 'CAT-KEBERSIHAN', unit: 'botol', kind: 'consumable', qty: 7, min: 6, loc: 'LOC-A1' },
+  { name: 'Karbol wangi', cat: 'CAT-KEBERSIHAN', unit: 'botol', kind: 'consumable', qty: 4, min: 4, loc: 'LOC-A1' },
   { name: 'Kanebo', cat: 'CAT-KEBERSIHAN', unit: 'buah', kind: 'consumable', qty: 18, min: null, loc: 'LOC-A2' },
   { name: 'Kain pel', cat: 'CAT-KEBERSIHAN', unit: 'buah', kind: 'consumable', qty: 7, min: 4, loc: 'LOC-A2' },
   { name: 'Kantong sampah besar', cat: 'CAT-KEBERSIHAN', unit: 'pak', kind: 'consumable', qty: 2, min: 3, loc: 'LOC-A3' },
@@ -72,7 +75,7 @@ const SEEDS: Seed[] = [
   { name: 'Baterai AA', cat: 'CAT-KEAMANAN', unit: 'pak', kind: 'consumable', qty: 2, min: 3, loc: 'LOC-B1' },
   { name: 'Cooler box', cat: 'CAT-PHBI', unit: 'buah', kind: 'equipment', qty: 4, min: null, loc: 'LOC-P3' },
   { name: 'Baskom besar', cat: 'CAT-PHBI', unit: 'buah', kind: 'equipment', qty: 8, min: null, loc: 'LOC-P3', trackBy: 'quantity' },
-  { name: 'Kantong daging', cat: 'CAT-PHBI', unit: 'pak', kind: 'consumable', qty: 6, min: 10, loc: 'LOC-P3' },
+  { name: 'Kantong daging', cat: 'CAT-PHBI', unit: 'pak', kind: 'consumable', qty: 12, min: 10, loc: 'LOC-P3' },
   { name: 'Asahan pisau', cat: 'CAT-PHBI', unit: 'buah', kind: 'equipment', qty: 3, min: null, loc: 'LOC-P1' },
   { name: 'Sarung tangan karet', cat: 'CAT-PHBI', unit: 'pak', kind: 'consumable', qty: 5, min: 4, loc: 'LOC-P3' },
   { name: 'Tabung gas 12kg', cat: 'CAT-LAIN', unit: 'tabung', kind: 'consumable', qty: 2, min: 1, loc: 'LOC-P2' },
