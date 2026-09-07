@@ -29,7 +29,7 @@ import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
-import { RequestPhotos, RequestPhotoStrip } from './RequestPhotos';
+import { discardPhotos, RequestPhotos, RequestPhotoStrip } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
 export const rupiah = (n: number): string => `Rp${n.toLocaleString('id-ID')}`;
@@ -125,21 +125,36 @@ export function RequestBoard(
     return prefill;
   }, [prefill, inventory.txns]);
 
+  /**
+   * The id the next request will get, minted BEFORE the form opens.
+   *
+   * Highest so far plus one, not the count: turning down a request does not remove it, so a
+   * count-based id starts colliding the moment anything is deleted or seeded unevenly. It is
+   * needed up front because photos are attached inside the form and have to be keyed to
+   * something — an abandoned draft's photos are thrown away on cancel.
+   */
+  const draftId = useMemo(() => {
+    const highest = requests.reduce((max, r) => {
+      const n = Number(/(\d+)$/.exec(r.requestId)?.[1] ?? 0);
+      return n > max ? n : max;
+    }, 0);
+    return `REQ-${String(highest + 1).padStart(4, '0')}`;
+  }, [requests]);
+
   function closeForm() {
     setAdding(false);
     onPrefillUsed?.();
   }
 
+  /** Cancelling means the request never existed, so neither should the photos taken for it. */
+  function abandonForm() {
+    void discardPhotos(draftId);
+    closeForm();
+  }
+
   function submit(input: RequestInput) {
-    // Highest so far plus one, not the count: turning down a request does not remove it, so a
-    // count-based id starts colliding the moment anything is ever deleted or seeded unevenly.
-    const highest = requests.reduce((max, r) => {
-      const n = Number(/(\d+)$/.exec(r.requestId)?.[1] ?? 0);
-      return n > max ? n : max;
-    }, 0);
-    const id = `REQ-${String(highest + 1).padStart(4, '0')}`;
     setRequests((prev) => [...prev, {
-      requestId: id,
+      requestId: draftId,
       type: input.type,
       name: input.name.trim(),
       qty: input.qty,
@@ -404,14 +419,15 @@ export function RequestBoard(
         open={adding}
         title="Ajukan"
         description="Pengurus akan melihat ini di Beranda."
-        onClose={closeForm}
+        onClose={abandonForm}
       >
         <RequestForm
           items={draft.items}
           instances={instances}
           prefill={formPrefill}
+          requestId={draftId}
           onSubmit={submit}
-          onCancel={closeForm}
+          onCancel={abandonForm}
         />
       </Sheet>
 

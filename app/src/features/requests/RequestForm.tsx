@@ -6,9 +6,10 @@
 // opened. What changes between them is small and honest: a purchase asks how many and in what
 // unit, a repair asks which unit is broken. The rest — why, how much, where — is shared.
 //
-// Photos are added AFTER saving, from the request's own row. Uploading before the request
-// exists would mean holding blobs against an id that does not exist yet, and the common case —
-// a screenshot of a listing, or a photo of the crack — is pasted in a moment later anyway.
+// The photo is IN this form, not bolted on afterwards. It is one of the four fields the boss
+// named, and the moment somebody is describing a request is the moment they have the screenshot
+// of the listing or the photo of the crack in hand. Making them save, find the row and open a
+// panel to attach it was three steps to avoid one cleanup call on cancel.
 
 import { useMemo, useState } from 'octane';
 import { ShoppingCart, Wrench } from '@octanejs/lucide';
@@ -17,6 +18,7 @@ import type { RequestProblem, RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import { Button, CODE, ERROR_TEXT, FIELD, FIELD_ERROR, LABEL, Select } from '../../components/ui';
 import { artFor, ItemArt } from '../items/ItemArt';
+import { RequestPhotos } from './RequestPhotos';
 
 export interface RequestInput {
   type: RequestType;
@@ -53,12 +55,17 @@ export function replacementReason(d: DerivedInstance, note?: string): string {
 }
 
 export function RequestForm(
-  { items, instances, onSubmit, onCancel, prefill }:
+  { items, instances, onSubmit, onCancel, prefill, requestId }:
   {
     items: Item[];
     instances: DerivedInstance[];
     onSubmit: (input: RequestInput) => void;
     onCancel: () => void;
+    /**
+     * The id this request WILL have. Minted before the form opens so photos have somewhere to
+     * go; released by the caller if the form is abandoned.
+     */
+    requestId: string;
     /**
      * Set when the form was opened from a broken or lost unit rather than from the button.
      * `note` is what the person who reported the loss wrote at the time.
@@ -345,6 +352,11 @@ export function RequestForm(
         {problem('url') && <p class={ERROR_TEXT}>{problem('url')!.message}</p>}
       </div>
 
+      <div class="mt-4">
+        <span class={LABEL}>Foto (opsional)</span>
+        <RequestPhotos requestId={requestId} name={effectiveName || 'pengajuan ini'} />
+      </div>
+
       <div class="mt-5 flex flex-wrap items-center gap-3">
         {/* Not "Ajukan": that is the word on the button that opened this sheet, and two
             controls with one name is how somebody clicks the wrong one. */}
@@ -353,10 +365,6 @@ export function RequestForm(
           Batal
         </button>
       </div>
-
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
-        Fotonya bisa ditambahkan setelah pengajuan tersimpan, langsung dari daftarnya.
-      </p>
     </div>
   );
 }

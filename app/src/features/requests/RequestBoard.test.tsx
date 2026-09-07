@@ -297,3 +297,27 @@ describe('one page for both, and the repair half of it', () => {
     expect(stored().requests[0].assetId).toBeUndefined();
   });
 });
+
+describe('the photo is part of describing the request', () => {
+  it('is asked for in the form, not after saving', () => {
+    // It is one of the four fields the boss named, and the moment somebody is describing a
+    // request is the moment they have the screenshot in hand. Making them save, find the row
+    // and open a panel was three steps to avoid one cleanup call.
+    seed(catalog(input()));
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
+    expect(r.getByText('Foto (opsional)')).toBeTruthy();
+  });
+
+  it('gives the form the id the request will actually get', () => {
+    // Photos are keyed to it inside the form, so a mismatch would orphan every one of them.
+    seed(catalog(input()), [req({ requestId: 'REQ-0007' })]);
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Ajukan')[0]);
+    type(r.getByLabelText('Nama barang'), 'Sapu');
+    type(r.getByLabelText('Kenapa perlu dibeli?'), 'Patah');
+    fireEvent.click(r.getByText('Kirim pengajuan'));
+
+    expect(stored().requests.at(-1).requestId).toBe('REQ-0008');
+  });
+});

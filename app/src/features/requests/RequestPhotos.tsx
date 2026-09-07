@@ -5,9 +5,15 @@
 // is the field the boss asked for, and the one most likely to be a screenshot from a phone.
 //
 // TWO PIECES, on purpose. The LIST shows a strip of thumbnails and nothing else — a row is read,
-// not worked on, and a dashed upload target on every card made the list look like a form. ADDING
-// happens in a right-side sheet, the same panel pattern as every other occasional errand here
-// (export, cek rak, rak baru): you open it, do the thing, and dismiss it.
+// not worked on, and a dashed upload target on every card made the list look like a form.
+// The MANAGER is used twice: inside the request form, where a photo is part of describing the
+// thing (it is one of the four fields the boss named), and later from a right-side sheet when
+// somebody wants to add one to a request that already exists.
+//
+// The form case needs an id before the request is saved. That is not a problem, only a cost:
+// the id is minted when the form opens, and photos attached to an abandoned draft are deleted
+// on cancel (`discardPhotos`). The earlier design made people save, find the row and open a
+// panel to attach the photo they had in their hand — three steps to avoid one cleanup call.
 //
 // Same `PhotoStore` the items use. The port's first argument is an owner id, not specifically
 // an item id — keying by `requestId` is what it is for, and it means downscaling, the six-photo
@@ -90,6 +96,23 @@ export function RequestPhotoStrip(
       {open && <Lightbox src={open} name={name} onClose={() => setOpen('')} />}
     </div>
   );
+}
+
+/**
+ * Throw away photos attached to a request that was never submitted.
+ *
+ * The one mutation in an otherwise append-only system, and legitimate here: nothing has been
+ * recorded yet, so there is no history to protect — only blobs taking up a phone's storage
+ * against an id that will be handed to the next request that is actually saved.
+ */
+export async function discardPhotos(ownerId: string): Promise<void> {
+  try {
+    const photos = await store.list(ownerId);
+    await Promise.all(photos.map((p) => store.remove(p.photoId)));
+  } catch {
+    // A failed cleanup is not worth blocking a cancel over — the worst case is a few orphaned
+    // blobs, and the next save under this id simply adopts them.
+  }
 }
 
 export function RequestPhotos({ requestId, name }: { requestId: string; name: string }) {
