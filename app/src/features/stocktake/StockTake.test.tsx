@@ -56,12 +56,14 @@ describe('StockTake — walking the gudang', () => {
 
   it('keeps category, unit and kind but clears the name — the sticky-context win', () => {
     const r = render(Harness);
-    type(r.getByLabelText('Satuan'), 'galon');
+    // Satuan is a picker now, not a text box — a `<datalist>` only opens once somebody starts
+    // typing, which is the moment they have stopped needing suggestions.
+    fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'galon' } });
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '4');
 
     expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('');
-    expect((r.getByLabelText('Satuan') as HTMLInputElement).value).toBe('galon');
+    expect((r.getByLabelText('Satuan') as HTMLSelectElement).value).toBe('galon');
     expect(r.getByText('Barang tetap').closest('button')?.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -316,5 +318,39 @@ describe('gambar barang', () => {
     fireEvent.click(r.getByLabelText(/Gambar barang/));
     fireEvent.click(r.getByText('Kembali ke otomatis'));
     expect(r.getByLabelText(/Gambar barang: pisau/)).toBeTruthy();
+  });
+});
+
+describe('picking a satuan', () => {
+  it('offers the common ones without anybody typing first', () => {
+    const r = render(Harness);
+    const options = [...(r.getByLabelText('Satuan') as HTMLSelectElement).options].map((o) => o.value);
+    expect(options).toContain('galon');
+    expect(options).toContain('roll');
+    expect(options).toContain('kg');
+  });
+
+  it('puts what this masjid already counts in at the top, newest first', () => {
+    // The satuan used a moment ago is likelier to be the next one than one used at the start
+    // of the walk.
+    const r = render(Harness);
+    fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'roll' } });
+    addItem(r, 'Karpet', '2');
+    fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'kg' } });
+    addItem(r, 'Beras', '5');
+
+    const options = [...(r.getByLabelText('Satuan') as HTMLSelectElement).options].map((o) => o.value);
+    expect(options.slice(0, 2)).toEqual(['kg', 'roll']);
+  });
+
+  it('lets a satuan nobody listed be typed, and gives a way back', () => {
+    // A closed list would send somebody off to rename the thing instead.
+    const r = render(Harness);
+    fireEvent.change(r.getByLabelText('Satuan'), { target: { value: '\u0000new' } });
+    type(r.getByLabelText('Satuan'), 'jerigen');
+    expect((r.getByLabelText('Satuan') as HTMLInputElement).value).toBe('jerigen');
+
+    fireEvent.click(r.getByText('Pilih'));
+    expect((r.getByLabelText('Satuan') as HTMLSelectElement).tagName).toBe('SELECT');
   });
 });

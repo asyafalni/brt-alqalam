@@ -1,4 +1,4 @@
-import { useRef, useState } from 'octane';
+import { useMemo, useRef, useState } from 'octane';
 import type { Category, Location } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
@@ -10,6 +10,8 @@ interface Props {
   input: DraftInput;
   categories: Category[];
   locations: Location[];
+  /** Satuan already used in this catalog — offered before the generic list. */
+  units: string[];
   problems: DraftProblem[];
   showProblems: boolean;
   editing: boolean;
@@ -20,6 +22,9 @@ interface Props {
   onCancelEdit: () => void;
 }
 
+/** A sentinel no real satuan can collide with. Same trick the zone picker uses (§92). */
+const NEW_UNIT = '\u0000new';
+
 export function ItemForm(p: Props) {
   const nameRef = useRef<HTMLInputElement | null>(null);
   // Inline, not `prompt()`. A native dialog on a gudang tablet is a small unstyled box that
@@ -27,6 +32,17 @@ export function ItemForm(p: Props) {
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [newRack, setNewRack] = useState<{ code: string; zone: string } | null>(null);
   const [pickingArt, setPickingArt] = useState(false);
+  /** Starts typing when the unit is one we do not know — nothing to pick it from. */
+  const [typingUnit, setTypingUnit] = useState(false);
+
+  /* What this masjid actually counts in, first, then the generic list. A `<datalist>` used to
+     carry these and it was very nearly invisible: it only opens once somebody starts typing,
+     which is exactly the moment they have stopped needing suggestions. Satuan is answered fifty
+     times in an afternoon of opname, so it earns a control you can see. */
+  const unitOptions = useMemo(() => {
+    const used = p.units.filter((u) => u.trim() !== '');
+    return [...new Set([...used, ...COMMON_UNITS])];
+  }, [p.units]);
 
   // What this item will be drawn as right now — the override if one was chosen, otherwise the
   // guess, recomputed as the operator types.
@@ -185,17 +201,40 @@ export function ItemForm(p: Props) {
         </div>
         <div>
           <label class={LABEL} for="satuan">Satuan</label>
-          <input
-            id="satuan"
-            class={FIELD}
-            list="satuan-umum"
-            value={p.input.unit}
-            placeholder="galon"
-            onInput={(e: Event) => p.onChange('unit', (e.target as HTMLInputElement).value)}
-          />
-          <datalist id="satuan-umum">
-            {COMMON_UNITS.map((u) => <option key={u} value={u} />)}
-          </datalist>
+          {typingUnit || (p.input.unit !== '' && !unitOptions.includes(p.input.unit)) ? (
+            <div class="flex gap-2">
+              <input
+                id="satuan"
+                class={FIELD}
+                value={p.input.unit}
+                placeholder="galon"
+                autocomplete="off"
+                onInput={(e: Event) => p.onChange('unit', (e.target as HTMLInputElement).value)}
+              />
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-600 hover:border-slate-900 hover:bg-slate-100"
+                onClick={() => { setTypingUnit(false); p.onChange('unit', unitOptions[0] ?? 'buah'); }}
+              >
+                Pilih
+              </button>
+            </div>
+          ) : (
+            <Select
+              id="satuan"
+              value={p.input.unit}
+              onChange={(e: Event) => {
+                const picked = (e.target as HTMLSelectElement).value;
+                if (picked === NEW_UNIT) { setTypingUnit(true); p.onChange('unit', ''); }
+                else p.onChange('unit', picked);
+              }}
+            >
+              {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+              {/* One tap away, not a hurdle: a masjid will meet a unit nobody listed, and a
+                  closed list would send them to rename something instead. */}
+              <option value={NEW_UNIT}>+ Satuan lain…</option>
+            </Select>
+          )}
           <Problem problem={problemFor('unit')} />
         </div>
       </div>

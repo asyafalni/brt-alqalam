@@ -171,14 +171,32 @@ textarea:focus-visible {
   gap: 1mm;
   text-align: center;
 }
+/* A FIXED share of the height, not "whatever the text leaves over".
+   As `flex: 1 1 auto` the code grew and shrank with the length of the name beside it, so a
+   sheet of keyring tags came out with a different sized QR on every one — and the ones with the
+   longest names, which are the hardest to identify by eye, got the smallest code. A label's
+   whole job is to be the same label every time. */
 .label--stack .label-qr {
   width: auto;
-  height: auto;
-  flex: 1 1 auto;
-  min-height: 0;
+  height: 56%;
+  flex: 0 0 auto;
   aspect-ratio: 1;
 }
-.label--stack .label-text { width: 100%; }
+/* Fixed too, and clipped: the text block cannot borrow from the code by growing. Two lines of
+   name plus its id is what a 30mm tag holds, and a third line is not a thing worth shrinking
+   the QR for. */
+.label--stack .label-text {
+  width: 100%;
+  height: 40%;
+  flex: 0 0 auto;
+  overflow: hidden;
+  /* Tightened so that two lines of name AND the id fit the fixed box. Left at 1.25 the code
+     was clipped through the middle of its glyphs on every two-line name, which reads as a
+     printing fault rather than as a design decision — and the id is the half somebody types
+     in when the camera will not read the code. */
+  line-height: 1.12;
+}
+.label--stack .label-title { font-size: clamp(2.4mm, calc(var(--label-h) * 0.105), 8mm); }
 .label--stack .label-subtitle { display: none; }  /* no room, and the code is the identifier */
 
 /* A shelf BOARD, printed at 99×70 for one reason: to be read from the far end of the gudang.
@@ -215,26 +233,36 @@ textarea:focus-visible {
   gap: 3mm;
   text-align: center;
 }
+/* Same fix as `stack`, same reason: sized from the leftovers, the QR shrank on exactly the
+   labels whose names were longest. */
 .label--poster .label-qr {
   width: auto;
-  height: auto;
-  flex: 1 1 auto;
-  min-height: 0;
+  height: 58%;
+  flex: 0 0 auto;
   max-width: 100%;
   aspect-ratio: 1;
   align-self: center;
 }
-.label--poster .label-text { width: 100%; flex: 0 0 auto; }
+/* 38%, measured against the widest of these: `Papan zona` is 190mm across but only 135mm tall,
+   and the title scales with WIDTH — so its two-line names needed half again as much height as
+   the narrower poster's, on an identical height budget. At 26% the second line was clipped. */
+.label--poster .label-text {
+  width: 100%;
+  height: 38%;
+  flex: 0 0 auto;
+  overflow: hidden;
+  line-height: 1.12;
+}
 .label--poster .label-title {
   -webkit-line-clamp: 2;
-  font-size: clamp(6mm, calc(var(--label-w) * 0.11), 26mm);
+  font-size: clamp(6mm, calc(var(--label-w) * 0.09), 22mm);
   line-height: 1.05;
 }
 .label--poster .label-subtitle {
   -webkit-line-clamp: 1;
-  font-size: clamp(4mm, calc(var(--label-w) * 0.05), 12mm);
+  font-size: clamp(3mm, calc(var(--label-w) * 0.035), 9mm);
 }
-.label--poster .label-code { font-size: clamp(3mm, calc(var(--label-w) * 0.035), 8mm); }
+.label--poster .label-code { font-size: clamp(2.6mm, calc(var(--label-w) * 0.028), 7mm); }
 
 /* Type scales with the sticker, because the sizes exist for different reading distances.
    A fixed 3mm name is right on a 37mm rack label, cramped on a 25mm tag, and absurd on a

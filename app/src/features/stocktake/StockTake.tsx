@@ -275,6 +275,13 @@ export function StockTake(
     },
   ];
 
+  /* Newest first: the satuan somebody used a moment ago is far likelier to be the next one
+     than one they used at the start of the walk. */
+  const usedUnits = useMemo(
+    () => [...new Set(items.map((i) => i.unit).reverse())].filter((u) => u.trim() !== ''),
+    [items],
+  );
+
   return (
     <div class="space-y-4 pb-8 pt-4 sm:space-y-6 sm:pt-6">
       <PageHeader
@@ -339,6 +346,7 @@ export function StockTake(
           input={input}
           categories={categories}
           locations={locations}
+          units={usedUnits}
           problems={problems}
           showProblems={showProblems}
           editing={editingId != null}
