@@ -10,6 +10,12 @@
 // Escape and the backdrop dismiss, the page behind cannot scroll — and it inherits every one of
 // those from the same `useDialog`, so there is one implementation to keep correct.
 //
+// SIZED AGAINST THE ROW THAT OPENS IT. The rail's footer rows are 12px titles over 11px hints;
+// a panel hanging off one of them at 16px headings and full card padding read as a different
+// piece of software. Type and chrome shrink to match — but the CONTROLS do not: the URL field
+// and the primary buttons keep their 56px targets, because that was decided for a tablet
+// handled with wet hands (§66) and a flyout is not a reason to unpick it.
+//
 // ANCHORED ON DESKTOP, CENTRED ON A PHONE. The rail is 90–260px wide on a desktop, so there is
 // room to its right; on a phone the drawer is 280px of a 390px screen and a flyout beside it
 // would be a 110px column. Same component, two placements, because the placement is about the
@@ -75,21 +81,21 @@ export function Flyout(
         style={anchor == null ? '' : `left:${anchor}px`}
         class={`absolute bottom-4 flex max-h-[80vh] flex-col overflow-hidden rounded-2xl
                 bg-white shadow-2xl outline-none transition-all duration-200 ease-out
-                ${anchor == null ? 'inset-x-4 mx-auto max-w-sm' : 'w-[22rem]'}
+                ${anchor == null ? 'inset-x-4 mx-auto max-w-[19rem]' : 'w-[19rem]'}
                 ${shown
                   ? 'translate-x-0 translate-y-0 opacity-100'
                   : `opacity-0 ${anchor == null ? 'translate-y-3' : '-translate-x-3'}`}`}
       >
         <button
           type="button"
-          class="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg
+          class="absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg
                  border border-slate-400 bg-white/90 text-slate-600 hover:bg-slate-100"
           aria-label="Tutup"
           onClick={onClose}
         >
-          <X class="h-4 w-4" />
+          <X class="h-3.5 w-3.5" />
         </button>
-        <div class="card-pad custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 pt-12">{children}</div>
+        <div class="card-pad custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 pt-10">{children}</div>
       </div>
     </div>
   );

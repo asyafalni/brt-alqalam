@@ -364,27 +364,27 @@ export function AdminPanel(
       )}
 
       {phase === 'ready' && who && (
-        <Card class={who.isAdmin ? 'border-green-200' : 'border-amber-200 bg-amber-50/40'}>
-          <div class="flex items-start gap-3">
+        <div class={`rounded-lg border bg-white p-3.5 shadow-sm ${who.isAdmin ? 'border-green-200' : 'border-amber-200 bg-amber-50/40'}`}>
+          <div class="flex items-start gap-2.5">
             {who.isAdmin
               ? <ShieldCheck class="h-5 w-5 shrink-0 text-green-600" />
               : <TriangleAlert class="h-5 w-5 shrink-0 text-amber-600" />}
             <div class="min-w-0 flex-1">
-              <h2 class="text-base font-bold text-slate-900">
+              <h2 class="truncate text-sm font-bold text-slate-900">
                 {who.name || 'Tanpa nama'}
               </h2>
-              <p class={CODE}>{who.userId}</p>
+              <p class={`${CODE} truncate`}>{who.userId}</p>
 
               {who.isAdmin ? (
                 /* A CHIP, not a sentence in a flex row. `flex items-center` on a paragraph makes
                    every text node its own flex item, so "Peran admin_utama — kamu bisa mengubah
                    katalog" broke into three pieces that wrapped past each other. */
-                <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
-                  <CircleCheck class="h-3.5 w-3.5 shrink-0" />
+                <p class="mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                  <CircleCheck class="h-3 w-3 shrink-0" />
                   {who.role}
                 </p>
               ) : (
-                <div class="mt-2 text-sm text-slate-700">
+                <div class="mt-1.5 text-xs leading-relaxed text-slate-700">
                   <p>
                     Token sah, tetapi perannya
                     {who.role ? <> <strong>{who.role}</strong></> : ' kosong'} — bukan admin.
@@ -402,7 +402,8 @@ export function AdminPanel(
               )}
 
               <Button
-                class="mt-4"
+                class="mt-3"
+                size="sm"
                 variant="ghost"
                 onClick={() => {
                   const clerk = clerkRef.current;
@@ -415,7 +416,7 @@ export function AdminPanel(
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );
@@ -523,18 +524,19 @@ export function AdminSummary(
 
   return (
     <div class="space-y-4">
-      <Card>
-        <h2 class="text-base font-bold text-slate-900">Belum masuk</h2>
-        <p class="mt-1.5 text-sm text-slate-600">
+      <div class="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm">
+        <h2 class="text-sm font-bold text-slate-900">Belum masuk</h2>
+        <p class="mt-1 text-xs leading-relaxed text-slate-600">
           Perangkat ini bisa melihat, tidak bisa mengubah katalog.
         </p>
-        <Button class="mt-4" onClick={onSignIn}>
+        {/* The button keeps its full size. Type shrinks to match the rail; targets do not. */}
+        <Button class="mt-3 w-full" onClick={onSignIn}>
           <ShieldCheck class="h-4 w-4" />
           Masuk sebagai admin
         </Button>
-      </Card>
+      </div>
 
-      <p class="px-1 text-xs text-slate-500">Marbot pakai PIN di kios, bukan akun.</p>
+      <p class="px-1 text-[11px] text-slate-500">Marbot pakai PIN di kios, bukan akun.</p>
     </div>
   );
 }

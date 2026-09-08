@@ -107,9 +107,8 @@ export function ConnectPanel(
               {queued} catatan belum masuk ke spreadsheet.
             </p>
             <p class="mt-1 text-sm leading-relaxed text-slate-600">
-              Tersimpan di perangkat ini saat jaringan sedang tidak bisa dihubungi. Mengirimnya
-              perlu PIN, karena antrean ini memang tidak menyimpan PIN siapa pun — dan itu
-              berarti catatannya akan tercatat atas nama yang memasukkan PIN sekarang.
+              Tercatat atas nama siapa pun yang memasukkan PIN saat mengirim — antrean ini
+              memang tidak menyimpan PIN.
             </p>
             {onSendQueued && (
               <Button size="touch" class="mt-3" onClick={onSendQueued}>Kirim sekarang</Button>
@@ -117,10 +116,10 @@ export function ConnectPanel(
           </div>
         )}
 
-        <div class="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
-          <CircleCheck class="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+        <div class="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50/60 p-3">
+          <CircleCheck class="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
           <div class="min-w-0">
-            <p class="font-bold text-slate-900">
+            <p class="text-sm font-bold text-slate-900">
               {connection.deviceSecret ? 'Perangkat ini bisa mencatat.' : 'Perangkat ini bisa melihat.'}
             </p>
             <p class={`${CODE} mt-1 break-all`}>{connection.url}</p>
@@ -129,7 +128,7 @@ export function ConnectPanel(
 
         {/* One line, not a paragraph. This panel is a status somebody glances at; the reasoning
             behind the device code belongs in SETUP.md, where somebody is actually reading. */}
-        <p class="mt-3 text-sm text-slate-600">
+        <p class="mt-2.5 text-xs leading-relaxed text-slate-600">
           {connection.deviceSecret
             ? 'Katalog dibaca dari spreadsheet; pengambilan dicatat lewat gateway.'
             : 'Bisa melihat katalog dan laporan. Untuk mencatat, perlu kode perangkat.'}
@@ -144,7 +143,7 @@ export function ConnectPanel(
             <Unlink class="h-5 w-5" /> Putuskan sambungan
           </Button>
         </div>
-        <p class="mt-3 text-xs text-slate-400">
+        <p class="mt-2.5 text-[11px] leading-relaxed text-slate-400">
           Tablet hilang? Cabut dengan revokeDevice() di Apps Script.
         </p>
       </div>
