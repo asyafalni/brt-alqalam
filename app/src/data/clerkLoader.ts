@@ -52,6 +52,21 @@ function frontendApiHost(): string {
  */
 const CLERK_JS_VERSION = '6';
 
+/**
+ * `clerk.js`, NOT the `clerk.browser.js` that Clerk's own quickstart names.
+ *
+ * Found by deploying the quickstart version and watching the admin route go blank:
+ * `mountSignIn` threw "Clerk was not loaded with Ui components". `clerk.browser.js` is the
+ * 308kB core, which fetches its UI components separately afterwards — so mounting a sign-in the
+ * moment `load()` resolves is a race, and on a gudang tablet it is a race against gudang wifi.
+ * `clerk.js` is 1.5MB with the components already in it: one request, no readiness to guess at.
+ *
+ * The size is affordable precisely BECAUSE of §64.2 — this is never bundled and never fetched on
+ * the kiosk path. It costs an admin one cached download on a screen they open rarely, and it
+ * buys a sign-in that cannot half-arrive.
+ */
+const CLERK_JS_FILE = 'clerk.js';
+
 let loading: Promise<ClerkClient> | null = null;
 
 /** The error an admin actually sees when the gudang wifi is down. */
@@ -73,7 +88,7 @@ export function loadClerk(): Promise<ClerkClient> {
     script.async = true;
     script.crossOrigin = 'anonymous';
     script.dataset.clerkPublishableKey = CLERK_PUBLISHABLE_KEY;
-    script.src = `https://${frontendApiHost()}/npm/@clerk/clerk-js@${CLERK_JS_VERSION}/dist/clerk.browser.js`;
+    script.src = `https://${frontendApiHost()}/npm/@clerk/clerk-js@${CLERK_JS_VERSION}/dist/${CLERK_JS_FILE}`;
     script.onload = () => {
       const clerk = (window as unknown as { Clerk?: ClerkClient }).Clerk;
       if (!clerk) { reject(new ClerkUnavailable()); return; }

@@ -94,12 +94,27 @@ export function AdminPanel(
     return () => { live = false; stop?.(); };
   }, [connection?.url]);
 
-  // Mounting is a side effect on a DOM node Clerk owns, so it happens after the box exists.
+  /*
+   * Mounting is a side effect on a DOM node Clerk owns, so it happens after the box exists.
+   *
+   * WRAPPED, because an exception here took the WHOLE APP down — `#/admin` rendered a blank
+   * page, not a broken card. That is the wrong failure by a wide margin: a third-party script
+   * that cannot mount its own form must cost an admin one screen, never the register. The
+   * specific throw was "Clerk was not loaded with Ui components", from mounting against the
+   * core build before its components had arrived; the loader now fetches the build that has
+   * them. This catch is not for that bug — it is for the next one.
+   */
   useEffect(() => {
     const clerk = clerkRef.current;
     const box = signInBox.current;
     if (phase !== 'signed-out' || !clerk || !box) return;
-    clerk.mountSignIn(box);
+    try {
+      clerk.mountSignIn(box);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase('error');
+      return;
+    }
     return () => { try { clerk.unmountSignIn(box); } catch { /* already gone */ } };
   }, [phase]);
 
