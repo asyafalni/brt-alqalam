@@ -473,7 +473,13 @@ export function RequestBoard(
                   )}
                 </div>
 
-                <div class="flex shrink-0 items-center gap-1.5 sm:ml-auto">
+                {/* A ROW OF ITS OWN on a phone. `shrink-0` here against `min-w-0` on the text
+                    meant the text was the only thing that could give — so the title collapsed to
+                    about a hundred pixels and broke one word per line while three 40px buttons
+                    sat beside it, untouched. `w-full` makes the buttons wrap instead, which is
+                    the thing that should move: they are the same size at any width, and the
+                    title is not. */}
+                <div class="flex w-full shrink-0 items-center justify-end gap-1.5 sm:ml-auto sm:w-auto sm:justify-start">
                   {r.url && (
                     <a
                       href={r.url}
