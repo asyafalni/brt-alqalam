@@ -20,11 +20,16 @@ import { X } from '@octanejs/lucide';
 import { useDialog } from './useDialog';
 
 export function Flyout(
-  { open, title, description, anchor, onClose, children }:
+  { open, title, anchor, onClose, children }:
   {
     open: boolean;
+    /**
+     * Not rendered — it is the dialog's accessible name only.
+     *
+     * A heading here restated the row that was just tapped, one hand-span away and still on
+     * screen. Screen readers still need the name, so the prop stays and the pixels do not.
+     */
     title: string;
-    description?: string;
     /**
      * Distance from the left of the viewport to just past the rail's right edge, or `null` to
      * centre it. Passed as a NUMBER rather than left to a CSS breakpoint because the rail's own
@@ -75,21 +80,16 @@ export function Flyout(
                   ? 'translate-x-0 translate-y-0 opacity-100'
                   : `opacity-0 ${anchor == null ? 'translate-y-3' : '-translate-x-3'}`}`}
       >
-        <div class="flex shrink-0 items-start gap-3 border-b border-slate-200 p-4">
-          <div class="min-w-0 flex-1">
-            <h2 class="text-base font-bold text-slate-900">{title}</h2>
-            {description && <p class="mt-0.5 text-xs text-slate-500">{description}</p>}
-          </div>
-          <button
-            type="button"
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-400 text-slate-600 hover:bg-slate-100"
-            aria-label="Tutup"
-            onClick={onClose}
-          >
-            <X class="h-4 w-4" />
-          </button>
-        </div>
-        <div class="card-pad custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <button
+          type="button"
+          class="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg
+                 border border-slate-400 bg-white/90 text-slate-600 hover:bg-slate-100"
+          aria-label="Tutup"
+          onClick={onClose}
+        >
+          <X class="h-4 w-4" />
+        </button>
+        <div class="card-pad custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 pt-12">{children}</div>
       </div>
     </div>
   );

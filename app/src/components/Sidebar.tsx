@@ -57,7 +57,7 @@ interface Props {
   queued?: number;
   /** False when this device is connected only to read — the takmir's phone, say. */
   canRecord?: boolean;
-  /** Who is signed in as an admin, if anyone. */
+  /** Who is signed in as an admin, if anyone. Also decides which nav items exist. */
   admin?: { name: string; role: string } | null;
   onOpenConnection: () => void;
   onOpenAdmin: () => void;
@@ -67,6 +67,16 @@ export function Sidebar(p: Props) {
   const panel = useRef<HTMLDivElement | null>(null);
   const asDialog = p.isMobile && !p.collapsed;
   useDialog(asDialog, p.onClose, panel);
+
+  /*
+   * Hidden on the SHARED register when nobody is signed in — not on a device working offline.
+   *
+   * The two screens name people, so on the gateway they are admin-only and the gateway already
+   * withholds their data (§39). But an unconnected device is the stock-take walk (§59 stage 1):
+   * everything on it is this phone's own draft, roles do not exist yet, and hiding them there
+   * would take function away from the one mode that has no accounts at all.
+   */
+  const canSeeNames = !p.connected || p.admin?.role === 'admin' || p.admin?.role === 'admin_utama';
 
   const items: NavItem[] = [
     { name: 'Beranda', icon: LayoutDashboard, route: { name: 'beranda' } },
@@ -78,12 +88,20 @@ export function Sidebar(p: Props) {
     // (§35), and until that exists the honest version is putting the count where they already
     // look — silently holding requests until somebody thinks to check would be worse than not
     // having the screen.
-    { name: 'Pengajuan', icon: ShoppingCart, route: { name: 'pengajuan' }, badge: p.requestCount },
+    /* ADMIN ONLY, both of them, and for the same reason: they are the two screens that name
+       people. Pengajuan carries who asked and who decided; Histori Data carries PENGAMBIL on
+       every row. The gateway already withholds that data from a device without an admin token
+       (§39), so leaving the menu items visible would advertise two destinations that can only
+       ever be empty — which reads as the register having lost something. */
+    ...(canSeeNames ? [{
+      name: 'Pengajuan', icon: ShoppingCart, route: { name: 'pengajuan' } as Route,
+      badge: p.requestCount,
+    }] : []),
     { name: 'Cetak Label', icon: QrCode, route: { name: 'label' }, badge: p.itemCount },
     // Below Laporan: the report is the summary somebody reads, this is the raw record they
     // drop to when the summary looks wrong.
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
-    { name: 'Histori Data', icon: History, route: { name: 'histori' } },
+    ...(canSeeNames ? [{ name: 'Histori Data', icon: History, route: { name: 'histori' } as Route }] : []),
     /* No `Admin` entry here. It moved to the footer beside the gateway connection, which is
        where it belongs — both are facts about THIS DEVICE rather than places in the register,
        and both now open the same kind of flyout. Leaving a nav item as well would be two doors

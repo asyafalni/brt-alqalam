@@ -286,8 +286,7 @@ export function AdminPanel(
         <Card class="border-t-4 border-t-[#c9a86a] shadow-xl">
           <h2 class="text-base font-bold text-slate-900">Masukkan kode dari email</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Password-mu sudah benar. Clerk belum mengenali perangkat ini, jadi kode enam angka
-            dikirim ke emailmu.
+            Password benar. Clerk mengirim kode ke emailmu untuk mengenali perangkat ini.
           </p>
 
           <form class="mt-4 space-y-4" onSubmit={submitCode}>
@@ -326,10 +325,7 @@ export function AdminPanel(
       {phase === 'signed-out' && !needsCode && (
         <Card class="border-t-4 border-t-[#c9a86a] shadow-xl">
           <h2 class="text-base font-bold text-slate-900">Masuk sebagai admin</h2>
-          <p class="mt-1 text-sm text-slate-600">
-            Pakai email atau username Clerk-mu. Marbot tidak perlu masuk di sini — mereka pakai
-            PIN di kios.
-          </p>
+          <p class="mt-1 text-sm text-slate-600">Email atau username Clerk-mu.</p>
 
           <form class="mt-4 space-y-4" onSubmit={signIn}>
             <div>
@@ -379,14 +375,17 @@ export function AdminPanel(
               <p class={CODE}>{who.userId}</p>
 
               {who.isAdmin ? (
-                <p class="mt-2 flex items-center gap-1.5 text-sm text-green-700">
-                  <CircleCheck class="h-4 w-4" />
-                  Peran <strong>{who.role}</strong> — kamu bisa mengubah katalog.
+                /* A CHIP, not a sentence in a flex row. `flex items-center` on a paragraph makes
+                   every text node its own flex item, so "Peran admin_utama — kamu bisa mengubah
+                   katalog" broke into three pieces that wrapped past each other. */
+                <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                  <CircleCheck class="h-3.5 w-3.5 shrink-0" />
+                  {who.role}
                 </p>
               ) : (
                 <div class="mt-2 text-sm text-slate-700">
                   <p>
-                    Token-mu sah, tetapi perannya
+                    Token sah, tetapi perannya
                     {who.role ? <> <strong>{who.role}</strong></> : ' kosong'} — bukan admin.
                   </p>
                   {/* The distinction that saves an hour: an empty role is almost never a
@@ -394,13 +393,8 @@ export function AdminPanel(
                       the two are identical, so the screen has to say which one it is. */}
                   {!who.role && (
                     <p class="mt-2 rounded-lg bg-white p-3 text-xs leading-relaxed text-slate-600">
-                      Peran kosong biasanya bukan soal izin, melainkan JWT template Clerk yang
-                      belum mengirim klaim <code class="font-mono">role</code>. Di Clerk →
-                      JWT Templates → <code class="font-mono">gateway</code>, klaimnya harus
-                      memuat <code class="font-mono">
-                        {'{"role": "{{user.public_metadata.role}}", "name": "{{user.full_name}}"}'}
-                      </code>, dan user-nya harus punya <code class="font-mono">role</code> di
-                      public metadata.
+                      Peran kosong biasanya JWT template Clerk yang belum mengirim klaim
+                      <code class="font-mono"> role</code>, bukan soal izin.
                     </p>
                   )}
                 </div>
@@ -519,11 +513,9 @@ export function AdminSummary(
   return (
     <div class="space-y-4">
       <Card>
-        <h2 class="text-base font-bold text-slate-900">Belum masuk sebagai admin</h2>
-        <p class="mt-2 text-sm leading-relaxed text-slate-600">
-          Tanpa masuk, perangkat ini bisa melihat register tetapi tidak bisa mengubah katalog —
-          barang, rak, kategori, stok awal, dan pengajuan. Pengajuan juga tidak ditampilkan sama
-          sekali, karena isinya menyebut nama orang.
+        <h2 class="text-base font-bold text-slate-900">Belum masuk</h2>
+        <p class="mt-1.5 text-sm text-slate-600">
+          Perangkat ini bisa melihat, tidak bisa mengubah katalog.
         </p>
         <Button class="mt-4" onClick={onSignIn}>
           <ShieldCheck class="h-4 w-4" />
@@ -531,10 +523,7 @@ export function AdminSummary(
         </Button>
       </Card>
 
-      <p class="px-1 text-xs leading-relaxed text-slate-500">
-        Marbot tidak perlu masuk di sini. Mereka mencatat pengambilan dengan PIN di kios, dan
-        itu memerlukan perangkat yang sudah didaftarkan — bukan akun.
-      </p>
+      <p class="px-1 text-xs text-slate-500">Marbot pakai PIN di kios, bukan akun.</p>
     </div>
   );
 }

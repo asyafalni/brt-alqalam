@@ -127,14 +127,12 @@ export function ConnectPanel(
           </div>
         </div>
 
-        <p class="mt-4 text-sm leading-relaxed text-slate-600">
+        {/* One line, not a paragraph. This panel is a status somebody glances at; the reasoning
+            behind the device code belongs in SETUP.md, where somebody is actually reading. */}
+        <p class="mt-3 text-sm text-slate-600">
           {connection.deviceSecret
-            ? 'Katalog dibaca dari spreadsheet, dan setiap pengambilan dicatat lewat gateway. '
-              + 'Kode perangkat tersimpan di perangkat ini saja — tidak ditampilkan lagi, karena '
-              + 'gateway menyimpannya untuk dibandingkan, bukan untuk dikeluarkan.'
-            : 'Perangkat ini membaca katalog dan laporan dari spreadsheet, tapi tidak bisa '
-              + 'mencatat pengambilan — untuk itu perlu kode perangkat dari enrollDevice(). '
-              + 'Melihat memang tidak perlu kode apa pun.'}
+            ? 'Katalog dibaca dari spreadsheet; pengambilan dicatat lewat gateway.'
+            : 'Bisa melihat katalog dan laporan. Untuk mencatat, perlu kode perangkat.'}
         </p>
 
         <div class="mt-5">
@@ -146,9 +144,8 @@ export function ConnectPanel(
             <Unlink class="h-5 w-5" /> Putuskan sambungan
           </Button>
         </div>
-        <p class="mt-3 text-xs leading-relaxed text-slate-400">
-          Memutuskan hanya menghapus kode dari perangkat ini. Untuk mencabut aksesnya sungguhan
-          — tablet hilang, misalnya — jalankan revokeDevice() di Apps Script.
+        <p class="mt-3 text-xs text-slate-400">
+          Tablet hilang? Cabut dengan revokeDevice() di Apps Script.
         </p>
       </div>
     );

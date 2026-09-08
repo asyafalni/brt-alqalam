@@ -165,6 +165,14 @@ export function App() {
   // is just something to mis-tap while aiming.
   /* Outside the shell entirely, until somebody is signed in. A sign-in wrapped in the sidebar
      and navbar of the app it guards reads as a settings panel; on its own it reads as a door. */
+  /* Typing the hash must not get past the menu. `admin` is only ever set for a verified
+     admin or admin_utama — `onAdmin(null)` is what a valid token with any other role produces —
+     so this is the same test the sidebar uses, not a second one to keep in step. Unconnected
+     devices are exempt for the reason given there: that mode has no accounts. */
+  if ((route.name === 'pengajuan' || route.name === 'histori') && connection && !admin) {
+    navigate({ name: 'beranda' });
+  }
+
   if (route.name === 'admin' && admin && !adminOpen) {
     setAdminOpen(true);
     navigate({ name: 'beranda' });
@@ -428,7 +436,6 @@ export function App() {
           open={adminOpen}
           anchor={isMobile ? null : railRightEdge(isMobile, collapsed)}
           title="Admin"
-          description="Siapa yang masuk, dan apa yang boleh diubah."
           onClose={() => setAdminOpen(false)}
         >
           <AdminSummary
@@ -443,7 +450,6 @@ export function App() {
           open={connectOpen}
           anchor={isMobile ? null : railRightEdge(isMobile, collapsed)}
           title="Sambungkan ke gateway"
-          description="Sekali per perangkat, oleh admin."
           onClose={() => setConnectOpen(false)}
         >
           <ConnectPanel
