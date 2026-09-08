@@ -38,7 +38,36 @@ appsscript.json manifest file in editor"**. It is worth the extra click, because
 | `package.json` | so that command works |
 | `README.md` | this file |
 
-## Deploying — 15 minutes
+## Deploying with clasp — two commands, and the reason it exists
+
+Pasting five files into a browser tab and then choosing the right item in a Version dropdown
+took three rounds to land one one-line fix. Twice the code looked correct in the editor and the
+old code was still being served, because **saving a file does not change what `/exec` serves** —
+the URL is bound to a deployment VERSION, and creating one is a separate act that is easy to
+skip without noticing.
+
+```bash
+cd gateway
+npx clasp login          # once, opens a browser
+npm run ship             # tests, then push, then redeploy the SAME deployment id
+```
+
+`npm run deploy` passes `-i <deploymentId>`, so it updates the deployment already in use rather
+than making a new one. That matters more than convenience: a new deployment means a new URL, and
+the URL is baked into every printed QR code. The id is in `package.json`; `.clasp.json` carries
+the script id, and `.claspignore` keeps the vitest suite from being uploaded to Apps Script.
+
+**After any deploy, check what is actually live:**
+
+```bash
+curl -sL "<your /exec url>?op=ping"
+```
+
+It returns `GATEWAY_VERSION`. Bump that constant with every change — a version string nobody can
+read is a version string nobody can check, which is exactly how two rounds went into verifying a
+fix that was never deployed.
+
+## Deploying by hand — 15 minutes
 
 1. Open your spreadsheet → **Extensions → Apps Script**. A *bound* script reaches the sheet
    with no extra authorisation.

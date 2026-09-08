@@ -1,0 +1,8 @@
+# clasp uploads .js/.gs/.ts/.html by default, which would send the vitest suite to Apps Script.
+# Only the four scripts and the manifest belong up there.
+**/**
+!Code.gs
+!auth.gs
+!sheets.gs
+!setup.gs
+!appsscript.json

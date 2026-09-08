@@ -3,6 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "push": "clasp push -f",
+    "deploy": "clasp deploy -i AKfycbxdmUl6RruY06PnhRp7YW07fimNdrPzNiy2glhbgv2M1dKnBFxIpYIit74-qP1DvxIa -d \"from clasp\"",
+    "ship": "npm run test && npm run push && npm run deploy"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
   }
 }
