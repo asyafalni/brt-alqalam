@@ -10,6 +10,14 @@ import type { GatewayState } from '../../../data/gateway';
 export interface Draft {
   /** True when the catalog is the spreadsheet's, and this device may only append movements. */
   readOnly?: boolean;
+  /**
+   * Whether this device may record a movement at all.
+   *
+   * Separate from `readOnly` because they are different permissions: a kiosk cannot edit the
+   * catalog but can record; a viewer can do neither. A phone belonging to the takmir reads the
+   * register without anybody enrolling it, which is the whole reason the public tier exists.
+   */
+  canRecord?: boolean;
   items: Item[];
   categories: Category[];
   locations: Location[];
@@ -79,6 +87,8 @@ export function useDraft(): Draft {
     stock: state.stock,
     txns: state.txns,
     requests: state.requests,
+    // Not connected: this device holds the whole draft, so it may do everything to it.
+    canRecord: true,
     setItems: (update) => setState((prev) => ({ ...prev, items: update(prev.items) })),
     setCategories: (update) => setState((prev) => ({ ...prev, categories: update(prev.categories) })),
     setLocations: (update) => setState((prev) => ({ ...prev, locations: update(prev.locations) })),
@@ -117,7 +127,7 @@ export function useDraft(): Draft {
  * writer of `Transactions` and it has no endpoint for anything else, and that is not an
  * omission — one writer over an append-only log is what makes every derived number trustworthy.
  */
-export function gatewayDraft(state: GatewayState, txns: Txn[]): Draft {
+export function gatewayDraft(state: GatewayState, txns: Txn[], canRecord: boolean): Draft {
   const noop = () => {};
   return {
     items: state.items,
@@ -129,6 +139,7 @@ export function gatewayDraft(state: GatewayState, txns: Txn[]): Draft {
     txns,
     requests: state.requests,
     readOnly: true,
+    canRecord,
     setItems: noop,
     setCategories: noop,
     setLocations: noop,

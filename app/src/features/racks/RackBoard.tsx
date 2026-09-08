@@ -505,7 +505,7 @@ export function RackBoard(
                         </button>
                         {/* Outside the row button, not inside it: a button in a button is not
                             valid HTML and the inner one stops being reachable by keyboard. */}
-                        {i.trackBy === 'quantity' && (
+                        {i.trackBy === 'quantity' && draft.canRecord !== false && (
                           <Button
                             size="sm"
                             class="min-h-11 shrink-0"

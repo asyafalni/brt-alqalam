@@ -1,5 +1,15 @@
 // Connecting this device to the gateway.
 //
+// TWO KINDS OF DEVICE, and the difference is the address alone:
+//
+//   * a VIEWER needs only the URL. Reading is the open tier (§39), so the takmir or the boss can
+//     open the register on their own phone and see that the masjid's assets are managed —
+//     which is §0's third problem — without anybody issuing them a credential, granting write
+//     access they never asked for, or leaving one more thing to revoke.
+//   * a KIOSK adds the device secret, because recording needs one: `doPost` sees no headers, no
+//     cookies and no client IP (§65.2), so an enrolled device is the only thing a PIN can be
+//     rate-limited against.
+//
 // Done ONCE per tablet, by an admin, and then never again — so it lives in a sheet rather than
 // on a screen of its own. What makes it worth care is that both failure modes are silent: a
 // `/dev` URL answers with a Google sign-in page carrying HTTP 200, and a mistyped device secret
@@ -50,7 +60,6 @@ export function ConnectPanel(
 
     const problem = urlProblem(url);
     if (problem) { setError(problem); return; }
-    if (secret.trim() === '') { setError('Kode perangkat belum diisi.'); return; }
 
     setBusy(true);
     try {
@@ -59,10 +68,11 @@ export function ConnectPanel(
          a wrong address. */
       const state = await fetchState(url.trim());
 
-      /* Second: is this device actually enrolled. A deliberately impossible PIN is used, so
-         the reply distinguishes "device unknown" from "device fine, PIN wrong" WITHOUT anyone
-         having to type a real PIN into a setup screen. */
-      try {
+      /* Second, and ONLY when a secret was given: is this device actually enrolled. A
+         deliberately impossible PIN is used, so the reply distinguishes "device unknown" from
+         "device fine, PIN wrong" WITHOUT anyone having to type a real PIN into a setup screen.
+         A viewer skips this entirely — there is nothing to check. */
+      if (secret.trim() !== '') try {
         const session = await openSession(url.trim(), secret.trim(), '000000000');
         // Should not happen — but if a PIN that long ever matched, do not leave it open.
         await closeSession(url.trim(), session.token).catch(() => undefined);
@@ -110,15 +120,21 @@ export function ConnectPanel(
         <div class="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
           <CircleCheck class="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
           <div class="min-w-0">
-            <p class="font-bold text-slate-900">Perangkat ini tersambung.</p>
+            <p class="font-bold text-slate-900">
+              {connection.deviceSecret ? 'Perangkat ini bisa mencatat.' : 'Perangkat ini bisa melihat.'}
+            </p>
             <p class={`${CODE} mt-1 break-all`}>{connection.url}</p>
           </div>
         </div>
 
         <p class="mt-4 text-sm leading-relaxed text-slate-600">
-          Katalog dibaca dari spreadsheet, dan setiap pengambilan dicatat lewat gateway. Kode
-          perangkat tersimpan di perangkat ini saja — tidak ditampilkan lagi, karena gateway
-          menyimpannya untuk dibandingkan, bukan untuk dikeluarkan.
+          {connection.deviceSecret
+            ? 'Katalog dibaca dari spreadsheet, dan setiap pengambilan dicatat lewat gateway. '
+              + 'Kode perangkat tersimpan di perangkat ini saja — tidak ditampilkan lagi, karena '
+              + 'gateway menyimpannya untuk dibandingkan, bukan untuk dikeluarkan.'
+            : 'Perangkat ini membaca katalog dan laporan dari spreadsheet, tapi tidak bisa '
+              + 'mencatat pengambilan — untuk itu perlu kode perangkat dari enrollDevice(). '
+              + 'Melihat memang tidak perlu kode apa pun.'}
         </p>
 
         <div class="mt-5">
@@ -164,7 +180,7 @@ export function ConnectPanel(
       </p>
 
       <div class="mt-4">
-        <label class={LABEL} for="gw-secret">Kode perangkat</label>
+        <label class={LABEL} for="gw-secret">Kode perangkat (opsional)</label>
         <input
           id="gw-secret"
           class={`${FIELD} min-h-touch font-mono text-sm`}
@@ -174,8 +190,9 @@ export function ConnectPanel(
           onInput={(e: Event) => setSecret((e.target as HTMLInputElement).value)}
         />
         <p class="mt-1.5 text-xs leading-relaxed text-slate-400">
-          Dicetak sekali di Execution log saat admin menjalankan enrollDevice(), dan tidak
-          ditampilkan lagi. Kode inilah yang membuat PIN 4 angka berarti.
+          <b>Kosongkan kalau perangkat ini hanya untuk melihat</b> — laporan, stok, peta rak.
+          Isi hanya untuk tablet gudang yang dipakai mencatat pengambilan: kode inilah yang
+          membuat PIN 4 angka berarti, dan ia dicetak sekali oleh enrollDevice().
         </p>
       </div>
 
@@ -188,17 +205,20 @@ export function ConnectPanel(
 
       <div class="mt-5">
         <Button size="touch" disabled={busy} onClick={() => void connect()}>
-          <Link2 class="h-5 w-5" /> {busy ? 'Menguji…' : 'Sambungkan'}
+          <Link2 class="h-5 w-5" />
+          {busy ? 'Menguji…' : secret.trim() === '' ? 'Sambungkan untuk melihat' : 'Sambungkan'}
         </Button>
       </div>
 
       {/* Said out loud because it was decided out loud: this is the trade the design already
           assumed, and §65.2's answer to it is that revoking is one deleted row. */}
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
-        Kode perangkat disimpan di perangkat ini saja. Artinya siapa pun yang memegang tablet
-        ini bisa membuka layar PIN — jadi tempatkan tabletnya sebagaimana Anda menempatkan kunci
-        gudang.
-      </p>
+      {secret.trim() !== '' && (
+        <p class="mt-4 text-xs leading-relaxed text-slate-400">
+          Kode perangkat disimpan di perangkat ini saja. Artinya siapa pun yang memegang tablet
+          ini bisa membuka layar PIN — jadi tempatkan tabletnya sebagaimana Anda menempatkan
+          kunci gudang.
+        </p>
+      )}
     </div>
   );
 }

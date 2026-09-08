@@ -42,6 +42,8 @@ interface Props {
   stale?: boolean;
   /** Movements recorded on this device but not yet in the sheet. */
   queued?: number;
+  /** False when this device is connected only to read — the takmir's phone, say. */
+  canRecord?: boolean;
   onOpenConnection: () => void;
 }
 
@@ -101,8 +103,12 @@ export function Sidebar(p: Props) {
           dot: 'bg-green-400',
           tone: 'text-slate-200',
           title: 'Tersambung',
-          hint: 'Membaca dari spreadsheet',
-          aria: 'Tersambung ke gateway dan membaca dari spreadsheet.',
+          /* Which of the two this device is, said plainly. A viewer that has quietly lost its
+             Ambil buttons should be able to see WHY without opening anything. */
+          hint: p.canRecord ? 'Bisa mencatat' : 'Hanya melihat',
+          aria: p.canRecord
+            ? 'Tersambung ke gateway. Perangkat ini bisa mencatat pengambilan.'
+            : 'Tersambung ke gateway. Perangkat ini hanya membaca — tidak bisa mencatat.',
         };
 
   const width = p.isMobile ? '280px' : p.collapsed ? '90px' : '260px';

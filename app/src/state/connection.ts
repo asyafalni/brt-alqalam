@@ -20,8 +20,17 @@ const KEY = 'brt.gateway.connection';
 export interface Connection {
   /** The Apps Script `/exec` URL. */
   url: string;
-  /** Issued once by `enrollDevice()`, shown once, and stored only here. */
-  deviceSecret: string;
+  /**
+   * Issued once by `enrollDevice()`, shown once, and stored only here.
+   *
+   * OPTIONAL, and that is the whole point of the two tiers. READING needs no credential at all —
+   * the public tier is open by design (§39), which is what lets the takmir or the boss open the
+   * register on their own phone and see that the masjid's assets are managed. Only RECORDING
+   * needs a device, so only a kiosk needs enrolling. Requiring a secret from somebody who just
+   * wants to look would put one more credential into the world, give write access nobody asked
+   * for, and leave one more thing to revoke.
+   */
+  deviceSecret?: string;
   /** When this device was connected, for the settings screen to show. */
   connectedTs: number;
 }
@@ -32,18 +41,30 @@ export function loadConnection(): Connection | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const c = JSON.parse(raw) as Partial<Connection>;
-    if (!c.url || !c.deviceSecret) return null;
-    return { url: c.url, deviceSecret: c.deviceSecret, connectedTs: c.connectedTs ?? 0 };
+    if (!c.url) return null;
+    return {
+      url: c.url,
+      ...(c.deviceSecret ? { deviceSecret: c.deviceSecret } : {}),
+      connectedTs: c.connectedTs ?? 0,
+    };
   } catch {
     return null;
   }
 }
 
-export function saveConnection(url: string, deviceSecret: string): Connection {
-  const c: Connection = { url: url.trim(), deviceSecret: deviceSecret.trim(), connectedTs: Date.now() };
+export function saveConnection(url: string, deviceSecret?: string): Connection {
+  const secret = (deviceSecret ?? '').trim();
+  const c: Connection = {
+    url: url.trim(),
+    ...(secret ? { deviceSecret: secret } : {}),
+    connectedTs: Date.now(),
+  };
   try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* private window */ }
   return c;
 }
+
+/** Whether this device may append movements, as opposed to only reading the register. */
+export const canRecord = (c: Connection | null): boolean => !!c?.deviceSecret;
 
 export function clearConnection(): void {
   try { localStorage.removeItem(KEY); } catch { /* private window */ }

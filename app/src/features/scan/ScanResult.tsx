@@ -18,6 +18,8 @@ interface Props {
   onBack: () => void;
   /** Scanning is the designed path to recording a movement (§58), not just a lookup. */
   onMove: (target: MovementTarget) => void;
+  /** False on a device connected only to read — the takmir's phone, say. */
+  canRecord?: boolean;
 }
 
 export function ScanResult(p: Props) {
@@ -87,7 +89,7 @@ export function ScanResult(p: Props) {
                     </span>
                     {/* The point of scanning a shelf: you are standing at it, holding the thing.
                         Anything further than one tap from here loses to just walking away. */}
-                    {i.trackBy === 'quantity' && (
+                    {i.trackBy === 'quantity' && p.canRecord !== false && (
                       <Button
                         size="sm"
                         class="min-h-11 shrink-0"
@@ -137,7 +139,7 @@ export function ScanResult(p: Props) {
       {/* Equipment is deliberately still read-only here. Loans need a borrower, and §60 says
           we do not yet know whether things are lent-and-lost or lost in the mess — which
           decides how big that flow should be. Saying so beats a half-built one. */}
-      {item.trackBy === 'quantity' ? (
+      {item.trackBy === 'quantity' && p.canRecord !== false ? (
         <div class="grid grid-cols-2 gap-3">
           <Button size="touch" onClick={() => p.onMove({ item, direction: 'keluar' })}>
             <ArrowUpRight class="h-5 w-5" /> Ambil

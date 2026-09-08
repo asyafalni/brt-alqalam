@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { clearConnection, loadConnection, saveConnection, urlProblem } from './connection';
+import { canRecord, clearConnection, loadConnection, saveConnection, urlProblem } from './connection';
 
 const EXEC = 'https://script.google.com/macros/s/AKfycb123/exec';
 
@@ -11,10 +11,24 @@ describe('remembering how this device reaches the gateway', () => {
     expect(loadConnection()).toMatchObject({ url: EXEC, deviceSecret: 'device-secret' });
   });
 
-  it('is not connected until BOTH halves are there', () => {
-    // A URL with no secret cannot open a session, so treating it as connected would put the
-    // kiosk into a state where every PIN attempt fails for a reason nobody could see.
-    localStorage.setItem('brt.gateway.connection', JSON.stringify({ url: EXEC }));
+  it('connects with the URL alone — reading needs no credential', () => {
+    // The two tiers exist precisely so the boss can open the register on his own phone without
+    // anybody enrolling his device, handing him write access he never asked for, and leaving
+    // one more secret to revoke.
+    saveConnection(EXEC);
+    const c = loadConnection();
+    expect(c).toMatchObject({ url: EXEC });
+    expect(c?.deviceSecret).toBeUndefined();
+    expect(canRecord(c)).toBe(false);
+  });
+
+  it('can record only once a device secret is there', () => {
+    saveConnection(EXEC, 'device-secret');
+    expect(canRecord(loadConnection())).toBe(true);
+  });
+
+  it('is not connected at all without a URL', () => {
+    localStorage.setItem('brt.gateway.connection', JSON.stringify({ deviceSecret: 's' }));
     expect(loadConnection()).toBeNull();
   });
 

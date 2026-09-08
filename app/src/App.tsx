@@ -41,7 +41,7 @@ import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
 import { PinPad } from './features/gateway/PinPad';
-import { loadConnection } from './state/connection';
+import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
@@ -77,7 +77,7 @@ export function App() {
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
      reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
   const draft = register.state
-    ? gatewayDraft(register.state, [...register.state.txns, ...freshTxns])
+    ? gatewayDraft(register.state, [...register.state.txns, ...freshTxns], canRecord(connection))
     : localDraft;
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
@@ -171,6 +171,7 @@ export function App() {
         connected={connection !== null}
         stale={register.error !== ''}
         queued={queued}
+        canRecord={canRecord(connection)}
         onOpenConnection={() => setConnectOpen(true)}
         onClose={() => setCollapsed(true)}
       />
@@ -308,6 +309,7 @@ export function App() {
               now={now}
               onBack={() => navigate({ name: 'beranda' })}
               onMove={setMoving}
+              canRecord={draft.canRecord !== false}
             />
           )}
           {route.name === 'scan-empty' && (
@@ -384,7 +386,10 @@ export function App() {
           description="Sekali untuk satu kunjungan."
           onClose={() => setPinFor(null)}
         >
-          {pinFor && connection && (
+          {pinFor && connection?.deviceSecret && (() => {
+            // Narrowed once, so the closures below carry a string rather than re-asserting it.
+            const { url, deviceSecret } = connection;
+            return (
             <PinPad
               busy={pinBusy}
               error={pinError}
@@ -395,7 +400,7 @@ export function App() {
                 void (async () => {
                   let token = '';
                   try {
-                    const session = await openSession(connection.url, connection.deviceSecret, pin);
+                    const session = await openSession(url, deviceSecret, pin);
                     token = session.token;
 
                     /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was
@@ -404,7 +409,7 @@ export function App() {
                     const waiting = await pending().catch(() => []);
                     const batch = [...waiting.map((w) => w.entry), ...pinFor];
 
-                    const result = await append(connection.url, token, batch);
+                    const result = await append(url, token, batch);
                     /* Duplicates count as settled: the gateway already holds them, and leaving
                        them queued would retry for ever against rows that exist. */
                     await settle([
@@ -442,12 +447,13 @@ export function App() {
                     /* Closed even when the append failed: the session covers one visit, and
                        leaving it open on a shared tablet is exactly the misattribution §58.5
                        set out to make structurally impossible. */
-                    if (token) await closeSession(connection.url, token).catch(() => undefined);
+                    if (token) await closeSession(url, token).catch(() => undefined);
                   }
                 })();
               }}
             />
-          )}
+            );
+          })()}
         </Sheet>
 
         <MovementSheet
@@ -458,14 +464,18 @@ export function App() {
              a PIN — so the entry is held until that PIN is given rather than written first and
              attributed afterwards. Not connected, it is the local log, as during a stock-take. */
           onCommit={(txn) => {
-            if (connection) {
+            /* A viewer has no device secret and cannot record — so the movement goes nowhere
+               rather than to the local draft, which would be a private number diverging from
+               the shared one under the same heading. The buttons are hidden for that case, so
+               reaching here at all would be a bug. */
+            if (connection && canRecord(connection)) {
               setPinError('');
               setPinFor([{
                 clientTxnId: txn.clientTxnId, type: txn.type, itemId: txn.itemId,
                 assetId: txn.assetId, locationId: txn.locationId, qtyDelta: txn.qtyDelta,
                 recipient: txn.recipient, condition: txn.condition, note: txn.note,
               }]);
-            } else {
+            } else if (!connection) {
               localDraft.setTxns((prev) => [...prev, txn]);
             }
             setMoving(null);

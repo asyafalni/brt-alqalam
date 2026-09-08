@@ -189,7 +189,9 @@ export function ItemDetail(
             {/* Ahead of Ubah and Label, because this is the thing that happens fifty times a
                 week while those happen once. Quantity items only — a loan needs a borrower,
                 and that flow is deliberately not built yet (§60). */}
-            {item.trackBy === 'quantity' && (
+            {/* Hidden, not disabled, for a device that may only look: a greyed-out Ambil is a
+                promise the register cannot keep, and it invites the tap that explains nothing. */}
+            {item.trackBy === 'quantity' && draft.canRecord !== false && (
               <>
                 <Button onClick={() => onMove({ item, direction: 'keluar' })}>
                   <ArrowUpRight class="h-4 w-4" /> Ambil
