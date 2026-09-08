@@ -46,6 +46,25 @@ export interface Draft {
     { txns: Txn[]; requests: PurchaseRequest[] },
   ) => void;
   /**
+   * Connected mode only: close a request, and for a repair put the unit back on its hook.
+   *
+   * `setRepair` cannot do this when connected. It writes to `Transactions`, and only `append`
+   * may — so it was a NOOP, and "tandai selesai" was a button that silently did nothing on a
+   * screen that can only be opened while connected. The boundary was right; a dead control was
+   * not. Present here means "the gateway can do this properly"; absent means the local draft
+   * handles it with `setRepair`.
+   */
+  finishRequest?: (
+    input: {
+      requestId: string;
+      status?: 'selesai' | 'dibatalkan';
+      note?: string;
+      assetId?: string;
+      itemId?: string;
+      toStatus?: string;
+    },
+  ) => void;
+  /**
    * Items, stock and requests in one write. Buying a request touches all three, and three
    * separate setters would land as three renders with a half-updated catalog in between.
    */
@@ -134,6 +153,8 @@ export function gatewayDraft(
   canRecord: boolean,
   /** Present only when an admin is signed in; without it every catalog setter is a noop. */
   writer?: CatalogWriter,
+  /** Closes a request through the gateway. Only an admin has the credential for it. */
+  onFinish?: Draft['finishRequest'],
 ): Draft {
   const noop = () => {};
 
@@ -182,7 +203,10 @@ export function gatewayDraft(
      * finishing a repair from a connected admin screen needs the movement path, not this one.
      */
     setTxns: noop,
+    /* Still a noop, and now it has a replacement rather than a silence: `finishRequest` below
+       does the same job through the one op allowed to touch both the log and a request row. */
     setRepair: noop,
+    finishRequest: writer && onFinish ? onFinish : undefined,
     /* Local-draft-only. There is nothing to reset or seed when the catalog is the masjid's
        actual spreadsheet, and an import belongs in the sheet where it can be reviewed first. */
     reset: noop,

@@ -394,3 +394,35 @@ function adminLog(who, action, detail) {
     String(detail || ''),
   ]]);
 }
+
+
+/**
+ * Change some fields of one row, found by its id column.
+ *
+ * Narrower than `writeTab` on purpose. Closing a repair changes one request and appends one
+ * movement; doing it by rewriting the whole Requests tab would make a two-field edit race every
+ * other admin editing anything, and would need the client to hold the entire tab to change a
+ * status. Returns false when the id is not there, so a caller can refuse rather than no-op.
+ */
+function updateRowById(name, idColumn, id, patch) {
+  var header = REQUIRED_TABS[name];
+  if (!header) throw new Error('Tab "' + name + '" is not writable.');
+  var idIndex = header.indexOf(idColumn);
+  if (idIndex === -1) throw new Error('No column "' + idColumn + '" in ' + name + '.');
+
+  var sheet = sheetNamed(name);
+  var values = sheet.getDataRange().getValues();
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idIndex]) !== String(id)) continue;
+    var row = values[r].slice();
+    for (var c = 0; c < header.length; c++) {
+      if (Object.prototype.hasOwnProperty.call(patch, header[c])) {
+        row[c] = patch[header[c]] === null || patch[header[c]] === undefined
+          ? '' : String(patch[header[c]]);
+      }
+    }
+    sheet.getRange(r + 1, 1, 1, header.length).setValues([row]);
+    return true;
+  }
+  return false;
+}

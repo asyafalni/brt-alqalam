@@ -575,3 +575,34 @@ export async function revokeInvitation(
 ): Promise<Invitation[]> {
   return readInvitations(await call(url, { op: 'revokeInvitation', token, invitationId }, fetchImpl));
 }
+
+/**
+ * Close a request, and — for a repair — put the unit back on its hook.
+ *
+ * ONE CALL because it is two facts that must not separate: the request is closed, and the tool
+ * is no longer broken. Sent as two writes, a failure between them leaves the register saying a
+ * thing is fixed that is still marked broken, and nobody would think to check.
+ *
+ * This is also why it exists at all: `setRepair` cannot work through `putCatalog`, which may not
+ * touch `Transactions` — so the connected screen's "tandai selesai" was a button that silently
+ * did nothing.
+ */
+export async function finishRequest(
+  url: string,
+  token: string,
+  input: {
+    requestId: string;
+    status?: 'selesai' | 'dibatalkan';
+    note?: string;
+    /** Set for a repair: the unit going back, and the status it goes back to. */
+    assetId?: string;
+    itemId?: string;
+    toStatus?: string;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ appended: Txn | null }> {
+  const json = await call(url, { op: 'finishRequest', token, ...input }, fetchImpl);
+  if (!json.appended) return { appended: null };
+  const rows = parseRecords(lower([json.appended as Record<string, unknown>]), buildTxn);
+  return { appended: rows.ok[0] ?? null };
+}

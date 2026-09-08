@@ -39,6 +39,8 @@ export interface CatalogWriter {
   /** A message worth showing an admin, or `''`. */
   error: string;
   clearError: () => void;
+  /** For the writes that do not go through `write` — closing a request, for one. */
+  reportError: (err: unknown) => void;
 }
 
 const REASON: Record<string, string> = {
@@ -103,5 +105,12 @@ export function useCatalogWriter(
       .finally(() => setSaving(false));
   }
 
-  return { write, pending: visible, saving, error, clearError: () => setError('') };
+  return {
+    write,
+    pending: visible,
+    saving,
+    error,
+    clearError: () => setError(''),
+    reportError: (err) => setError(explain(err instanceof GatewayError ? err.code : 'offline')),
+  };
 }

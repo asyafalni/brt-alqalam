@@ -63,7 +63,7 @@ import { useCatalogWriter } from './state/useCatalogWriter';
 import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
 import { Manage } from './features/admin/Manage';
 import type { AdminSession } from './features/admin/AdminPanel';
-import { append, closeSession, GatewayError } from '../../data/gateway';
+import { append, closeSession, finishRequest, GatewayError } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
 import { enqueue, pending, pendingCount, settle } from '../../data/outbox';
 import type { Txn } from '../../domain/types';
@@ -116,6 +116,21 @@ export function App() {
       [...register.state.txns, ...freshTxns],
       canRecord(connection),
       admin ? writer : undefined,
+      admin && connection
+        ? (input) => {
+          void (async () => {
+            try {
+              const { appended } = await finishRequest(connection.url, await admin.getToken(), input);
+              if (appended) setFreshTxns((prev) => [...prev, appended]);
+              register.refresh();
+            } catch (err) {
+              /* Surfaced in the same banner as a failed catalog save. A repair that did not
+                 close must not look like one that did. */
+              writer.reportError(err);
+            }
+          })();
+        }
+        : undefined,
     )
     : localDraft;
   const [route, go] = useRoute();

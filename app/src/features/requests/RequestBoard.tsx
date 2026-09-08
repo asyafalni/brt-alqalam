@@ -111,7 +111,7 @@ export function RequestBoard(
     withheld?: boolean;
   },
 ) {
-  const { requests, setRequests, setPurchase, setRepair } = draft;
+  const { requests, setRequests, setPurchase, setRepair, finishRequest } = draft;
 
   // The sheet opens by itself when arrived at from Aset: the click that got here already said
   // "ajukan", and asking for it a second time is the tap §0.0 exists to remove.
@@ -302,6 +302,22 @@ export function RequestBoard(
    * register saying a thing is broken that is, by then, back on its hook.
    */
   function markRepaired(request: PurchaseRequest, note: string) {
+    /* Connected, this is one gateway call that closes the request AND appends the status
+       change — the two facts must not separate, and `setRepair` cannot write to the log at all.
+       Offline, the local draft does both in one state update, which is the same guarantee by
+       different means. */
+    if (finishRequest) {
+      const txn = repairDone(request, actor, Date.now());
+      finishRequest({
+        requestId: request.requestId,
+        status: 'selesai',
+        ...(note.trim() !== '' ? { note: note.trim() } : {}),
+        ...(txn?.assetId ? { assetId: txn.assetId, toStatus: txn.toStatus ?? 'available' } : {}),
+        ...(request.itemId ? { itemId: request.itemId } : {}),
+      });
+      setBuying(null);
+      return;
+    }
     setRepair((prev) => {
       const txn = repairDone(request, actor, Date.now());
       return {
@@ -321,6 +337,15 @@ export function RequestBoard(
   }
 
   function reject(request: PurchaseRequest, note: string) {
+    if (finishRequest) {
+      finishRequest({
+        requestId: request.requestId,
+        status: 'dibatalkan',
+        ...(note.trim() !== '' ? { note: note.trim() } : {}),
+      });
+      setRejecting(null);
+      return;
+    }
     setRequests((prev) => prev.map((r) => (r.requestId === request.requestId
       ? {
         ...r,

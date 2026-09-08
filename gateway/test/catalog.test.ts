@@ -31,7 +31,13 @@ function fakeBook(tabs: Record<string, Tab>) {
     getLastRow: () => tabs[name].length,
     setFrozenRows: () => {},
     getRange: (row: number, col: number, numRows: number, numCols: number) => ({
-      getValues: () => tabs[name].slice(row - 1, row - 1 + numRows),
+      /* Respects the COLUMN offset, which it did not: `existingClientTxnIds` asks for one
+         column and was handed whole rows, so it compared txnIds against clientTxnIds and found
+         no duplicates ever. A fake that is looser than the real thing hides exactly the bugs it
+         is there to catch. */
+      getValues: () => tabs[name]
+        .slice(row - 1, row - 1 + numRows)
+        .map((r) => r.slice(col - 1, col - 1 + numCols)),
       clearContent: () => { tabs[name] = tabs[name].slice(0, row - 1); },
       setValues: (vals: string[][]) => {
         while (tabs[name].length < row - 1) tabs[name].push(new Array(numCols).fill(''));
@@ -106,7 +112,8 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
        handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
        handleSetDeviceRevoked, handleRenameDevice, handleInviteAdmin,
-       handleListInvitations, handleRevokeInvitation, writeTab, txnRow, catalogRev,
+       handleListInvitations, handleRevokeInvitation, handleFinishRequest,
+       writeTab, txnRow, updateRowById, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -734,5 +741,90 @@ describe('inviting an admin', () => {
     const r = g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'admin' });
     expect(r).toMatchObject({ ok: false, error: 'clerk_422' });
     expect(r.message).toContain('duplicate invitation');
+  });
+});
+
+describe('closing a request', () => {
+  const REQ = ['requestId', 'type', 'name', 'itemId', 'assetId', 'qty', 'unit', 'price', 'reason',
+    'url', 'status', 'requestedBy', 'requestedTs', 'decidedBy', 'decidedTs', 'note'];
+
+  function withRequest(type = 'perbaikan') {
+    const tabs = freshTabs();
+    const row = REQ.map((c) => {
+      if (c === 'requestId') return 'REQ-1';
+      if (c === 'type') return type;
+      if (c === 'name') return 'Pisau potong #1';
+      if (c === 'assetId') return 'ALQ-1-001';
+      if (c === 'status') return 'diajukan';
+      if (c === 'qty') return '1';
+      if (c === 'unit') return 'buah';
+      return '';
+    });
+    tabs.Requests.push(row);
+    return { tabs, g: load(tabs) };
+  }
+
+  it('refuses without an admin token', () => {
+    expect(withRequest().g.handleFinishRequest({ requestId: 'REQ-1' }).ok).toBe(false);
+  });
+
+  it('closes the request AND puts the unit back, in one call', () => {
+    const { tabs, g } = withRequest();
+    const r = g.handleFinishRequest({
+      token: admin, requestId: 'REQ-1', assetId: 'ALQ-1-001', toStatus: 'available',
+    });
+    expect(r.ok).toBe(true);
+
+    expect(tabs.Requests[1][REQ.indexOf('status')]).toBe('selesai');
+    expect(tabs.Requests[1][REQ.indexOf('decidedBy')]).toBe('usr_1');
+
+    const txn = tabs.Transactions[1];
+    expect(txn[TXN_HEADER.indexOf('type')]).toBe('status_change');
+    expect(txn[TXN_HEADER.indexOf('assetId')]).toBe('ALQ-1-001');
+    expect(txn[TXN_HEADER.indexOf('toStatus')]).toBe('available');
+  });
+
+  it('does not append twice when pressed twice', () => {
+    const { tabs, g } = withRequest();
+    const call = () => g.handleFinishRequest({
+      token: admin, requestId: 'REQ-1', assetId: 'ALQ-1-001', toStatus: 'available',
+    });
+    call();
+    const second = call();
+    expect(second.ok).toBe(true);
+    expect(second.appended).toBeNull();
+    expect(tabs.Transactions).toHaveLength(2);
+  });
+
+  it('cancels without touching the log — nothing physical happened', () => {
+    const { tabs, g } = withRequest('beli');
+    g.handleFinishRequest({ token: admin, requestId: 'REQ-1', status: 'dibatalkan', note: 'tidak jadi' });
+    expect(tabs.Requests[1][REQ.indexOf('status')]).toBe('dibatalkan');
+    expect(tabs.Requests[1][REQ.indexOf('note')]).toBe('tidak jadi');
+    expect(tabs.Transactions).toHaveLength(1);
+  });
+
+  it('refuses an id that is not there rather than writing a movement for nothing', () => {
+    const { tabs, g } = withRequest();
+    expect(g.handleFinishRequest({ token: admin, requestId: 'REQ-nope' }))
+      .toMatchObject({ ok: false, error: 'no_such_request' });
+    expect(tabs.Requests[1][REQ.indexOf('status')]).toBe('diajukan');
+  });
+});
+
+describe('updateRowById', () => {
+  it('changes only the fields it was given', () => {
+    const tabs = freshTabs();
+    tabs.Items.push(['itm-9', 'B', 'Sapu', 'cat-1', 'consumable', 'buah', 'quantity', '2', 'TRUE', 'k', 'a']);
+    const g = load(tabs);
+    expect(g.updateRowById('Items', 'itemId', 'itm-9', { name: 'Sapu ijuk' })).toBe(true);
+    expect(tabs.Items[2][2]).toBe('Sapu ijuk');
+    // Everything else survives — a patch is not a replacement.
+    expect(tabs.Items[2][1]).toBe('B');
+    expect(tabs.Items[2][9]).toBe('k');
+  });
+
+  it('says so when the id is not there', () => {
+    expect(load(freshTabs()).updateRowById('Items', 'itemId', 'nope', { name: 'x' })).toBe(false);
   });
 });

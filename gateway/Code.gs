@@ -74,6 +74,7 @@ function doPost(e) {
       case 'inviteAdmin': return handleInviteAdmin(body);
       case 'revokeInvitation': return handleRevokeInvitation(body);
       case 'submitRequest': return handleSubmitRequest(body);
+      case 'finishRequest': return handleFinishRequest(body);
       default: return fail('unknown_op');
     }
   } catch (err) {
@@ -87,7 +88,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.11.0-invite';
+var GATEWAY_VERSION = '0.12.0-finish-request';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -580,4 +581,86 @@ function handleRevokeInvitation(body) {
 
   var listed = clerkInvitations();
   return respond({ ok: true, invitations: listed.ok ? listed.invitations : [] });
+}
+
+
+// ---------------------------------------------------------------------------
+// Closing a request — the one write that touches the log AND the catalog.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mark a request finished or cancelled, and — for a repair — put the unit back on its hook.
+ *
+ * WHY IT IS ONE OP. Finishing a repair is two facts: the request is closed, and the tool is no
+ * longer broken. Sent separately, a failure between them leaves the register saying a thing is
+ * fixed that is still marked broken, or the reverse — and nobody would think to check. They land
+ * under one lock, or neither does.
+ *
+ * This is also what makes the connected screen work at all. `setRepair` in the app was a NOOP
+ * when connected, because it writes to `Transactions` and only `append` may — so "tandai
+ * selesai" silently did nothing, on a screen that can ONLY be opened while connected. The
+ * boundary was right; leaving the button there was not.
+ */
+function handleFinishRequest(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var requestId = String(body.requestId || '');
+  if (!requestId) return fail('no_request');
+  var status = body.status === 'dibatalkan' ? 'dibatalkan' : 'selesai';
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return fail('busy');
+
+  try {
+    var now = new Date();
+    var appended = null;
+
+    /* The movement FIRST. If the request update then fails, the log holds a status change that
+       is true — the tool really is back — and the request is merely still open, which somebody
+       can see and fix. The other order leaves a closed request over a tool the register still
+       calls broken, which nobody looks for. */
+    if (body.assetId && body.toStatus) {
+      var txn = {
+        txnId: Utilities.getUuid(),
+        clientTxnId: 'finish-' + requestId,
+        ts: now.toISOString(),
+        type: 'status_change',
+        itemId: body.itemId || '',
+        assetId: String(body.assetId),
+        locationId: '',
+        qtyDelta: 0,
+        recipient: '',
+        actorUserId: who.uid,
+        condition: '',
+        note: body.note || '',
+        toStatus: String(body.toStatus),
+        reversesTxnId: '',
+      };
+      var built = txnRow(txn);
+      if (!built.ok) return fail('column_not_built', { column: built.column });
+
+      var sheet = txnSheet();
+      /* Idempotent on the request: pressing "selesai" twice, or a retry after a timeout, must
+         not append a second status change. */
+      if (!existingClientTxnIds(sheet)[txn.clientTxnId]) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, 1, TXN_COLUMNS.length).setValues([built.row]);
+        appended = txn;
+      }
+    }
+
+    var patch = {
+      status: status,
+      decidedBy: who.uid,
+      decidedTs: now.toISOString(),
+    };
+    if (body.note) patch.note = String(body.note);
+    if (!updateRowById('Requests', 'requestId', requestId, patch)) return fail('no_such_request');
+
+    dropStateCache();
+    SpreadsheetApp.flush();
+    return respond({ ok: true, appended: appended, status: status });
+  } finally {
+    lock.releaseLock();
+  }
 }
