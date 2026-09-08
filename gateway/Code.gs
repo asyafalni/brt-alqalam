@@ -402,8 +402,18 @@ function handleSubmitRequest(body) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) return fail('busy');
   try {
+    /* The CLIENT's id when it sent a usable one, because photos are keyed to it before the
+       form opens (`RequestForm` mints it so attachments have somewhere to go). A server-minted
+       id would orphan every photo on the device that took it. Shape-checked and collision-
+       checked all the same: a client that could name an existing row could append a second one
+       wearing its id, and the register would then hold two requests nobody can tell apart. */
+    var taken = {};
+    readTab('Requests').forEach(function (r) { taken[r.requestId] = true; });
+    var wanted = String(body.requestId || '');
+    var usable = /^REQ-[A-Za-z0-9_-]{4,40}$/.test(wanted) && !taken[wanted];
+
     var request = {
-      requestId: 'REQ-' + Utilities.getUuid().slice(0, 8),
+      requestId: usable ? wanted : 'REQ-' + Utilities.getUuid().slice(0, 8),
       type: type,
       name: name,
       itemId: body.itemId || '',

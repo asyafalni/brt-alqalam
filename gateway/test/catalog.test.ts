@@ -396,3 +396,27 @@ describe('an admin can file one too', () => {
     })).toMatchObject({ ok: false, error: 'not-admin' });
   });
 });
+
+describe('the request id, so photos are not orphaned', () => {
+  const ok = { session: 'sesi-marbot', name: 'Kain pel', qty: 1, unit: 'buah', reason: 'tipis' };
+
+  it("keeps the client's id, which is what its photos are filed under", () => {
+    const tabs = freshTabs();
+    const r = load(tabs).handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
+    expect(r.requestId).toBe('REQ-abc12345');
+  });
+
+  it('mints its own when the id is malformed', () => {
+    const r = load(freshTabs()).handleSubmitRequest({ ...ok, requestId: '../../etc' });
+    expect(r.requestId).toMatch(/^REQ-[0-9a-f]{8}$/);
+  });
+
+  it('mints its own rather than colliding with a row that exists', () => {
+    const tabs = freshTabs();
+    const g = load(tabs);
+    g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
+    const second = g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
+    expect(second.requestId).not.toBe('REQ-abc12345');
+    expect(tabs.Requests).toHaveLength(3);
+  });
+});

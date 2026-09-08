@@ -43,7 +43,7 @@ import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
 import { SubmitRequest } from './features/requests/SubmitRequest';
-import { nameOfAsset } from './features/requests/assetName';
+import { newRequestId } from './features/requests/newRequestId';
 import { PinPad } from './features/gateway/PinPad';
 import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
@@ -120,7 +120,7 @@ export function App() {
   /* Filing a request is open to everybody; reading the list is not (§39). So the form is a
      panel anybody can open, and the list stays a screen only an admin has. */
   const [ajukanOpen, setAjukanOpen] = useState<
-    { type: 'beli' | 'perbaikan'; assetId?: string; name?: string } | null
+    { type: 'beli' | 'perbaikan'; assetId?: string; requestId: string } | null
   >(null);
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
@@ -198,11 +198,7 @@ export function App() {
        Bouncing them to Beranda made "Ajukan perbaikan" a dead button for everyone who is most
        likely to press it. They get the form instead of the list. */
     if (route.name === 'pengajuan' && route.type && route.assetId && !ajukanOpen) {
-      setAjukanOpen({
-        type: route.type,
-        assetId: route.assetId,
-        name: nameOfAsset(draft, inventory, route.assetId),
-      });
+      setAjukanOpen({ type: route.type, assetId: route.assetId, requestId: newRequestId() });
     }
     /* Back to Aset, not Beranda, when the link named a unit: that is where the unit is, and
        where somebody following a shared link expects to end up once the form is dealt with.
@@ -326,7 +322,7 @@ export function App() {
               inventory={inventory}
               now={now}
               canReview={!connection || admin != null}
-              onAjukan={() => setAjukanOpen({ type: 'beli' })}
+              onAjukan={() => setAjukanOpen({ type: 'beli', requestId: newRequestId() })}
               onNavigate={navigate}
             />
           )}
@@ -391,7 +387,7 @@ export function App() {
                    them somewhere else costs them their place on a list they were working
                    down. Reporting a second broken knife should not mean finding it again. */
                 if (admin) { navigate({ name: 'pengajuan', type, assetId }); return; }
-                setAjukanOpen({ type, assetId, name: nameOfAsset(draft, inventory, assetId) });
+                setAjukanOpen({ type, assetId, requestId: newRequestId() });
               }}
               onOpenCounted={() => navigate({ name: 'board', kind: 'barang-tetap' })}
             />
@@ -510,11 +506,17 @@ export function App() {
               url={connection.url}
               deviceSecret={connection.deviceSecret}
               getToken={admin?.getToken}
-              units={[...new Set(draft.items.map((i) => i.unit).filter(Boolean))].sort()}
-              prefill={ajukanOpen ?? undefined}
-              /* Remounts on a different unit, so arriving from a second broken knife does not
-                 reuse the first one's half-typed form. */
-              key={ajukanOpen?.assetId ?? 'baru'}
+              items={draft.items}
+              instances={Object.values(inventory.derived.instances)}
+              /* Minted here, before the form opens, because photos are filed under it — and it
+                 is what the gateway stores, so the attachments are not orphaned. */
+              requestId={ajukanOpen?.requestId ?? 'REQ-baru'}
+              prefill={ajukanOpen?.assetId
+                ? { type: ajukanOpen.type, assetId: ajukanOpen.assetId }
+                : undefined}
+              /* Remounts per request, so a second broken knife does not inherit the first
+                 one's half-typed form or its photos. */
+              key={ajukanOpen?.requestId ?? 'baru'}
               onDone={() => setAjukanOpen(null)}
             />
           ) : (

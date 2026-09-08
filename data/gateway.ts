@@ -391,6 +391,14 @@ export async function setRosterActive(
 
 /** What somebody wants bought or repaired. No id, no status, no author — the gateway sets those. */
 export interface RequestDraft {
+  /**
+   * The id the client already filed this request's photos under.
+   *
+   * `RequestForm` mints it before opening so attachments have somewhere to go, so a
+   * server-minted id would orphan every photo on the device that took them. The gateway keeps
+   * it when it is well-formed and unused, and mints its own otherwise.
+   */
+  requestId?: string;
   type: 'beli' | 'perbaikan';
   name: string;
   qty: number;

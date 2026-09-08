@@ -5,16 +5,25 @@
 // rarely the person with a Clerk password, and making an admin type it in on their behalf is
 // exactly the added bookkeeping §0.0 exists to refuse.
 //
-// So this is a FORM AND A RECEIPT, never a list. After sending, it says the request was filed
-// and stops — it cannot show it in context, because the person who just filed it is not allowed
-// to see the tab it went into. Pretending otherwise would leak the thing the split protects.
+// IT WRAPS `RequestForm` RATHER THAN ASKING THE SAME QUESTIONS AGAIN. The first version of this
+// screen had its own fields, and within a day it had already drifted — no photo attachments, no
+// "something we already own" picker. Two forms for one thing is the §82 problem in another
+// costume, and the second copy is always the one that stops getting the fix. What belongs here
+// is only what is different: how it is SENT, and what happens afterwards.
+//
+// AFTERWARDS IS A RECEIPT, NEVER A LIST. The person who just filed it cannot read the tab it
+// went into, so this says it was filed and stops. Showing the row back would be the one hole in
+// the split it exists to keep.
 
 import { useState } from 'octane';
-import { CircleCheck, ShoppingCart, Wrench } from '@octanejs/lucide';
+import { CircleCheck } from '@octanejs/lucide';
 import { GatewayError, closeSession, openSession, submitRequest } from '../../../../data/gateway';
-import type { RequestDraft } from '../../../../data/gateway';
-import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
+import type { Item } from '../../../../domain/types';
+import type { DerivedInstance } from '../../../../domain/types';
+import { Button } from '../../components/ui';
 import { PinPad } from '../gateway/PinPad';
+import { RequestForm } from './RequestForm';
+import type { RequestInput } from './RequestForm';
 
 const REASON: Record<string, string> = {
   reason_required: 'Alasannya wajib diisi — tanpa itu pengurus harus menanyakannya lagi.',
@@ -22,6 +31,8 @@ const REASON: Record<string, string> = {
   bad_qty: 'Jumlah harus lebih dari nol.',
   no_session: 'Sesi sudah berakhir. Masukkan PIN lagi.',
   session_expired: 'Sesi sudah berakhir. Masukkan PIN lagi.',
+  invalid_pin: 'PIN salah.',
+  device_not_enrolled: 'Perangkat ini belum didaftarkan, jadi belum bisa mengirim.',
   'not-admin': 'Akun ini tidak boleh mengajukan.',
   offline: 'Tidak bisa menghubungi gateway. Pengajuan belum terkirim.',
 };
@@ -31,87 +42,63 @@ const explain = (e: unknown) => {
 };
 
 export function SubmitRequest(
-  { url, deviceSecret, getToken, units, prefill, onDone }:
+  { url, deviceSecret, getToken, items, instances, requestId, prefill, onDone }:
   {
     url: string;
-    /**
-     * Arrived from a broken or lost unit on the Aset screen.
-     *
-     * This is the path that matters most for repairs: the person who FINDS a broken knife is a
-     * marbot, not an admin, and before this the link took them to a screen they are not allowed
-     * to open and bounced them back to Beranda.
-     */
-    prefill?: { type: 'beli' | 'perbaikan'; assetId?: string; name?: string };
     /** Set on an enrolled kiosk: lets somebody file with a PIN and no account. */
     deviceSecret?: string;
     /** Set when an admin is signed in: no PIN step at all. */
     getToken?: () => Promise<string>;
-    /** Units already in use, so the common ones are one tap rather than typing. */
-    units: readonly string[];
+    items: Item[];
+    instances: DerivedInstance[];
+    /** Minted by the caller before opening, so photos have somewhere to go. */
+    requestId: string;
+    /** `assetId` is required when there is a prefill at all: the whole point is naming a unit. */
+    prefill?: { type: 'beli' | 'perbaikan'; assetId: string; note?: string };
     onDone: () => void;
   },
 ) {
-  const [type, setType] = useState<'beli' | 'perbaikan'>(prefill?.type ?? 'beli');
-  const [name, setName] = useState(prefill?.name ?? '');
-  const [qty, setQty] = useState('1');
-  const [unit, setUnit] = useState(units[0] ?? 'buah');
-  const [reason, setReason] = useState('');
-  const [price, setPrice] = useState('');
-  const [url_, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sentId, setSentId] = useState('');
-  /* The PIN step, and only for the people who need it. An admin already holds a credential; a
-     marbot holds a PIN. It appears after the form is filled, never before — asking who somebody
-     is before they have said what they want is the tax §0.0 exists to remove. */
-  const [askPin, setAskPin] = useState(false);
+  /* Held while the PIN is asked for, so the answers are not retyped after it. */
+  const [held, setHeld] = useState<RequestInput | null>(null);
 
-  const draft = (): RequestDraft => ({
-    type,
-    name: name.trim(),
-    qty: Number(qty) || 0,
-    unit,
-    reason: reason.trim(),
-    ...(price.trim() ? { price: Number(price) } : {}),
-    ...(url_.trim() ? { url: url_.trim() } : {}),
-    /* Carried through so the request points at the actual unit. Without it a repair says
-       "Pisau potong" and leaves somebody to work out which of the six. */
-    ...(prefill?.assetId ? { assetId: prefill.assetId } : {}),
-  });
-
-  async function send(e: Event) {
-    e.preventDefault();
-    if (getToken) {
-      setBusy(true);
-      setError('');
-      try {
-        setSentId(await submitRequest(url, { token: await getToken() }, draft()));
-      } catch (err) {
-        setError(explain(err));
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-    if (!deviceSecret) { setError('Perangkat ini belum didaftarkan, jadi belum bisa mengirim.'); return; }
-    setAskPin(true);
-  }
-
-  async function sendWithPin(pin: string) {
+  async function send(input: RequestInput, credential: { session: string } | { token: string }) {
     setBusy(true);
     setError('');
-    let token = '';
     try {
-      const session = await openSession(url, deviceSecret as string, pin);
-      token = session.token;
-      setSentId(await submitRequest(url, { session: token }, draft()));
-      setAskPin(false);
+      setSentId(await submitRequest(url, credential, { requestId, ...input }));
+      setHeld(null);
     } catch (err) {
       setError(explain(err));
     } finally {
       setBusy(false);
-      /* One visit, one session (§58.5). Closing it here means a request filed at the kiosk does
-         not leave a session open behind whoever walks away next. */
+    }
+  }
+
+  async function submit(input: RequestInput) {
+    if (getToken) { await send(input, { token: await getToken() }); return; }
+    if (!deviceSecret) { setError(REASON.device_not_enrolled); return; }
+    // The PIN comes AFTER the form, never before: asking who somebody is before they have said
+    // what they want is the tap §0.0 exists to remove.
+    setHeld(input);
+  }
+
+  async function sendWithPin(pin: string) {
+    if (!held) return;
+    setBusy(true);
+    setError('');
+    let token = '';
+    try {
+      token = (await openSession(url, deviceSecret as string, pin)).token;
+      await send(held, { session: token });
+    } catch (err) {
+      setError(explain(err));
+      setBusy(false);
+    } finally {
+      /* One visit, one session (§58.5): a request filed at the kiosk must not leave a session
+         open behind whoever walks away next. */
       if (token) void closeSession(url, token).catch(() => {});
     }
   }
@@ -121,11 +108,9 @@ export function SubmitRequest(
       <div class="py-4 text-center">
         <CircleCheck class="mx-auto mb-3 h-9 w-9 text-green-600" />
         <h2 class="text-base font-bold text-slate-900">Pengajuan terkirim</h2>
-        {/* No link to the list, and no summary of the row. The person who just filed this
-            cannot read that tab, and showing it here would be the hole in the split. */}
         <p class="mx-auto mt-1.5 max-w-xs text-sm text-slate-600">
-          Pengurus akan melihatnya dan memutuskan. Kamu tidak bisa membuka daftarnya di sini
-          karena daftar itu menyebut nama orang.
+          Pengurus akan melihatnya dan memutuskan. Daftarnya tidak bisa dibuka di sini karena
+          menyebut nama orang.
         </p>
         <p class="mt-2 font-mono text-[11px] uppercase tracking-tight text-slate-400">{sentId}</p>
         <Button class="mt-5" size="panel" onClick={onDone}>Selesai</Button>
@@ -133,132 +118,32 @@ export function SubmitRequest(
     );
   }
 
-  if (askPin) {
+  if (held) {
     return (
       <PinPad
         busy={busy}
         error={error}
-        onCancel={() => { setAskPin(false); setError(''); }}
+        onCancel={() => { setHeld(null); setError(''); }}
         onSubmit={(pin) => void sendWithPin(pin)}
       />
     );
   }
 
   return (
-    <form class="space-y-4" onSubmit={send}>
-      {prefill?.assetId && (
-        <p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          Untuk unit <span class="font-mono font-semibold text-slate-900">{prefill.assetId}</span>
+    <div class="space-y-3">
+      {error && (
+        <p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-slate-800" role="alert">
+          {error}
         </p>
       )}
-
-      {/* Two buttons, not a dropdown: there are exactly two kinds and the choice changes what
-          the rest of the form means. */}
-      <div class="grid grid-cols-2 gap-2">
-        {([['beli', 'Beli baru', ShoppingCart], ['perbaikan', 'Perbaikan', Wrench]] as const)
-          .map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={type === value}
-              class={`flex min-h-11 items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors ${
-                type === value
-                  ? 'border-slate-900 bg-slate-900 text-slate-50'
-                  : 'border-slate-400 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-              onClick={() => setType(value)}
-            >
-              <Icon class="h-4 w-4" /> {label}
-            </button>
-          ))}
-      </div>
-
-      <div>
-        <label class={LABEL} for="req-name">Barang apa?</label>
-        <input
-          id="req-name"
-          class={FIELD}
-          value={name}
-          onInput={(e: Event) => setName((e.target as HTMLInputElement).value)}
-        />
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class={LABEL} for="req-qty">Jumlah</label>
-          <input
-            id="req-qty"
-            class={FIELD}
-            type="number"
-            min="1"
-            value={qty}
-            onInput={(e: Event) => setQty((e.target as HTMLInputElement).value)}
-          />
-        </div>
-        <div>
-          <label class={LABEL} for="req-unit">Satuan</label>
-          <Select
-            id="req-unit"
-            value={unit}
-            onChange={(e: Event) => setUnit((e.target as HTMLSelectElement).value)}
-          >
-            {units.map((u) => <option key={u} value={u}>{u}</option>)}
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <label class={LABEL} for="req-reason">Kenapa perlu?</label>
-        <textarea
-          id="req-reason"
-          class={`${FIELD} min-h-20 py-3`}
-          rows={2}
-          value={reason}
-          onInput={(e: Event) => setReason((e.target as HTMLTextAreaElement).value)}
-        />
-        {/* Said before it is refused, not after. It is the only required field that is not
-            needed to place an order, so it looks optional until somebody explains it. */}
-        <p class="mt-1 text-xs text-slate-500">
-          Wajib — supaya pengurus bisa memutuskan tanpa bertanya lagi.
-        </p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class={LABEL} for="req-price">Perkiraan harga</label>
-          <input
-            id="req-price"
-            class={FIELD}
-            type="number"
-            inputmode="numeric"
-            placeholder="opsional"
-            value={price}
-            onInput={(e: Event) => setPrice((e.target as HTMLInputElement).value)}
-          />
-        </div>
-        <div>
-          <label class={LABEL} for="req-url">Tautan toko</label>
-          <input
-            id="req-url"
-            class={FIELD}
-            type="url"
-            placeholder="opsional"
-            value={url_}
-            onInput={(e: Event) => setUrl((e.target as HTMLInputElement).value)}
-          />
-        </div>
-      </div>
-
-      {error && <p class={ERROR_TEXT} role="alert">{error}</p>}
-
-      <Button
-        type="submit"
-        size="touch"
-        class="w-full"
-        disabled={busy || !name.trim() || !reason.trim() || !(Number(qty) > 0)}
-      >
-        {busy ? 'Mengirim…' : 'Kirim pengajuan'}
-      </Button>
-    </form>
+      <RequestForm
+        items={items}
+        instances={instances}
+        requestId={requestId}
+        prefill={prefill}
+        onSubmit={(input) => void submit(input)}
+        onCancel={onDone}
+      />
+    </div>
   );
 }

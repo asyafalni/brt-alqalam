@@ -1,9 +1,12 @@
 // The path a marbot actually takes to report a broken tool.
 //
-// "Ajukan perbaikan" on the Aset screen navigates to #/pengajuan with the unit prefilled. Once
-// that screen became admin-only, the link bounced every non-admin back to Beranda — making it a
-// dead button for exactly the people most likely to press it, since the person who FINDS a
-// broken knife is a marbot, not somebody with a Clerk password.
+// "Ajukan perbaikan" on the Aset screen opens the request form with the unit prefilled. Once
+// the Pengajuan screen became admin-only, the link bounced every non-admin back to Beranda —
+// making it a dead button for exactly the people most likely to press it, since the person who
+// FINDS a broken knife is a marbot, not somebody with a Clerk password.
+//
+// The form itself is the SHARED `RequestForm`, so these assert its fields rather than a second
+// set: a private copy of the same eight questions is how the photo picker went missing once.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@octanejs/testing-library';
@@ -46,30 +49,37 @@ describe('a prefilled repair link, on a device with no admin', () => {
   it('opens the form instead of bouncing to Beranda', async () => {
     location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
     const r = render(App);
-    await vi.waitFor(() => expect(r.getByLabelText('Barang apa?')).toBeTruthy());
+    await vi.waitFor(() => expect(r.getByLabelText('Unit yang rusak')).toBeTruthy());
   });
 
   it('names the unit, so the request is not "one of the six knives"', async () => {
     location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
     const r = render(App);
     await vi.waitFor(() => {
-      expect((r.getByLabelText('Barang apa?') as HTMLInputElement).value)
-        .toBe('Pisau potong #1');
+      expect((r.getByLabelText('Unit yang rusak') as HTMLInputElement).value)
+        .toBe('ALQ-PISAU-001');
     });
-    expect(r.getByText(/ALQ-PISAU-001/)).toBeTruthy();
+  });
+
+  it('offers the photo picker the admin form has — one form, not two', async () => {
+    location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
+    const r = render(App);
+    await vi.waitFor(() => expect(r.getByLabelText('Unit yang rusak')).toBeTruthy());
+    expect(r.container.querySelector('input[type="file"]')).toBeTruthy();
   });
 
   it('opens on Perbaikan, not on Beli baru', async () => {
     location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
     const r = render(App);
-    await vi.waitFor(() => expect(r.getByLabelText('Barang apa?')).toBeTruthy());
-    expect(r.getByRole('button', { name: 'Perbaikan' }).getAttribute('aria-pressed')).toBe('true');
+    await vi.waitFor(() => expect(r.getByLabelText('Unit yang rusak')).toBeTruthy());
+    // The unit picker only exists on a repair, so its presence IS the mode.
+    expect(r.getByLabelText('Unit yang rusak')).toBeTruthy();
   });
 
   it('lands them back on Aset, where the unit is — not on Beranda', async () => {
     location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
     const r = render(App);
-    await vi.waitFor(() => expect(r.getByLabelText('Barang apa?')).toBeTruthy());
+    await vi.waitFor(() => expect(r.getByLabelText('Unit yang rusak')).toBeTruthy());
     // Somebody working down a list of broken units should not have to find their place again.
     expect(location.hash).toBe('#/aset');
   });
