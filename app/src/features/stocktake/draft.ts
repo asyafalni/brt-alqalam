@@ -11,6 +11,10 @@ import type {
   AssetInstance, Category, Item, Kind, Location, StockLine, TrackBy,
 } from '../../../../domain/types';
 import { linesAt, setLine, totalFor } from '../../../../domain/stock';
+import {
+  CATEGORY_COLUMNS, ITEM_COLUMNS, LOCATION_COLUMNS, REQUEST_COLUMNS, STOCK_COLUMNS,
+  categoryRow, itemRow, locationRow, requestRow, stockRow,
+} from '../../../../data/rows';
 import type { PurchaseRequest } from '../../../../domain/requests';
 
 /**
@@ -114,64 +118,37 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 // Export — must match sheets/Items.csv exactly, because it is imported into that tab.
 // ---------------------------------------------------------------------------
 
-const ITEMS_HEADER =
-  'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,keterangan,artId';
-const STOCK_HEADER = 'itemId,locationId,initialStock';
-const REQUESTS_HEADER =
-  'requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note';
-
 const cell = (v: string): string => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
+/**
+ * A CSV built from the shared column list, not from a second copy of it.
+ *
+ * The header and the cell order come from the SAME array the gateway write path uses
+ * (`data/rows.ts`), so a column can no longer be added to one writer and forgotten in the
+ * other — which is the drift that produced a silently blank `locationId` on every movement.
+ */
+function toCsv<T>(
+  columns: readonly string[], rows: readonly T[], build: (row: T) => Record<string, string>,
+): string {
+  const body = rows.map((r) => {
+    const obj = build(r);
+    return columns.map((c) => cell(obj[c] ?? '')).join(',');
+  });
+  return [columns.join(','), ...body].join('\n') + '\n';
+}
+
 export function toItemsCsv(items: readonly Item[]): string {
-  const rows = items.map((i) => [
-    i.itemId,
-    i.barcode,
-    i.name,
-    i.categoryId,
-    i.kind,
-    i.unit,
-    i.trackBy,
-    i.minStock == null ? '(-)' : String(i.minStock),
-    i.active ? 'TRUE' : 'FALSE',
-    /* §67: the NOTIFIKASI STOK screen sources its KETERANGAN column from the item, not from
-       the breaching transaction. It was missing from this writer while the sheet template and
-       the gateway's own header check both expected it — so an export from the stock-take
-       produced a file `checkSpreadsheet()` would reject, and the round trip the whole CSV
-       path exists for did not close. */
-    i.keterangan ?? '',
-    i.artId ?? '',
-  ].map(cell).join(','));
-  return [ITEMS_HEADER, ...rows].join('\n') + '\n';
+  return toCsv(ITEM_COLUMNS, items, itemRow);
 }
 
 /** Purchase requests. Not stock: a request is what we WANT, an item is what we OWN. */
 export function toRequestsCsv(requests: readonly PurchaseRequest[]): string {
-  const rows = requests.map((r) => [
-    r.requestId,
-    r.type,
-    r.name,
-    r.itemId ?? '',
-    r.assetId ?? '',
-    String(r.qty),
-    r.unit,
-    r.price == null ? '' : String(r.price),
-    r.reason,
-    r.url ?? '',
-    r.status,
-    r.requestedBy,
-    new Date(r.requestedTs).toISOString(),
-    r.decidedBy ?? '',
-    r.decidedTs == null ? '' : new Date(r.decidedTs).toISOString(),
-    r.note ?? '',
-  ].map(cell).join(','));
-  return [REQUESTS_HEADER, ...rows].join('\n') + '\n';
+  return toCsv(REQUEST_COLUMNS, requests, requestRow);
 }
 
 /** One row per (barang × rak). A blank locationId is the unplaced pile, not a missing value. */
 export function toStockCsv(stock: readonly StockLine[]): string {
-  const rows = stock.map((l) =>
-    [l.itemId, l.locationId, String(l.initialStock)].map(cell).join(','));
-  return [STOCK_HEADER, ...rows].join('\n') + '\n';
+  return toCsv(STOCK_COLUMNS, stock, stockRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,21 +360,12 @@ export function deleteLocation(locations: readonly Location[], locationId: strin
   return locations.filter((l) => l.locationId !== locationId);
 }
 
-const LOCATIONS_HEADER = 'locationId,code,name,zone,order,active,artId';
-
 export function toLocationsCsv(locations: readonly Location[]): string {
-  const rows = locations.map((l) =>
-    [l.locationId, l.code, l.name, l.zone, String(l.order), l.active ? 'TRUE' : 'FALSE',
-      l.artId ?? ''].map(cell).join(','));
-  return [LOCATIONS_HEADER, ...rows].join('\n') + '\n';
+  return toCsv(LOCATION_COLUMNS, locations, locationRow);
 }
 
-const CATEGORIES_HEADER = 'categoryId,name,order,active';
-
 export function toCategoriesCsv(categories: readonly Category[]): string {
-  const rows = categories.map((c) =>
-    [c.categoryId, c.name, String(c.order), c.active ? 'TRUE' : 'FALSE'].map(cell).join(','));
-  return [CATEGORIES_HEADER, ...rows].join('\n') + '\n';
+  return toCsv(CATEGORY_COLUMNS, categories, categoryRow);
 }
 
 // ---------------------------------------------------------------------------

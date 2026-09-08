@@ -1667,3 +1667,101 @@ with reality either:
 
 The register still cannot be shared. What is proven is that the path from a sticker to a recorded
 movement is real, which is the part nobody could argue their way to.
+
+# Part XXV — Admin login, and what a login is actually for (v1.15)
+
+Recorded 2026-09-08, from the owner's question: *"berarti kita perlu implement login clerk untuk
+menjaganya kan ya?"* — followed by the decision that settles §12.4: **"tidak masalah kalo orang
+lihat asal mereka tidak bisa edit."**
+
+## 98. A login is not what protects reading, and cannot be
+
+The instinct was that Clerk is the lock on the door. It is not, and saying so precisely matters
+because the alternative is building the wrong thing:
+
+- **The gateway URL cannot be gated at all.** Apps Script has no `doOptions`, so a browser cannot
+  send an `Authorization` header; the deployment must be `ANYONE_ANONYMOUS` (§65.1). Anyone with
+  the `/exec` URL can call it, today and forever.
+- **What protects identities is the TIER SPLIT, which already existed** (§39). The public tier
+  carries stock, racks and movements with `actorUserId` stripped to `WITHHELD`; `Requests` is not
+  sent at all. Verified against the live deployment, not assumed.
+- **What Clerk protects is WRITING, and the admin surface.** That is the gap it was needed for.
+
+The write paths were probed against the live gateway with no credentials — `append` → `no_session`,
+a guessed session token → `session_expired`, `openSession` with a made-up device secret →
+`device_not_enrolled`, `stateDetailed` → `no_session`, an invented op → `unknown_op`. The owner's
+condition is therefore met by construction rather than by intention.
+
+> ⚠️ **A probe that "proves" nothing is worse than no probe.** The first two runs of exactly that
+> check returned Google HTML for every POST and looked like a catastrophic finding. Both were
+> curl artefacts: the first hit a placeholder URL copied out of documentation, and the second used
+> `-X POST`, which forces the method onto Apps Script's 302 redirect — whose target only answers
+> GET. The lesson is not about curl. It is that a security probe needs a **positive control**:
+> `?op=ping` returning a version string is what distinguishes "the gateway refused you" from
+> "you never reached the gateway".
+
+## 99. The residual risk, named rather than solved
+
+The `/exec` URL is a semi-secret. If it leaks, a stranger reads item names, quantities and rack
+codes — not people, not requests. The mitigation is **not** a login (impossible); it is rotating
+the deployment, which disconnects every enrolled device. Cheap now at two devices, expensive
+later. The owner has accepted the exposure, which is a legitimate call and matches §39's intent
+that a PII-free view be publicly reachable.
+
+## 100. `putCatalog`: whole tabs, one lock, and a revision
+
+Admin writes are **whole-tab replacements** of the five catalog tabs, because that is the shape
+the app already has — every `Draft` setter is `(prev) => next` over an entire array, so a granular
+row API would be a translation layer neither side asked for. The tabs are small; the write is one
+`setValues`.
+
+**`Transactions` is not among the writable tabs and never will be.** The log has exactly one
+writer — `append`, behind a PIN session — and a "put" that could reach it would turn one mistyped
+request body into a silently rewritten history (§58.4). The consequence is deliberate and visible
+in the code: `setTxns` and `setRepair` stay noops even for a signed-in admin, because both write
+movements. Finishing a repair from a connected admin screen needs the movement path, not this one.
+
+**Two admins editing at once is the normal case**, not an edge one — one walks the gudang while
+another tidies names at a desk. So every read carries a `rev`, every write sends the `rev` it was
+built on, and a mismatch is **refused, never merged**: with whole-tab writes there is nothing to
+merge against, and a silent three-way guess is exactly the confident wrong answer §0 says is
+worse than no system.
+
+**One column list, not two.** `data/rows.ts` now holds each tab's columns once; the stock-take's
+CSV export and the gateway write path both consume it, and a test pins every list to
+`sheets/*.csv`. This is the direct lesson of the `locationId` bug — two lists that must agree
+produced a blank column on every movement while every screen looked correct.
+
+## 101. Clerk is loaded, never bundled
+
+`@clerk/clerk-js` ships hard dependencies on Solana, Coinbase, Base and Stripe (§64.2). It is
+therefore injected as a CDN `<script>` the first time somebody opens `#/admin`, which on a gudang
+tablet is never. Measured on the built bundle: **four string occurrences** of "clerk" — the CDN
+URL, the data attribute, the package path — and **zero** occurrences of any wallet or payments
+library. The marbot's PIN path still works when Clerk's servers are unreachable, which is the
+property that mattered.
+
+**The role is checked at the gateway, not read from the browser's user object**, even though a
+round trip is slower than reading a field already in memory. A role the browser reports is a claim
+the browser makes about itself; the gateway reads `role` out of a payload whose HS256 signature it
+verified. `whoami` exists for the one failure this creates: a token that verifies perfectly but
+carries no `role` claim is, from the app, identical to "you are not an admin" — and the fix lives
+in a Clerk JWT template that nobody opens when a button is greyed out. The screen names which of
+the two it is.
+
+## 102. Admins read the detailed tier with their own credential
+
+An admin may edit `Requests`, and the public tier omits that tab entirely — so without this an
+admin would be saving into the dark. `stateDetailed` now accepts **either** a PIN session or a
+Clerk admin token, and it moved to POST so the token travels in the body: a JWT in a query string
+is a credential written into browser history and every log in between, and a 60-second lifetime
+shortens that window without excusing it.
+
+## 103. Not yet proven, and stated as such
+
+The **admin success path has never run against the live gateway.** Every refusal has been verified
+there; no write has, because doing so needs a Clerk admin token, which needs the HS256 signing key
+— a symmetric key whose holder can *mint* admin tokens, and which therefore must live only in
+Apps Script Script Properties and never in a transcript. What is proven is the shape of the
+refusals and 31 gateway tests against a fake spreadsheet. **The first real admin save is a test
+the owner has to run**, and it is the one remaining unknown in this Part.

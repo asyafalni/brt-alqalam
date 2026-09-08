@@ -48,7 +48,13 @@ export type Route =
    */
   | { name: 'pengajuan'; type?: 'beli' | 'perbaikan'; assetId?: string }
   | { name: 'scan'; target: 'item' | 'asset' | 'location'; id: string }
-  | { name: 'scan-empty' };
+  | { name: 'scan-empty' }
+  /**
+   * The one route that loads Clerk. Everything else on a kiosk runs without it, which is why
+   * it is a route at all rather than a modal: reaching it is a deliberate act, and until
+   * somebody performs it the tablet has never fetched a byte of Clerk (§64.2).
+   */
+  | { name: 'admin' };
 
 /** Accepts a raw `location.hash` ("#/scan?i=X"), with or without the leading "#". */
 export function parseRoute(hash: string): Route {
@@ -104,6 +110,7 @@ export function parseRoute(hash: string): Route {
     return id ? { name: 'racks', id } : { name: 'racks' };
   }
   if (path === '/pindai') return { name: 'pindai' };
+  if (path === '/admin') return { name: 'admin' };
   return { name: 'beranda' };
 }
 
@@ -129,6 +136,7 @@ export function routeToHash(route: Route): string {
     }
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';
+    case 'admin': return '#/admin';
     case 'opname': return '#/opname';
     case 'item': return `#/barang?i=${encodeURIComponent(route.id)}`;
     case 'scan': {

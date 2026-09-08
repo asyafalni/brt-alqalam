@@ -116,6 +116,30 @@ the gateway maintains: stock levels, low-stock, and status *counts* only.
 3. **Create the three roles**: `admin_utama` (permanent, undeletable — your boss), `admin`,
    `anggota`. Admins sign in with a password; **anggota never sign in** — they use a PIN at the
    kiosk.
+
+   **Where the role lives, and what the template must send.** The gateway does not ask Clerk who
+   you are — it reads the token it just verified. So the role has to be *in* the token, and that
+   is a template setting nobody would guess:
+
+   - Put the role on each user at **Users → (user) → Metadata → Public metadata**:
+     ```json
+     { "role": "admin" }
+     ```
+   - Then make the `gateway` JWT template emit it, alongside a display name:
+     ```json
+     { "role": "{{user.public_metadata.role}}", "name": "{{user.full_name}}" }
+     ```
+     (`sub` — the user id — Clerk always includes; the gateway reads that for `actorUserId`.)
+
+   **`public_metadata` is correct here, and it is NOT a contradiction of the PIN rule.** §31 bans
+   `publicMetadata` for the **pinHash**, because a hash the browser can read is a hash an attacker
+   can grind offline against 10⁴ possibilities. A **role** is not a secret: the browser may read
+   it and may even lie about it, because the only copy that decides anything is the one inside a
+   token signed with a key the browser has never seen. The pinHash stays in `privateMetadata`.
+
+   **The symptom if you skip this:** sign-in works, the Admin screen says your token is valid,
+   and the role shows as empty — which looks exactly like "you are not an admin". The screen says
+   which of the two it is, because from the app they are otherwise identical.
 4. **Create the users.** Each marbot gets a Clerk user record even though they never log in —
    it is where their name and `privateMetadata.pinHash` live.
 

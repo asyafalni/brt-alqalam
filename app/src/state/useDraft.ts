@@ -5,6 +5,7 @@ import { SEED_CATEGORIES } from '../data/seedCategories';
 import type { StoredDraft } from './persist';
 import { clearDraft, loadDraft, saveDraft } from './persist';
 import { demoDraft } from '../data/demo';
+import type { CatalogPatch, CatalogWriter } from './useCatalogWriter';
 import type { GatewayState } from '../../../data/gateway';
 
 export interface Draft {
@@ -127,30 +128,66 @@ export function useDraft(): Draft {
  * writer of `Transactions` and it has no endpoint for anything else, and that is not an
  * omission — one writer over an append-only log is what makes every derived number trustworthy.
  */
-export function gatewayDraft(state: GatewayState, txns: Txn[], canRecord: boolean): Draft {
+export function gatewayDraft(
+  state: GatewayState,
+  txns: Txn[],
+  canRecord: boolean,
+  /** Present only when an admin is signed in; without it every catalog setter is a noop. */
+  writer?: CatalogWriter,
+): Draft {
   const noop = () => {};
+
+  /* What is on screen: the register, with any not-yet-visible admin write laid over it. The
+     overlay is dropped by the writer itself once a read comes back carrying the change. */
+  const p = writer?.pending;
+  const items = p?.items ?? state.items;
+  const categories = p?.categories ?? state.categories;
+  const locations = p?.locations ?? state.locations;
+  const stock = p?.stock ?? state.stock;
+  const requests = p?.requests ?? state.requests;
+
+  const edit = <T>(get: () => T, put: (next: T) => CatalogPatch) =>
+    (writer ? (u: (prev: T) => T) => writer.write(put(u(get()))) : noop);
+
   return {
-    items: state.items,
-    categories: state.categories,
-    locations: state.locations,
-    stock: state.stock,
+    items,
+    categories,
+    locations,
+    stock,
     /* Rows appended in this session are shown immediately, ahead of the next poll: a marbot
        who records a withdrawal must see the number move now, not in a minute. */
     txns,
-    requests: state.requests,
-    readOnly: true,
+    requests,
+    /* An admin edits the shared catalog; everybody else reads it. Not the same permission as
+       `canRecord`, which is about movements and is earned by a device rather than a person. */
+    readOnly: !writer,
     canRecord,
-    setItems: noop,
-    setCategories: noop,
-    setLocations: noop,
-    setStock: noop,
-    setRequests: noop,
+    setItems: edit(() => items, (next) => ({ items: next })),
+    setCategories: edit(() => categories, (next) => ({ categories: next })),
+    setLocations: edit(() => locations, (next) => ({ locations: next })),
+    setStock: edit(() => stock, (next) => ({ stock: next })),
+    setRequests: edit(() => requests, (next) => ({ requests: next })),
+    setCatalog: edit(
+      () => ({ items, stock }),
+      (next) => ({ items: next.items, stock: next.stock }),
+    ),
+    setPurchase: edit(
+      () => ({ items, stock, requests }),
+      (next) => ({ items: next.items, stock: next.stock, requests: next.requests }),
+    ),
+    /*
+     * These two stay noops even for an admin, and the boundary is deliberate rather than
+     * unfinished: both write to `Transactions`, and the log has exactly ONE writer — `append`,
+     * behind a PIN session. `putCatalog` cannot touch that tab and never will (§58.4), so
+     * finishing a repair from a connected admin screen needs the movement path, not this one.
+     */
     setTxns: noop,
     setRepair: noop,
-    setPurchase: noop,
-    setCatalog: noop,
+    /* Local-draft-only. There is nothing to reset or seed when the catalog is the masjid's
+       actual spreadsheet, and an import belongs in the sheet where it can be reviewed first. */
     reset: noop,
     loadDemo: noop,
     loadFrom: noop,
   };
 }
+

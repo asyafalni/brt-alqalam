@@ -53,6 +53,9 @@ function doPost(e) {
       case 'openSession': return handleOpenSession(body);
       case 'closeSession': return handleCloseSession(body);
       case 'append': return handleAppend(body);
+      case 'putCatalog': return handlePutCatalog(body);
+      case 'whoami': return handleWhoami(body);
+      case 'stateDetailed': return handleDetailedRead(body);
       default: return fail('unknown_op');
     }
   } catch (err) {
@@ -66,7 +69,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.2.0-locationId';
+var GATEWAY_VERSION = '0.4.0-admin-read';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -183,13 +186,10 @@ function handleAppend(body) {
         toStatus: entry.toStatus || '',
         reversesTxnId: entry.reversesTxnId || '',
       };
-      /* Fails loudly rather than writing a blank: `TXN_COLUMNS` and this literal are two lists
-         that must agree, and the last time they drifted the result was a silently empty column
-         nobody noticed for a week. */
-      for (var c = 0; c < TXN_COLUMNS.length; c++) {
-        if (!(TXN_COLUMNS[c] in txn)) return fail('column_not_built', { column: TXN_COLUMNS[c] });
-      }
-      rows.push(TXN_COLUMNS.map(function (c) { return txn[c]; }));
+      // Fails loudly rather than writing a blank — see `txnRow`, which every writer shares.
+      var built = txnRow(txn);
+      if (!built.ok) return fail('column_not_built', { column: built.column });
+      rows.push(built.row);
       appended.push(txn);
     }
 
@@ -199,6 +199,115 @@ function handleAppend(body) {
     }
 
     return respond({ ok: true, appended: appended, duplicates: duplicates });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Clerk-signed, and the only way to change the catalog.
+// ---------------------------------------------------------------------------
+
+/**
+ * Who does the gateway think you are?
+ *
+ * Exists because the failure it diagnoses is otherwise invisible: a Clerk token that verifies
+ * perfectly but carries no `role` claim is indistinguishable, from the app, from "you are not
+ * an admin" — and the fix (add the claim to the JWT template) is in a console nobody thinks to
+ * open. This says which of the two it is.
+ */
+function handleWhoami(body) {
+  var who = verifyClerk(body.token);
+  if (!who.ok) return fail(who.error);
+  return respond({
+    ok: true,
+    who: { userId: who.uid, name: who.name, role: who.role },
+    isAdmin: who.role === 'admin' || who.role === 'admin_utama',
+  });
+}
+
+/**
+ * Replaces whole catalog tabs, under one lock, for a signed-in admin.
+ *
+ * WHOLE TABS rather than per-row operations, because that is the shape the app already has:
+ * every setter in `Draft` is `(prev) => next` over an entire array, so a granular API would be
+ * a translation layer with nothing on either side asking for it. These tabs are small — fifty
+ * items, fourteen racks — and the write is one `setValues`.
+ *
+ * The log is NOT among them. Movements are appended and never rewritten (§58.4); an admin who
+ * needs to undo one appends a reversal.
+ */
+/**
+ * The detailed tier, for either kind of credential.
+ *
+ * A PIN session and a Clerk admin token are different things that earn the same read: the
+ * marbot at the kiosk needs to see who has the drill, and so does the admin editing the
+ * request list. Without this an admin could WRITE `Requests` and never SEE them — the public
+ * tier omits that tab entirely (§39) — which is a screen that saves into the dark.
+ *
+ * It is a POST rather than a GET so the token travels in the body. A JWT in a query string ends
+ * up in logs and history; a 60-second lifetime shortens that exposure but does not excuse it.
+ */
+function handleDetailedRead(body) {
+  if (body.token) {
+    var who = requireAdmin(body.token);
+    if (!who.ok) return fail(who.error);
+    return respond({ ok: true, state: readDetailedState() });
+  }
+  var session = requireSession(body.session);
+  if (!session.ok) return fail(session.error, { retryAfterMs: session.retryAfterMs });
+  return respond({ ok: true, state: readDetailedState() });
+}
+
+function handlePutCatalog(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var tabs = body.tabs || {};
+  var names = Object.keys(tabs);
+  if (!names.length) return fail('no_tabs');
+  for (var i = 0; i < names.length; i++) {
+    if (WRITABLE_TABS.indexOf(names[i]) === -1) return fail('tab_not_writable', { tab: names[i] });
+    if (!Array.isArray(tabs[names[i]])) return fail('tab_not_array', { tab: names[i] });
+    if (tabs[names[i]].length > MAX_TAB_ROWS) return fail('too_many_rows', { tab: names[i] });
+  }
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return fail('busy');
+
+  try {
+    /* The whole point of `rev`: refuse a save built on a catalog somebody else has already
+       changed. Merging is not attempted — with whole-tab writes there is nothing to merge
+       against, and a silent three-way guess is exactly the kind of confident wrong answer §0
+       says is worse than no system. The client re-reads and the admin sees the current state. */
+    if (body.rev !== undefined && Number(body.rev) !== catalogRev()) {
+      return fail('stale_rev', { rev: catalogRev() });
+    }
+
+    for (var t = 0; t < names.length; t++) writeTab(names[t], tabs[names[t]]);
+
+    /* The audit trail §29 asks for. One row per save, not per changed field: HISTORI DATA has
+       eight stock-shaped columns with nowhere to put a renamed category (§71.3), so what goes
+       in is the fact that an admin changed these tabs, when, and who — which is what somebody
+       reading the log actually wants to know. */
+    var audit = {
+      txnId: Utilities.getUuid(),
+      clientTxnId: 'catalog-' + Utilities.getUuid(),
+      ts: new Date().toISOString(),
+      type: 'catalog_edit',
+      itemId: '', assetId: '', locationId: '', qtyDelta: 0, recipient: '',
+      actorUserId: who.uid,
+      condition: '', toStatus: '', reversesTxnId: '',
+      note: names.map(function (n) { return n + '=' + tabs[n].length; }).join(' '),
+    };
+    var built = txnRow(audit);
+    if (!built.ok) return fail('column_not_built', { column: built.column });
+    var sheet = txnSheet();
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, TXN_COLUMNS.length).setValues([built.row]);
+
+    var rev = bumpCatalogRev();
+    SpreadsheetApp.flush();
+    return respond({ ok: true, rev: rev, wrote: names, by: who.name || who.uid });
   } finally {
     lock.releaseLock();
   }

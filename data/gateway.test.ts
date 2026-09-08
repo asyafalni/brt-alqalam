@@ -4,8 +4,14 @@ import {
 } from './gateway';
 
 const URL = 'https://script.google.com/macros/s/X/exec';
-const reply = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body)));
-const raw = (text: string) => vi.fn(async () => new Response(text));
+// The parameters are declared so `mock.calls[0]` is a typed pair rather than an empty tuple:
+// without them every assertion about the URL or the request init fails to typecheck, which
+// left `tsrx-tsc` permanently red and therefore useless as a gate.
+const reply = (body: unknown) =>
+  vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+    new Response(JSON.stringify(body)));
+const raw = (text: string) =>
+  vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(text));
 
 describe('reading the register', () => {
   it('turns the gateway\'s string rows into domain types', () => {

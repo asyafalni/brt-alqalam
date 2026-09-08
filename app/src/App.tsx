@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
-import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package } from '@octanejs/lucide';
+import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package, TriangleAlert } from '@octanejs/lucide';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
-import { Card } from './components/ui';
+import { Card, PageHeader } from './components/ui';
 import { Sheet } from './components/Sheet';
 import { StockAlerts } from './features/alerts/StockAlerts';
 import { openRequests } from '../../domain/requests';
@@ -45,6 +45,9 @@ import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
+import { useCatalogWriter } from './state/useCatalogWriter';
+import { AdminPanel } from './features/admin/AdminPanel';
+import type { AdminSession } from './features/admin/AdminPanel';
 import { append, closeSession, GatewayError, openSession } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
 import { enqueue, pending, pendingCount, settle } from '../../data/outbox';
@@ -76,8 +79,21 @@ export function App() {
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
      reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
+  /* An admin signed in with Clerk. Held here rather than inside the Admin screen because it is
+     what turns every catalog setter in the app from a noop into a write — the sign-in is on one
+     screen, the editing is on all of them. */
+  const [admin, setAdmin] = useState<AdminSession | null>(null);
+  const writer = useCatalogWriter(
+    connection?.url, register.state?.rev ?? 0, admin?.getToken, register.refresh,
+  );
+
   const draft = register.state
-    ? gatewayDraft(register.state, [...register.state.txns, ...freshTxns], canRecord(connection))
+    ? gatewayDraft(
+      register.state,
+      [...register.state.txns, ...freshTxns],
+      canRecord(connection),
+      admin ? writer : undefined,
+    )
     : localDraft;
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
@@ -195,6 +211,26 @@ export function App() {
             rendered inside it *below* the z-40 navbar, however high its own z-index went.
             Without the index, `relative` creates no context and an overlay reaches the top. */}
         <main class="custom-scrollbar relative flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pb-8">
+          {/* At the frame, not on the Admin screen: a catalog edit is made from Opname, from a
+              rack, from the item page — so the news that it did NOT save has to reach whichever
+              screen the admin was on when they made it. Silence here means an admin walks away
+              believing the sheet has something it does not. */}
+          {writer.error && (
+            <div
+              role="alert"
+              class="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4"
+            >
+              <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+              <p class="flex-1 text-sm text-slate-800">{writer.error}</p>
+              <button
+                type="button"
+                class="shrink-0 text-sm font-semibold text-slate-500 hover:text-slate-900"
+                onClick={writer.clearError}
+              >
+                Tutup
+              </button>
+            </div>
+          )}
           {route.name === 'beranda' && (
             <Dashboard
               draft={draft}
@@ -286,6 +322,15 @@ export function App() {
           )}
           {route.name === 'laporan' && (
             <Report draft={draft} inventory={inventory} now={now} />
+          )}
+          {route.name === 'admin' && (
+            <div class="space-y-6 pt-2">
+              <PageHeader
+                title="Admin"
+                subtitle="Masuk dengan akun Clerk untuk mengubah katalog bersama."
+              />
+              <AdminPanel connection={connection} admin={admin} onAdmin={setAdmin} />
+            </div>
           )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>

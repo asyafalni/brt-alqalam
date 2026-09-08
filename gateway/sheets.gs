@@ -110,6 +110,7 @@ function readPublicState() {
       });
       return copy;
     }),
+    rev: catalogRev(),
     serverTs: new Date().toISOString(),
     tier: 'public',
   };
@@ -128,6 +129,7 @@ function readDetailedState() {
        low-stock and status counts alone. */
     requests: readTab('Requests'),
     txns: readTab('Transactions'),
+    rev: catalogRev(),
     serverTs: new Date().toISOString(),
     tier: 'detailed',
   };
@@ -191,4 +193,82 @@ function checkSpreadsheet() {
   Logger.log(problems
     ? problems + ' PROBLEM(S). Fix these before deploying — the app cannot read past them.'
     : 'All ' + Object.keys(REQUIRED_TABS).length + ' tabs present and correct.');
+}
+
+// ---------------------------------------------------------------------------
+// Catalog writes — admin only (design doc Part XXV).
+// ---------------------------------------------------------------------------
+
+/*
+ * The tabs an admin may rewrite, and the ONE that is deliberately absent.
+ *
+ * `Transactions` is not here and must never be: it is the append-only core the whole register
+ * derives from (§58.4), and a "put" that could replace it would turn one mistyped request body
+ * into a silently rewritten history. Movements have exactly one way in — `append`.
+ *
+ * `AssetInstances` is also absent, but for a duller reason: nothing in the app edits it, so
+ * exposing it would be a write path with no caller and no test.
+ */
+var WRITABLE_TABS = ['Categories', 'Locations', 'Items', 'Stock', 'Requests'];
+
+/** Guards against a runaway body rewriting the sheet with nonsense. */
+var MAX_TAB_ROWS = 5000;
+
+/**
+ * One list, one guard.
+ *
+ * `TXN_COLUMNS` and the object a caller builds are two lists that must agree, and the last time
+ * they drifted the result was a silently empty `locationId` on every movement. Every writer goes
+ * through here so there is one place that can catch it.
+ */
+function txnRow(txn) {
+  for (var c = 0; c < TXN_COLUMNS.length; c++) {
+    if (!(TXN_COLUMNS[c] in txn)) return { ok: false, column: TXN_COLUMNS[c] };
+  }
+  return { ok: true, row: TXN_COLUMNS.map(function (c) { return txn[c]; }) };
+}
+
+/**
+ * A counter that changes whenever the catalog does.
+ *
+ * Two admins editing the same tab from two phones is not hypothetical — it is the normal case
+ * for a stock-take, where one walks the gudang while another tidies names at a desk. Without
+ * this, the second save silently discards the first, and nobody finds out because both screens
+ * look right. The client sends the `rev` it read; a mismatch is refused, not merged.
+ */
+function catalogRev() {
+  return Number(PropertiesService.getScriptProperties().getProperty('CATALOG_REV') || '0');
+}
+
+function bumpCatalogRev() {
+  var next = catalogRev() + 1;
+  PropertiesService.getScriptProperties().setProperty('CATALOG_REV', String(next));
+  return next;
+}
+
+/**
+ * Replaces a tab's data rows, keeping its header.
+ *
+ * Column ORDER comes from `REQUIRED_TABS`, never from the incoming object's key order: a client
+ * that serialises its keys differently would otherwise write every value into the wrong column,
+ * which reads as corrupted data rather than as a bad request. Unknown keys are dropped and
+ * missing ones written blank, so a client one version behind degrades instead of failing.
+ */
+function writeTab(name, rows) {
+  var header = REQUIRED_TABS[name];
+  if (!header) throw new Error('Tab "' + name + '" is not writable.');
+  var sheet = sheetNamed(name);
+  var values = rows.map(function (r) {
+    return header.map(function (col) {
+      var v = r[col];
+      return (v === null || v === undefined) ? '' : String(v);
+    });
+  });
+
+  // Clear only the data, never the header: rewriting row 1 would let a client rename the
+  // columns, and `checkSpreadsheet` would then be the only thing standing between that and a
+  // register whose every row is quarantined.
+  var last = sheet.getLastRow();
+  if (last > 1) sheet.getRange(2, 1, last - 1, header.length).clearContent();
+  if (values.length) sheet.getRange(2, 1, values.length, header.length).setValues(values);
 }

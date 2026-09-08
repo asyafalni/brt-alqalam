@@ -16,7 +16,7 @@
 // and so flips only once the panel has finished leaving.
 
 import { useRef } from 'octane';
-import { ChartColumn, ChevronLeft, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShoppingCart, Wrench } from '@octanejs/lucide';
+import { ChartColumn, ChevronLeft, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShieldCheck, ShoppingCart, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 import { Logo } from './Logo';
 import { useDialog } from './useDialog';
@@ -68,6 +68,11 @@ export function Sidebar(p: Props) {
     // drop to when the summary looks wrong.
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
     { name: 'Histori Data', icon: History, route: { name: 'histori' } },
+    /* Last, and the only entry that leads anywhere a marbot has no business going. It stays in
+       the list rather than hiding behind a gesture: an admin has to be able to FIND it, and
+       hiding it would protect nothing — the password is what protects it, and tapping through
+       to a sign-in form costs a curious marbot ten seconds and teaches them it is not for them. */
+    { name: 'Admin', icon: ShieldCheck, route: { name: 'admin' } },
   ];
 
   /*

@@ -42,6 +42,14 @@ export interface GatewayState {
   /** The gateway's own clock. Used in preference to the device's, which may be wrong. */
   serverTs: number;
   tier: 'public' | 'detailed';
+  /**
+   * The catalog's revision when this state was read.
+   *
+   * Sent back with any admin write so the gateway can refuse a save built on a catalog somebody
+   * else has already changed. Zero on a gateway that predates it, which reads as "never edited"
+   * and is the safe interpretation: the first write then sets the counter honestly.
+   */
+  rev: number;
   /** Rows the sheet holds but the model rejects. Surfaced, never silently dropped. */
   quarantined: { tab: string; issues: ParseIssue[] }[];
 }
@@ -182,6 +190,7 @@ export function readState(raw: Record<string, unknown>): GatewayState {
        depend on it, and a tablet with a wrong clock would corrupt both silently (§4.1). */
     serverTs: Date.parse(String(raw.serverTs ?? '')) || Date.now(),
     tier,
+    rev: Number(raw.rev) || 0,
     quarantined,
   };
 }
@@ -235,4 +244,77 @@ export async function append(
     appended: rows.ok,
     duplicates: Array.isArray(json.duplicates) ? (json.duplicates as string[]) : [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Clerk-signed catalog writes.
+// ---------------------------------------------------------------------------
+
+export interface Whoami {
+  userId: string;
+  name: string;
+  /** Empty when the token verified but the JWT template emits no `role` claim. */
+  role: string;
+  isAdmin: boolean;
+}
+
+/**
+ * Who the gateway thinks the signed-in person is.
+ *
+ * Worth a round trip before showing an admin screen, because the one misconfiguration that
+ * bites here is invisible from the client: a token that verifies perfectly but carries no
+ * `role` claim is, from the app's side, identical to "this person is not an admin". The fix
+ * lives in Clerk's JWT template, which is not a place anybody looks when a button is greyed out.
+ */
+export async function whoami(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<Whoami> {
+  const json = await call(url, { op: 'whoami', token }, fetchImpl);
+  const who = (json.who ?? {}) as Record<string, unknown>;
+  return {
+    userId: String(who.userId ?? ''),
+    name: String(who.name ?? ''),
+    role: String(who.role ?? ''),
+    isAdmin: json.isAdmin === true,
+  };
+}
+
+/** The catalog tabs an admin may replace. The log is not among them, and never will be. */
+export interface CatalogTabs {
+  Categories?: readonly Record<string, unknown>[];
+  Locations?: readonly Record<string, unknown>[];
+  Items?: readonly Record<string, unknown>[];
+  Stock?: readonly Record<string, unknown>[];
+  Requests?: readonly Record<string, unknown>[];
+}
+
+/**
+ * Replace whole catalog tabs.
+ *
+ * `rev` is the revision the caller last read. The gateway refuses a mismatch rather than
+ * merging, and the caller's job on `stale_rev` is to re-read and show the admin what is
+ * actually there — never to retry with the same body, which would be overwriting somebody
+ * else's save on purpose.
+ */
+export async function putCatalog(
+  url: string, token: string, rev: number, tabs: CatalogTabs, fetchImpl: typeof fetch = fetch,
+): Promise<{ rev: number; wrote: string[] }> {
+  const json = await call(url, { op: 'putCatalog', token, rev, tabs }, fetchImpl);
+  if (typeof json.rev !== 'number') throw new GatewayError('unexpected-reply', json);
+  return { rev: json.rev, wrote: (json.wrote as string[]) ?? [] };
+}
+
+/**
+ * The detailed tier read with a Clerk admin token instead of a PIN session.
+ *
+ * A POST, unlike `fetchState`, because the token goes in the body: a JWT in a query string is a
+ * credential written into browser history and any log in between, and a 60-second lifetime
+ * shortens that window without justifying it.
+ */
+export async function fetchStateAsAdmin(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<GatewayState> {
+  const json = await call(url, { op: 'stateDetailed', token }, fetchImpl);
+  if (!json.state) throw new GatewayError('unexpected-reply', json);
+  return readState(json.state as Record<string, unknown>);
 }
