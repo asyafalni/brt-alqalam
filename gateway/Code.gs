@@ -84,7 +84,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.9.0-devices';
+var GATEWAY_VERSION = '0.10.0-admin-utama';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -379,6 +379,16 @@ function handleSetUserPin(body) {
   var who = requireAdmin(body.token);
   if (!who.ok) return fail(who.error);
 
+  /* Only the permanent super-admin may create or alter another ADMIN.
+     Enforced here rather than by hiding a dropdown: a UI restriction is decoration, and the one
+     thing an ordinary admin must not be able to do is quietly promote themselves a colleague —
+     or themselves, by renaming their own row into a higher role. */
+  var elevating = body.role === 'admin' || body.role === 'admin_utama';
+  if (elevating && who.role !== 'admin_utama') return fail('needs_admin_utama');
+  if (body.userId && who.role !== 'admin_utama' && rosterIsAdmin(body.userId)) {
+    return fail('needs_admin_utama');
+  }
+
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) return fail('busy');
   try {
@@ -400,6 +410,8 @@ function handleSetUserPin(body) {
 function handleSetUserActive(body) {
   var who = requireAdmin(body.token);
   if (!who.ok) return fail(who.error);
+  // Same rule the other way round: an admin must not be able to switch off another admin.
+  if (who.role !== 'admin_utama' && rosterIsAdmin(body.userId)) return fail('needs_admin_utama');
   var result = rosterDisable(body.userId, body.disabled === true);
   if (!result.ok) return fail(result.error);
   return respond({ ok: true, users: rosterList() });

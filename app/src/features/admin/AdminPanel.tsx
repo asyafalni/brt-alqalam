@@ -12,7 +12,7 @@
 // round trip is slower than reading a field we already have.
 
 import { useEffect, useRef, useState } from 'octane';
-import { CircleCheck, LogOut, ShieldCheck, TriangleAlert } from '@octanejs/lucide';
+import { ChevronRight, CircleCheck, LogOut, ShieldCheck, TriangleAlert, Users } from '@octanejs/lucide';
 import { whoami } from '../../../../data/gateway';
 import type { Whoami } from '../../../../data/gateway';
 import {
@@ -24,8 +24,7 @@ import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/u
 import { Logo } from '../../components/Logo';
 import { MasjidArt } from '../../components/MasjidArt';
 import { Lanterns } from '../../components/Lanterns';
-import { Roster } from './Roster';
-import { Devices } from '../gateway/Devices';
+
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
 export interface AdminSession {
@@ -497,26 +496,38 @@ export function AdminPanel(
  * becoming a second, smaller one that would drift out of step with it.
  */
 export function AdminSummary(
-  { connection, admin, onAdmin, onSignIn }:
+  { connection, admin, onAdmin, onSignIn, onManage }:
   {
     connection: Connection | null;
     admin: AdminSession | null;
     onAdmin: (a: AdminSession | null) => void;
     onSignIn: () => void;
+    /** Opens the management screen. Absent means there is nowhere to go yet. */
+    onManage?: () => void;
   },
 ) {
   if (admin) {
     return (
-      <div class="space-y-4">
+      <div class="space-y-3">
         <AdminPanel connection={connection} admin={admin} onAdmin={onAdmin} />
-        {/* Only for a signed-in admin, and only when there is a gateway to ask: the roster lives
-            in the gateway's own store, not in the spreadsheet, because a PIN hash must never be
-            in a document somebody can share (§65.4). */}
-        {connection && <Roster url={connection.url} getToken={admin.getToken} />}
-        {/* Devices below people, because that is the order somebody sets them up in: a PIN with
-            no enrolled phone cannot record anything, and the panel says so when the list is
-            empty. */}
-        {connection && <Devices url={connection.url} getToken={admin.getToken} />}
+        {/* A LINK, not the lists themselves. Two editable lists with forms in them do not fit a
+            304px column: names wrapped, buttons shrank to icons to make room, and adding
+            somebody meant working in a space narrower than a phone. The panel is good at "who
+            am I and how do I leave"; it was never going to be good at this. */}
+        {connection && onManage && (
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-slate-400"
+            onClick={onManage}
+          >
+            <Users class="h-4 w-4 shrink-0 text-slate-500" />
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-bold text-slate-900">Pengguna & Perangkat</span>
+              <span class="block text-[11px] text-slate-500">PIN, peran, dan HP yang terdaftar</span>
+            </span>
+            <ChevronRight class="h-4 w-4 shrink-0 text-slate-400" />
+          </button>
+        )}
       </div>
     );
   }

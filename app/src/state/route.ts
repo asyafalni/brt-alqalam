@@ -62,7 +62,9 @@ export type Route =
    * typed at all — which is the whole point: a marbot standing in the gudang scans once and is
    * done. Both values are consumed and dropped from the URL immediately.
    */
-  | { name: 'daftar'; gateway: string; secret: string };
+  | { name: 'daftar'; gateway: string; secret: string }
+  /** People, PINs and devices. A screen, because it outgrew the panel it started in. */
+  | { name: 'kelola' };
 
 /** Accepts a raw `location.hash` ("#/scan?i=X"), with or without the leading "#". */
 export function parseRoute(hash: string): Route {
@@ -119,6 +121,7 @@ export function parseRoute(hash: string): Route {
   }
   if (path === '/pindai') return { name: 'pindai' };
   if (path === '/admin') return { name: 'admin' };
+  if (path === '/kelola') return { name: 'kelola' };
   if (path === '/daftar') {
     const gateway = params.get('g');
     const secret = params.get('s');
@@ -150,6 +153,7 @@ export function routeToHash(route: Route): string {
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';
     case 'admin': return '#/admin';
+    case 'kelola': return '#/kelola';
     case 'daftar':
       return `#/daftar?g=${encodeURIComponent(route.gateway)}&s=${encodeURIComponent(route.secret)}`;
     case 'opname': return '#/opname';

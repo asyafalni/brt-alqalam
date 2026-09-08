@@ -106,6 +106,8 @@ const freshTabs = (): Record<string, Tab> => ({
 });
 
 const admin = token({ sub: 'usr_1', role: 'admin', name: 'Alfin' });
+/** The permanent super-admin. Only this role may create or alter another admin. */
+const utama = token({ sub: 'usr_0', role: 'admin_utama', name: 'Bos' });
 
 describe('what an admin may replace', () => {
   it('never lists Transactions — the log is appended, never rewritten', () => {
@@ -317,8 +319,9 @@ describe('the roster', () => {
 
   it('will not disable admin_utama, which the spec draws as Tetap', () => {
     const g = load2();
-    const made = g.handleSetUserPin({ token: admin, name: 'Bos', role: 'admin_utama', pin: '9999' });
-    expect(g.handleSetUserActive({ token: admin, userId: made.userId, disabled: true }))
+    const made = g.handleSetUserPin({ token: utama, name: 'Bos', role: 'admin_utama', pin: '9999' });
+    // Even admin_utama cannot switch off an admin_utama — the spec draws that account as Tetap.
+    expect(g.handleSetUserActive({ token: utama, userId: made.userId, disabled: true }))
       .toMatchObject({ ok: false, error: 'admin_utama_permanent' });
   });
 
@@ -567,5 +570,49 @@ describe('revoking a device', () => {
     g.handleRenameDevice({ token: admin, deviceId: made.deviceId, label: 'HP Budi (baru)' });
     expect(g.handleListDevices({ token: admin }).devices[0].label).toBe('HP Budi (baru)');
     expect(g.handleOpenSession({ deviceSecret: made.secret, pin: '4321' }).ok).toBe(true);
+  });
+});
+
+const plainAdmin = token({ sub: 'usr_plain', role: 'admin', name: 'Admin Biasa' });
+
+describe('only admin_utama may touch another admin', () => {
+  it('lets admin_utama create an admin', () => {
+    const g = load(freshTabs());
+    expect(g.handleSetUserPin({ token: utama, name: 'Rudi', role: 'admin', pin: '5555' }).ok)
+      .toBe(true);
+  });
+
+  it('refuses an ordinary admin creating one — no quiet promotions', () => {
+    const g = load(freshTabs());
+    expect(g.handleSetUserPin({ token: plainAdmin, name: 'Rudi', role: 'admin', pin: '5555' }))
+      .toMatchObject({ ok: false, error: 'needs_admin_utama' });
+  });
+
+  it('still lets an ordinary admin issue an anggota PIN — the daily job', () => {
+    const g = load(freshTabs());
+    expect(g.handleSetUserPin({ token: plainAdmin, name: 'Budi', role: 'anggota', pin: '4321' }).ok)
+      .toBe(true);
+  });
+
+  it("refuses an ordinary admin editing an existing admin's row", () => {
+    const g = load(freshTabs());
+    const rudi = g.handleSetUserPin({ token: utama, name: 'Rudi', role: 'admin', pin: '5555' });
+    expect(g.handleSetUserPin({
+      token: plainAdmin, userId: rudi.userId, name: 'Rudi', role: 'anggota', pin: '1111',
+    })).toMatchObject({ ok: false, error: 'needs_admin_utama' });
+  });
+
+  it('refuses an ordinary admin switching another admin off', () => {
+    const g = load(freshTabs());
+    const rudi = g.handleSetUserPin({ token: utama, name: 'Rudi', role: 'admin', pin: '5555' });
+    expect(g.handleSetUserActive({ token: plainAdmin, userId: rudi.userId, disabled: true }))
+      .toMatchObject({ ok: false, error: 'needs_admin_utama' });
+  });
+
+  it('lets an ordinary admin retire an anggota', () => {
+    const g = load(freshTabs());
+    const budi = g.handleSetUserPin({ token: plainAdmin, name: 'Budi', role: 'anggota', pin: '4321' });
+    expect(g.handleSetUserActive({ token: plainAdmin, userId: budi.userId, disabled: true }).ok)
+      .toBe(true);
   });
 });

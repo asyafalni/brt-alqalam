@@ -30,6 +30,7 @@ const REASON: Record<string, string> = {
   name_required: 'Nama tidak boleh kosong.',
   admin_utama_permanent: 'Admin Utama tidak bisa dinonaktifkan.',
   'not-admin': 'Hanya admin yang bisa mengelola PIN.',
+  needs_admin_utama: 'Hanya Admin Utama yang bisa membuat atau mengubah Admin lain.',
   offline: 'Tidak bisa menghubungi gateway.',
 };
 function explain(e: unknown): string {
@@ -41,7 +42,19 @@ function explain(e: unknown): string {
 }
 
 export function Roster(
-  { url, getToken }: { url: string; getToken: () => Promise<string> },
+  { url, getToken, canManageAdmins = false }:
+  {
+    url: string;
+    getToken: () => Promise<string>;
+    /**
+     * Whether the signed-in person is `admin_utama`.
+     *
+     * The gateway enforces this regardless — hiding a dropdown is decoration, and the one thing
+     * an ordinary admin must not be able to do is quietly promote a colleague. This only stops
+     * the screen offering an option that would be refused.
+     */
+    canManageAdmins?: boolean;
+  },
 ) {
   const [users, setUsers] = useState<RosterUser[] | null>(null);
   const [error, setError] = useState('');
@@ -147,7 +160,7 @@ export function Roster(
               onChange={(e: Event) => setRole((e.target as HTMLSelectElement).value as RosterRole)}
             >
               <option value="anggota">Anggota — mencatat dengan PIN di kios</option>
-              <option value="admin">Admin — juga bisa mengubah katalog</option>
+              {canManageAdmins && <option value="admin">Admin — PIN admin di kios</option>}
               {/* No `admin_utama`. The spec creates only Admin and Anggota in the UI (§72), and
                   a second permanent super-admin is not a thing anybody should mint by accident. */}
             </Select>

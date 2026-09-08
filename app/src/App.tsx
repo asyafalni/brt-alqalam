@@ -61,6 +61,7 @@ import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
 import { useCatalogWriter } from './state/useCatalogWriter';
 import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
+import { Manage } from './features/admin/Manage';
 import type { AdminSession } from './features/admin/AdminPanel';
 import { append, closeSession, GatewayError } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
@@ -202,6 +203,12 @@ export function App() {
      connected device still has the EMPTY local draft — so the prefilled name resolved to '' and,
      because the panel was already open by then, never resolved again. Waiting for the register
      costs one render and is the difference between "Pisau potong (Pisau #1)" and a blank field. */
+  /* Managing people and phones is an admin screen by definition: every control on it is a
+     gateway call that an admin token is the only thing that satisfies. */
+  if (route.name === 'kelola' && !admin) {
+    navigate({ name: 'beranda' });
+  }
+
   if ((route.name === 'pengajuan' || route.name === 'histori') && connection && !admin && !firstLoad) {
     /* A prefilled link is somebody trying to FILE, not to read — and it is the important case
        for repairs, because the person who finds a broken knife is a marbot, not an admin.
@@ -443,6 +450,9 @@ export function App() {
               search={search}
             />
           )}
+          {route.name === 'kelola' && admin && (
+            <Manage connection={connection} admin={admin} />
+          )}
           {route.name === 'laporan' && (
             <Report draft={draft} inventory={inventory} now={now} />
           )}
@@ -562,6 +572,7 @@ export function App() {
             admin={admin}
             onAdmin={setAdmin}
             onSignIn={() => { setAdminOpen(false); navigate({ name: 'admin' }); }}
+            onManage={() => { setAdminOpen(false); navigate({ name: 'kelola' }); }}
           />
         </Flyout>
 

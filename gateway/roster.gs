@@ -103,3 +103,15 @@ function rosterDisable(userId, disabled) {
   }
   return { ok: false, error: 'no_such_user' };
 }
+
+
+/** Whether a roster row is an admin of either kind — the rows only `admin_utama` may touch. */
+function rosterIsAdmin(userId) {
+  var users = rosterUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].userId === userId) {
+      return users[i].role === 'admin' || users[i].role === 'admin_utama';
+    }
+  }
+  return false;
+}
