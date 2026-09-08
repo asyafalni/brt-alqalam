@@ -66,6 +66,14 @@ describe('a prefilled repair link, on a device with no admin', () => {
     expect(r.getByRole('button', { name: 'Perbaikan' }).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('lands them back on Aset, where the unit is — not on Beranda', async () => {
+    location.hash = '#/pengajuan?t=perbaikan&a=ALQ-PISAU-001';
+    const r = render(App);
+    await vi.waitFor(() => expect(r.getByLabelText('Barang apa?')).toBeTruthy());
+    // Somebody working down a list of broken units should not have to find their place again.
+    expect(location.hash).toBe('#/aset');
+  });
+
   it('still keeps the LIST away from them — a bare link goes nowhere', async () => {
     location.hash = '#/pengajuan';
     const r = render(App);

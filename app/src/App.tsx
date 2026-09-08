@@ -204,7 +204,11 @@ export function App() {
         name: nameOfAsset(draft, inventory, route.assetId),
       });
     }
-    navigate({ name: 'beranda' });
+    /* Back to Aset, not Beranda, when the link named a unit: that is where the unit is, and
+       where somebody following a shared link expects to end up once the form is dealt with.
+       This path is now only for links that arrive from outside — a pasted URL, a message —
+       since the button itself no longer routes for a non-admin. */
+    navigate({ name: route.name === 'pengajuan' && route.assetId ? 'aset' : 'beranda' });
   }
 
   if (route.name === 'admin' && admin && !adminOpen) {
@@ -380,7 +384,15 @@ export function App() {
               inventory={inventory}
               search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
-              onRequest={(type, assetId) => navigate({ name: 'pengajuan', type, assetId })}
+              onRequest={(type, assetId) => {
+                /* An admin goes to the Pengajuan screen, where the new request lands in the
+                   list they can actually see. Everybody else opens the form WHERE THEY ARE:
+                   they cannot open that screen, and routing them through it only to bounce
+                   them somewhere else costs them their place on a list they were working
+                   down. Reporting a second broken knife should not mean finding it again. */
+                if (admin) { navigate({ name: 'pengajuan', type, assetId }); return; }
+                setAjukanOpen({ type, assetId, name: nameOfAsset(draft, inventory, assetId) });
+              }}
               onOpenCounted={() => navigate({ name: 'board', kind: 'barang-tetap' })}
             />
           )}
