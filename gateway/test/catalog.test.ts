@@ -52,7 +52,15 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
         setProperty: (k: string, v: string) => { store[k] = v; },
       }),
     },
-    CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
+    CacheService: {
+      getScriptCache: () => ({
+        // One live session, so the PIN-gated paths can be exercised without a Clerk token.
+        get: (k: string) => (k === 'session:sesi-marbot'
+          ? JSON.stringify({ userId: 'USR-marbot', name: 'Budi', role: 'anggota', deviceId: 'DEV-1' })
+          : null),
+        put: () => {}, remove: () => {},
+      }),
+    },
     SpreadsheetApp: { getActiveSpreadsheet: () => fakeBook(tabs), openById: () => fakeBook(tabs), flush: () => {} },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     ContentService: {
@@ -75,7 +83,7 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   return new Function(
     ...Object.keys(sandbox),
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
-       handleSetUserPin, handleSetUserActive, writeTab, txnRow, catalogRev,
+       handleSetUserPin, handleSetUserActive, handleSubmitRequest, writeTab, txnRow, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -306,5 +314,85 @@ describe('the roster', () => {
 
   it('lists nobody before anybody is added', () => {
     expect(load2().handleListUsers({ token: admin })).toMatchObject({ ok: true, users: [] });
+  });
+});
+
+const REQ_HEADER = ['requestId', 'type', 'name', 'itemId', 'assetId', 'qty', 'unit', 'price',
+  'reason', 'url', 'status', 'requestedBy', 'requestedTs', 'decidedBy', 'decidedTs', 'note'];
+
+describe('filing a request needs a PIN, not an admin', () => {
+  const ok = { session: 'sesi-marbot', name: 'Kain pel', qty: 2, unit: 'buah', reason: 'sudah tipis' };
+
+  it('refuses with no session at all', () => {
+    expect(load(freshTabs()).handleSubmitRequest({ ...ok, session: undefined }))
+      .toMatchObject({ ok: false, error: 'no_session' });
+  });
+
+  it('accepts an anggota session — no Clerk token anywhere', () => {
+    const tabs = freshTabs();
+    const r = load(tabs).handleSubmitRequest(ok);
+    expect(r.ok).toBe(true);
+    expect(tabs.Requests).toHaveLength(2);
+  });
+
+  it('takes requestedBy from the SESSION, never from the body', () => {
+    const tabs = freshTabs();
+    load(tabs).handleSubmitRequest({ ...ok, requestedBy: 'USR-orang-lain' });
+    expect(tabs.Requests[1][REQ_HEADER.indexOf('requestedBy')]).toBe('USR-marbot');
+  });
+
+  it('always files as diajukan, whatever the body says', () => {
+    const tabs = freshTabs();
+    load(tabs).handleSubmitRequest({ ...ok, status: 'selesai' });
+    expect(tabs.Requests[1][REQ_HEADER.indexOf('status')]).toBe('diajukan');
+  });
+
+  it('requires a reason, because a request nobody can judge gets chased instead', () => {
+    expect(load(freshTabs()).handleSubmitRequest({ ...ok, reason: '  ' }))
+      .toMatchObject({ ok: false, error: 'reason_required' });
+  });
+
+  it('requires a name and a positive quantity', () => {
+    const g = load(freshTabs());
+    expect(g.handleSubmitRequest({ ...ok, name: '' })).toMatchObject({ ok: false, error: 'name_required' });
+    expect(g.handleSubmitRequest({ ...ok, qty: 0 })).toMatchObject({ ok: false, error: 'bad_qty' });
+  });
+
+  it('does not echo the row back — the submitter cannot read this tab', () => {
+    const r = load(freshTabs()).handleSubmitRequest(ok);
+    expect(Object.keys(r).sort()).toEqual(['ok', 'requestId']);
+  });
+
+  it('appends, never replaces: an existing request survives', () => {
+    const tabs = freshTabs();
+    tabs.Requests.push(REQ_HEADER.map((c) => (c === 'requestId' ? 'REQ-lama' : '')));
+    load(tabs).handleSubmitRequest(ok);
+    expect(tabs.Requests[1][0]).toBe('REQ-lama');
+    expect(tabs.Requests).toHaveLength(3);
+  });
+
+  it('writes an unpriced request blank, not zero', () => {
+    const tabs = freshTabs();
+    load(tabs).handleSubmitRequest(ok);
+    expect(tabs.Requests[1][REQ_HEADER.indexOf('price')]).toBe('');
+  });
+});
+
+describe('an admin can file one too', () => {
+  it('accepts a Clerk token where a PIN would do', () => {
+    const tabs = freshTabs();
+    const r = load(tabs).handleSubmitRequest({
+      token: admin, name: 'Sapu', qty: 1, unit: 'buah', reason: 'patah',
+    });
+    expect(r.ok).toBe(true);
+    // The author is the admin's own id, from the verified token.
+    expect(tabs.Requests[1][REQ_HEADER.indexOf('requestedBy')]).toBe('usr_1');
+  });
+
+  it('still refuses an anggota Clerk token', () => {
+    expect(load(freshTabs()).handleSubmitRequest({
+      token: token({ sub: 'u', role: 'anggota', name: 'M' }),
+      name: 'Sapu', qty: 1, reason: 'patah',
+    })).toMatchObject({ ok: false, error: 'not-admin' });
   });
 });

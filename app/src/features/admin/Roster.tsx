@@ -14,7 +14,7 @@ import { useEffect, useState } from 'octane';
 import { KeyRound, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus } from '@octanejs/lucide';
 import { GatewayError, listRoster, setRosterActive, setRosterPin } from '../../../../data/gateway';
 import type { RosterRole, RosterUser } from '../../../../data/gateway';
-import { Button, Card, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
+import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
 
 const ROLE_LABEL: Record<RosterRole, string> = {
   admin_utama: 'Admin Utama',
@@ -96,16 +96,23 @@ export function Roster(
   }
 
   return (
-    <Card>
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="flex items-center gap-2 text-base font-bold text-slate-900">
-          <KeyRound class="h-4 w-4 text-slate-500" />
-          PIN anggota
-        </h2>
+    <div class="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm">
+      {/* A 304px panel has room for a title OR a labelled button on one line, not both — the
+          heading was wrapping to two lines to make space for "+ Tambah". The button becomes an
+          icon with a real accessible name, which is what the width can carry. */}
+      <div class="flex items-center gap-2">
+        <KeyRound class="h-4 w-4 shrink-0 text-slate-500" />
+        <h2 class="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">PIN anggota</h2>
         {!editing && (
-          <Button size="sm" onClick={() => open('new')}>
-            <Plus class="h-4 w-4" /> Tambah
-          </Button>
+          <button
+            type="button"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-slate-50 hover:bg-slate-700"
+            aria-label="Tambah orang baru"
+            title="Tambah orang baru"
+            onClick={() => open('new')}
+          >
+            <Plus class="h-4 w-4" />
+          </button>
         )}
       </div>
 
@@ -186,23 +193,31 @@ export function Roster(
       ) : (
         <ul class="mt-3 divide-y divide-slate-200">
           {users.map((u) => (
-            <li key={u.userId} class="flex items-center gap-3 py-2.5">
+            <li key={u.userId} class="flex items-center gap-2 py-2">
               {u.role === 'anggota'
                 ? <UserPlus class="h-4 w-4 shrink-0 text-slate-400" />
                 : <ShieldCheck class="h-4 w-4 shrink-0 text-slate-500" />}
-              <div class="min-w-0 flex-1">
-                <p class={`truncate text-sm font-semibold ${u.disabled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+
+              {/* Name and role on ONE line. Two stacked lines in a 304px row is where the
+                  wrapping started, and `min-w-0` is what actually lets the name truncate
+                  instead of shoving the buttons off the end. */}
+              <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
+                <span class={`truncate text-sm font-semibold ${u.disabled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                   {u.name}
-                </p>
-                <p class="text-xs text-slate-500">{ROLE_LABEL[u.role] ?? u.role}</p>
+                </span>
+                <span class="shrink-0 text-[11px] text-slate-500">{ROLE_LABEL[u.role] ?? u.role}</span>
               </div>
 
+              {/* Icons, not words. "Ganti PIN" as text took a third of the row and pushed the
+                  name into wrapping — and the name is the part somebody is reading. */}
               <button
                 type="button"
-                class="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                aria-label={`Ganti PIN ${u.name}`}
+                title="Ganti PIN"
                 onClick={() => open(u)}
               >
-                Ganti PIN
+                <KeyRound class="h-4 w-4" />
               </button>
 
               {/* Admin Utama has no button at all, rather than a disabled one: the spec draws
@@ -211,7 +226,7 @@ export function Roster(
               {u.role !== 'admin_utama' && (
                 <button
                   type="button"
-                  class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
                   aria-label={u.disabled ? `Aktifkan ${u.name}` : `Nonaktifkan ${u.name}`}
                   title={u.disabled ? 'Aktifkan lagi' : 'Nonaktifkan'}
                   onClick={() => void run((t) => setRosterActive(url, t, u.userId, !u.disabled))}
@@ -223,6 +238,6 @@ export function Roster(
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

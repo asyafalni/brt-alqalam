@@ -27,8 +27,14 @@ import { openRequests, openTotal } from '../../../../domain/requests';
 const PAGE = 6;
 
 export function Dashboard(
-  { draft, inventory, now, onNavigate }:
-  { draft: Draft; inventory: Inventory; now: number; onNavigate: (r: Route) => void },
+  { draft, inventory, now, onNavigate, onAjukan, canReview = true }:
+  {
+    draft: Draft; inventory: Inventory; now: number; onNavigate: (r: Route) => void;
+    /** Opens the request FORM. Available to everybody, unlike the list. */
+    onAjukan?: () => void;
+    /** False when this device may file requests but not read them back. */
+    canReview?: boolean;
+  },
 ) {
   const { items, locations, categories } = draft;
   const derived = Object.values(inventory.derived.items);
@@ -341,14 +347,28 @@ export function Dashboard(
         {/* The badge in the sidebar says a number; this says what the number is ABOUT, and it
             is the only screen here somebody opens to make a decision rather than to look
             something up. */}
-        <Action
-          icon={ShoppingCart}
-          title="Pengajuan"
-          body={openRequestCount === 0
-            ? 'Tidak ada yang menunggu diputuskan.'
-            : `${openRequestCount} menunggu diputuskan${requestMoney.total > 0 ? ` · ${rupiah(requestMoney.total)}` : ''}.`}
-          onClick={() => onNavigate({ name: 'pengajuan' })}
-        />
+        {/* TWO different errands behind one word, and only admins have both.
+            Filing a request names only yourself; reading the list names who asked and who
+            decided (§39). So the list is admin-only and the FORM is not — the person who
+            notices the mop is finished is rarely the person with a Clerk password, and making
+            an admin type it in for them is the bookkeeping §0.0 says to refuse. */}
+        {canReview ? (
+          <Action
+            icon={ShoppingCart}
+            title="Pengajuan"
+            body={openRequestCount === 0
+              ? 'Tidak ada yang menunggu diputuskan.'
+              : `${openRequestCount} menunggu diputuskan${requestMoney.total > 0 ? ` · ${rupiah(requestMoney.total)}` : ''}.`}
+            onClick={() => onNavigate({ name: 'pengajuan' })}
+          />
+        ) : onAjukan ? (
+          <Action
+            icon={ShoppingCart}
+            title="Ajukan pembelian"
+            body="Ada yang habis atau rusak? Ajukan di sini — pengurus yang memutuskan."
+            onClick={onAjukan}
+          />
+        ) : null}
       </div>
     </div>
   );

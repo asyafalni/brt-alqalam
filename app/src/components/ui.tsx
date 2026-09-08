@@ -111,7 +111,7 @@ export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
  * binding-parity gap in this stack lives (§62) — the wrong place to be inventive.
  */
 export function Select(
-  { class: cls = '', wrapClass = 'w-full', children, ...rest }:
+  { class: cls = '', wrapClass = 'w-full', compact = false, children, ...rest }:
   {
     id?: string; value?: string; class?: string; children?: unknown;
     /**
@@ -120,13 +120,24 @@ export function Select(
      * used to end. Toolbars pass a fixed width; forms take the default.
      */
     wrapClass?: string;
+    /**
+     * 40px instead of the 56px field height, for toolbars.
+     *
+     * A prop rather than a class, because `min-h-10` passed in `class` DOES NOT WIN: `FIELD`
+     * already sets `min-h-touch`, they are the same property, and Tailwind resolves the tie by
+     * stylesheet order rather than by the order they appear in the attribute. The stock filter
+     * bar had a 44px segmented control beside 56px selects for exactly that reason, and no
+     * amount of reordering the class string would have fixed it.
+     */
+    compact?: boolean;
     'aria-label'?: string; disabled?: boolean;
     onChange?: (e: Event) => void;
   },
 ) {
+  const base = compact ? FIELD.replace('min-h-touch', 'min-h-10') : FIELD;
   return (
     <div class={`relative ${wrapClass}`}>
-      <select class={`${FIELD} appearance-none pr-11 ${cls}`} {...rest}>
+      <select class={`${base} appearance-none pr-11 ${cls}`} {...rest}>
         {children}
       </select>
       {/* `pointer-events-none` so the chevron never eats a tap meant for the control. */}

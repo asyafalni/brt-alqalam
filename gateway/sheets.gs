@@ -272,3 +272,22 @@ function writeTab(name, rows) {
   if (last > 1) sheet.getRange(2, 1, last - 1, header.length).clearContent();
   if (values.length) sheet.getRange(2, 1, values.length, header.length).setValues(values);
 }
+
+/**
+ * Append one row to a catalog tab, without touching anything already in it.
+ *
+ * Distinct from `writeTab`, which REPLACES a tab and is admin-only. This is what lets somebody
+ * with only a PIN file a purchase request: inserting your own row reveals nothing about anybody
+ * else's, while reading the tab would reveal who asked for what and who turned it down (§39).
+ * Narrower permission, narrower operation — it cannot edit or delete a thing.
+ */
+function appendRow(name, row) {
+  var header = REQUIRED_TABS[name];
+  if (!header) throw new Error('Tab "' + name + '" is not writable.');
+  var sheet = sheetNamed(name);
+  var values = header.map(function (col) {
+    var v = row[col];
+    return (v === null || v === undefined) ? '' : String(v);
+  });
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, header.length).setValues([values]);
+}

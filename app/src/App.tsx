@@ -42,6 +42,7 @@ import { History } from './features/history/History';
 import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
+import { SubmitRequest } from './features/requests/SubmitRequest';
 import { PinPad } from './features/gateway/PinPad';
 import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
@@ -115,6 +116,9 @@ export function App() {
      fact you glance at and a way out, and it belongs beside whatever you were doing. Signing IN
      is the exception and keeps its own full page — a door is not a setting. */
   const [adminOpen, setAdminOpen] = useState(false);
+  /* Filing a request is open to everybody; reading the list is not (§39). So the form is a
+     panel anybody can open, and the list stays a screen only an admin has. */
+  const [ajukanOpen, setAjukanOpen] = useState(false);
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
   const [moving, setMoving] = useState<MovementTarget | null>(null);
@@ -299,6 +303,8 @@ export function App() {
               draft={draft}
               inventory={inventory}
               now={now}
+              canReview={!connection || admin != null}
+              onAjukan={() => setAjukanOpen(true)}
               onNavigate={navigate}
             />
           )}
@@ -460,6 +466,27 @@ export function App() {
               now={now}
               onOpenItem={(id) => { setAlertsOpen(false); navigate({ name: 'item', id }); }}
             />
+          )}
+        </Sheet>
+
+        <Sheet
+          open={ajukanOpen}
+          title="Ajukan pembelian atau perbaikan"
+          description="Pengurus yang memutuskan."
+          onClose={() => setAjukanOpen(false)}
+        >
+          {connection ? (
+            <SubmitRequest
+              url={connection.url}
+              deviceSecret={connection.deviceSecret}
+              getToken={admin?.getToken}
+              units={[...new Set(draft.items.map((i) => i.unit).filter(Boolean))].sort()}
+              onDone={() => setAjukanOpen(false)}
+            />
+          ) : (
+            <p class="text-sm text-slate-600">
+              Perangkat ini belum tersambung ke gateway, jadi pengajuan belum bisa dikirim.
+            </p>
           )}
         </Sheet>
 

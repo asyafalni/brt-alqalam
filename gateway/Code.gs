@@ -59,6 +59,7 @@ function doPost(e) {
       case 'listUsers': return handleListUsers(body);
       case 'setUserPin': return handleSetUserPin(body);
       case 'setUserActive': return handleSetUserActive(body);
+      case 'submitRequest': return handleSubmitRequest(body);
       default: return fail('unknown_op');
     }
   } catch (err) {
@@ -72,7 +73,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.5.0-roster';
+var GATEWAY_VERSION = '0.6.0-submit-request';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -359,4 +360,75 @@ function handleSetUserActive(body) {
   var result = rosterDisable(body.userId, body.disabled === true);
   if (!result.ok) return fail(result.error);
   return respond({ ok: true, users: rosterList() });
+}
+
+
+// ---------------------------------------------------------------------------
+// Filing a request — a PIN is enough. Reading them back is not.
+// ---------------------------------------------------------------------------
+
+/**
+ * File one purchase or repair request.
+ *
+ * SESSION-GATED, NOT ADMIN-GATED, and that asymmetry is the point. Reading the Requests tab
+ * names who asked, who decided and why (§39) — so it stays behind an admin token. Filing one
+ * reveals nothing about anybody else, and the person who needs a new mop is rarely the person
+ * with a Clerk password. Requiring an admin to type it in for them is exactly the added
+ * bookkeeping §0.0 says to refuse.
+ *
+ * The narrowness is what makes it safe: it can only APPEND, only to `Requests`, only with
+ * status `diajukan`, and `requestedBy` is taken from the verified session rather than the body.
+ * A request that could name somebody else as its author would be worse than no request at all.
+ */
+function handleSubmitRequest(body) {
+  /* Either credential. An admin signs in with a Clerk password and may not hold a PIN at all,
+     so demanding one would make the person who approves requests the only person who cannot
+     file one. Whichever it is, the AUTHOR comes from the verified identity, never the body. */
+  var who = body.token ? requireAdmin(body.token) : requireSession(body.session);
+  if (!who.ok) return fail(who.error);
+  var author = who.userId || who.uid;
+
+  var name = String(body.name || '').trim();
+  if (!name) return fail('name_required');
+  var reason = String(body.reason || '').trim();
+  /* Required, as it is in the app (§95): a request nobody can judge is one somebody has to
+     chase the requester about, which is more work for two people than typing it cost one. */
+  if (!reason) return fail('reason_required');
+
+  var type = body.type === 'perbaikan' ? 'perbaikan' : 'beli';
+  var qty = Number(body.qty);
+  if (!(qty > 0)) return fail('bad_qty');
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return fail('busy');
+  try {
+    var request = {
+      requestId: 'REQ-' + Utilities.getUuid().slice(0, 8),
+      type: type,
+      name: name,
+      itemId: body.itemId || '',
+      assetId: body.assetId || '',
+      qty: String(qty),
+      unit: String(body.unit || 'buah'),
+      price: body.price === '' || body.price === null || body.price === undefined
+        ? '' : String(Number(body.price)),
+      reason: reason,
+      url: String(body.url || ''),
+      /* Always `diajukan`. A submitter deciding their own request is not a workflow. */
+      status: 'diajukan',
+      requestedBy: author,
+      requestedTs: new Date().toISOString(),
+      decidedBy: '',
+      decidedTs: '',
+      note: '',
+    };
+    appendRow('Requests', request);
+    SpreadsheetApp.flush();
+    /* The row is NOT echoed back. The submitter cannot read this tab, and handing them their own
+       row would be the one hole in that — it is the reply that teaches a client the shape of
+       data it is not allowed to fetch. */
+    return respond({ ok: true, requestId: request.requestId });
+  } finally {
+    lock.releaseLock();
+  }
 }

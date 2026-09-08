@@ -280,13 +280,17 @@ export function Board(
                 </span>
               </div>
 
-              {/* One segmented control, not four separate pills: they are one choice, and four
+              {/* All three controls are 40px tall: the group is 36px buttons in 2px of padding,
+                  the selects are `compact`. They were 44 and 56, which is what made the row look
+                  assembled from parts.
+
+                  One segmented control, not four separate pills: they are one choice, and four
                   outlined buttons in a row made the loudest thing on the page a set of filters
                   nobody has pressed yet. The single border around the group is also what keeps
                   WCAG 1.4.11 satisfied without a boundary on every segment. */}
               <div class="mt-3 flex flex-wrap items-center gap-2">
                 <div
-                  class="inline-flex flex-wrap rounded-lg border border-slate-400 bg-white p-0.5"
+                  class="inline-flex flex-wrap rounded-lg border border-slate-400 bg-white p-px"
                   role="group"
                   aria-label="Saring stok"
                 >
@@ -299,7 +303,7 @@ export function Board(
                         key={f}
                         type="button"
                         aria-pressed={filter === f}
-                        class={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-semibold ${filter === f
+                        class={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-semibold ${filter === f
                           ? 'bg-slate-900 text-white'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                         onClick={() => onView({ filter: f })}
@@ -319,7 +323,8 @@ export function Board(
                 <Select
                   id="board-kind"
                   wrapClass="w-40"
-                  class="min-h-10 py-0 text-sm"
+                  compact
+                  class="py-0 text-sm"
                   value={kind}
                   onChange={(e: Event) => onView({ kind: (e.target as HTMLSelectElement).value as BoardKind })}
                 >
@@ -332,7 +337,8 @@ export function Board(
                 <Select
                   id="board-category"
                   wrapClass="w-48"
-                  class="min-h-10 py-0 text-sm"
+                  compact
+                  class="py-0 text-sm"
                   value={category}
                   onChange={(e: Event) => onView({ category: (e.target as HTMLSelectElement).value })}
                 >
@@ -350,7 +356,8 @@ export function Board(
                 <Select
                   id="board-sort"
                   wrapClass="w-48"
-                  class="min-h-10 py-0 text-sm"
+                  compact
+                  class="py-0 text-sm"
                   value={sort}
                   onChange={(e: Event) => onView({ sort: (e.target as HTMLSelectElement).value as BoardSort })}
                 >

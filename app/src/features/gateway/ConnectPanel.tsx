@@ -134,13 +134,18 @@ export function ConnectPanel(
             : 'Bisa melihat katalog dan laporan. Untuk mencatat, perlu kode perangkat.'}
         </p>
 
-        <div class="mt-5">
+        {/* Quiet and compact. This is a rare, mildly destructive action and it was carrying
+            the visual weight of a primary one — a wide pill with a 20px icon, in a panel whose
+            own type is 12px. The icon says "disconnect"; the label no longer has to say it
+            twice, and the full phrase stays in the accessible name. */}
+        <div class="mt-4">
           <Button
             variant="secondary"
-            size="panel"
+            size="sm"
+            aria-label="Putuskan sambungan perangkat ini"
             onClick={() => { clearConnection(); onChange(null); setUrl(connection.url); }}
           >
-            <Unlink class="h-5 w-5" /> Putuskan sambungan
+            <Unlink class="h-3.5 w-3.5" /> Putuskan
           </Button>
         </div>
         <p class="mt-2.5 text-[11px] leading-relaxed text-slate-400">

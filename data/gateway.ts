@@ -388,3 +388,37 @@ export async function setRosterActive(
 ): Promise<RosterUser[]> {
   return readUsers(await call(url, { op: 'setUserActive', token, userId, disabled }, fetchImpl));
 }
+
+/** What somebody wants bought or repaired. No id, no status, no author — the gateway sets those. */
+export interface RequestDraft {
+  type: 'beli' | 'perbaikan';
+  name: string;
+  qty: number;
+  unit: string;
+  reason: string;
+  price?: number;
+  url?: string;
+  itemId?: string;
+  assetId?: string;
+}
+
+/**
+ * File a request with whichever credential this device has.
+ *
+ * The asymmetry with reading is deliberate and is the whole reason this exists: the Requests tab
+ * names who asked, who decided and why, so reading it needs an admin (§39) — but the person who
+ * needs a new mop is rarely the person with a Clerk password, and making an admin type it in for
+ * them is the added bookkeeping §0.0 says to refuse. Filing reveals nothing about anybody else.
+ *
+ * Nothing comes back but an id. The submitter cannot read this tab, and echoing their own row
+ * would be the one hole in that.
+ */
+export async function submitRequest(
+  url: string,
+  credential: { session: string } | { token: string },
+  draft: RequestDraft,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const json = await call(url, { op: 'submitRequest', ...credential, ...draft }, fetchImpl);
+  return String(json.requestId ?? '');
+}

@@ -523,8 +523,10 @@ export function AdminSummary(
         <p class="mt-1 text-xs leading-relaxed text-slate-600">
           Perangkat ini bisa melihat, tidak bisa mengubah katalog.
         </p>
-        {/* The button keeps its full size. Type shrinks to match the rail; targets do not. */}
-        <Button size="panel" class="mt-3 w-full" onClick={onSignIn}>
+        {/* Auto width, not full. A black pill spanning a 304px panel gives a once-a-month
+            action the weight of the panel's whole reason for existing; sized to its own label
+            it reads as the one thing to do here without shouting it. */}
+        <Button size="panel" class="mt-3" onClick={onSignIn}>
           <ShieldCheck class="h-4 w-4" />
           Masuk sebagai admin
         </Button>
