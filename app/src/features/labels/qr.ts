@@ -7,11 +7,18 @@
 import qrcode from 'qrcode-generator';
 
 /**
- * Error correction H (~30% recoverable). Higher than the usual M because these labels live in
- * a gudang: they get scratched, greasy, water-marked and partly peeled. Redundancy is cheaper
- * than reprinting a sheet.
+ * How much damage the code can survive, and it is a per-USE decision rather than a constant.
+ *
+ * `H` (~30% recoverable) is right for a printed label: it lives in a gudang, gets scratched,
+ * greasy, water-marked and partly peeled, and redundancy is cheaper than reprinting a sheet.
+ *
+ * `M` (~15%) is right for a code shown on a SCREEN — clean, backlit, held at arm's length for
+ * ten seconds, and nothing is going to peel. Spending correction there buys nothing and costs
+ * density: the 240-character enrolment link needs 81 modules at H and 61 at M, which at a 240px
+ * panel is 2.7px per module versus 3.5px. That difference is the difference between a scan that
+ * works first time and one somebody has to fiddle with.
  */
-const ERROR_CORRECTION = 'H' as const;
+export type QrCorrection = 'H' | 'Q' | 'M' | 'L';
 
 export interface QrSvg {
   /** Modules per side, excluding the quiet zone. */
@@ -24,8 +31,8 @@ export interface QrSvg {
 
 const QUIET_ZONE = 4;
 
-export function qrSvg(data: string): QrSvg {
-  const qr = qrcode(0, ERROR_CORRECTION); // 0 = pick the smallest type that fits
+export function qrSvg(data: string, correction: QrCorrection = 'H'): QrSvg {
+  const qr = qrcode(0, correction); // 0 = pick the smallest type that fits
   qr.addData(data);
   qr.make();
 

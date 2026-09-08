@@ -77,13 +77,14 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   };
   // Every .gs file, because Apps Script gives them ONE global scope and a harness that loads
   // a subset will report "not defined" for code that works perfectly in production.
-  const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'Code.gs']
+  const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'devices.gs', 'Code.gs']
     .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
     .join('\n;\n');
   return new Function(
     ...Object.keys(sandbox),
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
-       handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, writeTab, txnRow, catalogRev,
+       handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
+       handleSetDeviceRevoked, handleRenameDevice, writeTab, txnRow, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -480,5 +481,91 @@ describe('signing in when a PIN belongs to two people', () => {
     const g = withUsers([['Budi', '4321']]);
     expect(g.handleOpenSession({ ...device, pin: '0000' }))
       .toMatchObject({ ok: false, error: 'invalid_pin' });
+  });
+});
+
+describe('enrolling a device', () => {
+  it('refuses without an admin token — a device secret is a credential', () => {
+    expect(load(freshTabs()).handleEnrollDevice({ label: 'HP Budi' }).ok).toBe(false);
+  });
+
+  it('refuses an anggota token', () => {
+    expect(load(freshTabs()).handleEnrollDevice({
+      token: token({ sub: 'u', role: 'anggota', name: 'M' }), label: 'HP Budi',
+    })).toMatchObject({ ok: false, error: 'not-admin' });
+  });
+
+  it('needs a label, so the list is not a column of identical rows', () => {
+    expect(load(freshTabs()).handleEnrollDevice({ token: admin, label: '  ' }))
+      .toMatchObject({ ok: false, error: 'label_required' });
+  });
+
+  it('returns the secret ONCE, and never again', () => {
+    const g = load(freshTabs());
+    const made = g.handleEnrollDevice({ token: admin, label: 'HP Budi' });
+    expect(made.secret).toMatch(/^[0-9a-f-]{60,}$/);
+
+    // Every later view of the roster of devices omits it.
+    const listed = g.handleListDevices({ token: admin }).devices;
+    expect(listed).toHaveLength(1);
+    expect(JSON.stringify(listed)).not.toContain(made.secret);
+    expect(Object.keys(listed[0]).sort()).toEqual(['deviceId', 'enrolledTs', 'label', 'revoked']);
+  });
+
+  it('issues a different secret every time', () => {
+    const g = load(freshTabs());
+    const a = g.handleEnrollDevice({ token: admin, label: 'A' }).secret;
+    const b = g.handleEnrollDevice({ token: admin, label: 'B' }).secret;
+    expect(a).not.toBe(b);
+  });
+
+  it('lets the new secret open a session straight away', () => {
+    const g = load(freshTabs());
+    g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    const made = g.handleEnrollDevice({ token: admin, label: 'HP Budi' });
+    expect(g.handleOpenSession({ deviceSecret: made.secret, pin: '4321' }).session.actorName)
+      .toBe('Budi');
+  });
+});
+
+describe('revoking a device', () => {
+  function enrolled() {
+    const g = load(freshTabs());
+    g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    return { g, made: g.handleEnrollDevice({ token: admin, label: 'HP Budi' }) };
+  }
+
+  it('stops it reaching the PIN endpoint at all', () => {
+    const { g, made } = enrolled();
+    g.handleSetDeviceRevoked({ token: admin, deviceId: made.deviceId, revoked: true });
+    expect(g.handleOpenSession({ deviceSecret: made.secret, pin: '4321' }))
+      .toMatchObject({ ok: false, error: 'device_not_enrolled' });
+  });
+
+  it('is reversible — a phone found in a drawer is not a second identity', () => {
+    const { g, made } = enrolled();
+    g.handleSetDeviceRevoked({ token: admin, deviceId: made.deviceId, revoked: true });
+    g.handleSetDeviceRevoked({ token: admin, deviceId: made.deviceId, revoked: false });
+    expect(g.handleOpenSession({ deviceSecret: made.secret, pin: '4321' }).ok).toBe(true);
+  });
+
+  it('keeps the row, so "why did this stop working?" has an answer', () => {
+    const { g, made } = enrolled();
+    g.handleSetDeviceRevoked({ token: admin, deviceId: made.deviceId, revoked: true });
+    const listed = g.handleListDevices({ token: admin }).devices;
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ deviceId: made.deviceId, revoked: true, label: 'HP Budi' });
+  });
+
+  it('refuses an id that does not exist rather than silently doing nothing', () => {
+    expect(load(freshTabs()).handleSetDeviceRevoked({ token: admin, deviceId: 'DEV-x', revoked: true }))
+      .toMatchObject({ ok: false, error: 'no_such_device' });
+  });
+
+  it('renames without touching the secret', () => {
+    const { g, made } = enrolled();
+    g.handleRenameDevice({ token: admin, deviceId: made.deviceId, label: 'HP Budi (baru)' });
+    expect(g.handleListDevices({ token: admin }).devices[0].label).toBe('HP Budi (baru)');
+    expect(g.handleOpenSession({ deviceSecret: made.secret, pin: '4321' }).ok).toBe(true);
   });
 });

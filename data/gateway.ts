@@ -461,3 +461,61 @@ export async function submitRequest(
   const json = await call(url, { op: 'submitRequest', ...credential, ...draft }, fetchImpl);
   return String(json.requestId ?? '');
 }
+
+// ---------------------------------------------------------------------------
+// Devices — which phones and tablets may reach the PIN endpoint.
+// ---------------------------------------------------------------------------
+
+export interface GatewayDevice {
+  deviceId: string;
+  label: string;
+  /** When it was enrolled, ISO. `0` when the gateway predates the field. */
+  enrolledTs: number;
+  revoked: boolean;
+}
+
+const readDevices = (json: Record<string, unknown>): GatewayDevice[] =>
+  (Array.isArray(json.devices) ? json.devices : []).map((d) => {
+    const r = d as Record<string, unknown>;
+    return {
+      deviceId: String(r.deviceId ?? ''),
+      label: String(r.label ?? ''),
+      enrolledTs: Date.parse(String(r.enrolledTs ?? '')) || 0,
+      revoked: r.revoked === true,
+    };
+  });
+
+export async function listDevices(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<GatewayDevice[]> {
+  return readDevices(await call(url, { op: 'listDevices', token }, fetchImpl));
+}
+
+/**
+ * Enrol a device and receive its secret — the ONLY time it is ever readable.
+ *
+ * Nothing returns it afterwards, by design: it is stored to be compared against, not handed
+ * back out. A phone that loses it is enrolled again; a phone that is lost is revoked.
+ */
+export async function enrollDevice(
+  url: string, token: string, label: string, fetchImpl: typeof fetch = fetch,
+): Promise<{ deviceId: string; secret: string; devices: GatewayDevice[] }> {
+  const json = await call(url, { op: 'enrollDevice', token, label }, fetchImpl);
+  const secret = String(json.secret ?? '');
+  if (!secret) throw new GatewayError('no-secret-returned', json);
+  return { deviceId: String(json.deviceId ?? ''), secret, devices: readDevices(json) };
+}
+
+export async function setDeviceRevoked(
+  url: string, token: string, deviceId: string, revoked: boolean,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GatewayDevice[]> {
+  return readDevices(await call(url, { op: 'setDeviceRevoked', token, deviceId, revoked }, fetchImpl));
+}
+
+export async function renameDevice(
+  url: string, token: string, deviceId: string, label: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GatewayDevice[]> {
+  return readDevices(await call(url, { op: 'renameDevice', token, deviceId, label }, fetchImpl));
+}

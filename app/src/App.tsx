@@ -51,6 +51,7 @@ import { History } from './features/history/History';
 import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
+import { Enrol } from './features/gateway/Enrol';
 import { SubmitRequest } from './features/requests/SubmitRequest';
 import { newRequestId } from './features/requests/newRequestId';
 import { PinFlow } from './features/gateway/PinFlow';
@@ -228,6 +229,21 @@ export function App() {
         admin={admin}
         onAdmin={setAdmin}
         onHome={() => navigate({ name: 'beranda' })}
+      />
+    );
+  }
+
+  /* Before everything, including the loading state: this phone may have no connection at all
+     yet, so there is nothing for the shell to render around it. */
+  if (route.name === 'daftar') {
+    return (
+      <Enrol
+        gateway={route.gateway}
+        secret={route.secret}
+        onConnected={(c) => { setConnection(c); setFreshTxns([]); }}
+        /* The credential leaves the address bar the moment it is used — a secret in the URL is
+           a secret in browser history and in every screenshot taken afterwards. */
+        onCancel={() => navigate({ name: 'beranda' })}
       />
     );
   }

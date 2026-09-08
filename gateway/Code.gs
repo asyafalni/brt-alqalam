@@ -66,6 +66,10 @@ function doPost(e) {
       case 'listUsers': return handleListUsers(body);
       case 'setUserPin': return handleSetUserPin(body);
       case 'setUserActive': return handleSetUserActive(body);
+      case 'listDevices': return handleListDevices(body);
+      case 'enrollDevice': return handleEnrollDevice(body);
+      case 'setDeviceRevoked': return handleSetDeviceRevoked(body);
+      case 'renameDevice': return handleRenameDevice(body);
       case 'submitRequest': return handleSubmitRequest(body);
       default: return fail('unknown_op');
     }
@@ -80,7 +84,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.8.0-cached-read';
+var GATEWAY_VERSION = '0.9.0-devices';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -481,4 +485,46 @@ function handleSubmitRequest(body) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Devices — admin only. The secret leaves exactly once, at enrolment.
+// ---------------------------------------------------------------------------
+
+function handleListDevices(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  return respond({ ok: true, devices: deviceList() });
+}
+
+/**
+ * The reply carries the secret. It is the only reply that ever will, and the screen that
+ * receives it shows it as a QR for one person standing in front of it — never a message, never
+ * a list somebody can come back to.
+ */
+function handleEnrollDevice(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  var result = deviceEnroll(body.label);
+  if (!result.ok) return fail(result.error);
+  return respond({
+    ok: true, deviceId: result.deviceId, secret: result.secret, devices: deviceList(),
+  });
+}
+
+function handleSetDeviceRevoked(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  var result = deviceSetRevoked(body.deviceId, body.revoked === true);
+  if (!result.ok) return fail(result.error);
+  return respond({ ok: true, devices: deviceList() });
+}
+
+function handleRenameDevice(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  var result = deviceRename(body.deviceId, body.label);
+  if (!result.ok) return fail(result.error);
+  return respond({ ok: true, devices: deviceList() });
 }

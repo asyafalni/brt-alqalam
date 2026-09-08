@@ -25,6 +25,7 @@ import { Logo } from '../../components/Logo';
 import { MasjidArt } from '../../components/MasjidArt';
 import { Lanterns } from '../../components/Lanterns';
 import { Roster } from './Roster';
+import { Devices } from '../gateway/Devices';
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
 export interface AdminSession {
@@ -512,6 +513,10 @@ export function AdminSummary(
             in the gateway's own store, not in the spreadsheet, because a PIN hash must never be
             in a document somebody can share (§65.4). */}
         {connection && <Roster url={connection.url} getToken={admin.getToken} />}
+        {/* Devices below people, because that is the order somebody sets them up in: a PIN with
+            no enrolled phone cannot record anything, and the panel says so when the list is
+            empty. */}
+        {connection && <Devices url={connection.url} getToken={admin.getToken} />}
       </div>
     );
   }

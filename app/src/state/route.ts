@@ -54,7 +54,15 @@ export type Route =
    * it is a route at all rather than a modal: reaching it is a deliberate act, and until
    * somebody performs it the tablet has never fetched a byte of Clerk (§64.2).
    */
-  | { name: 'admin' };
+  | { name: 'admin' }
+  /**
+   * Enrolling this device, from a QR an admin is holding up.
+   *
+   * The gateway address travels with it so a phone that has never opened this app needs nothing
+   * typed at all — which is the whole point: a marbot standing in the gudang scans once and is
+   * done. Both values are consumed and dropped from the URL immediately.
+   */
+  | { name: 'daftar'; gateway: string; secret: string };
 
 /** Accepts a raw `location.hash` ("#/scan?i=X"), with or without the leading "#". */
 export function parseRoute(hash: string): Route {
@@ -111,6 +119,11 @@ export function parseRoute(hash: string): Route {
   }
   if (path === '/pindai') return { name: 'pindai' };
   if (path === '/admin') return { name: 'admin' };
+  if (path === '/daftar') {
+    const gateway = params.get('g');
+    const secret = params.get('s');
+    if (gateway && secret) return { name: 'daftar', gateway, secret };
+  }
   return { name: 'beranda' };
 }
 
@@ -137,6 +150,8 @@ export function routeToHash(route: Route): string {
     case 'racks': return route.id ? `#/racks?r=${encodeURIComponent(route.id)}` : '#/racks';
     case 'pindai': return '#/pindai';
     case 'admin': return '#/admin';
+    case 'daftar':
+      return `#/daftar?g=${encodeURIComponent(route.gateway)}&s=${encodeURIComponent(route.secret)}`;
     case 'opname': return '#/opname';
     case 'item': return `#/barang?i=${encodeURIComponent(route.id)}`;
     case 'scan': {
