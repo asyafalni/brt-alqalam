@@ -47,6 +47,7 @@ import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
 import { append, closeSession, GatewayError, openSession } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
+import { enqueue, pending, pendingCount, settle } from '../../data/outbox';
 import type { Txn } from '../../domain/types';
 import type { MovementTarget } from './features/movement/MovementSheet';
 
@@ -67,6 +68,11 @@ export function App() {
   const [pinFor, setPinFor] = useState<AppendEntry[] | null>(null);
   const [pinError, setPinError] = useState('');
   const [pinBusy, setPinBusy] = useState(false);
+  /** How many movements are recorded but not yet in the sheet. Shown, never hidden. */
+  const [queued, setQueued] = useState(0);
+
+  const refreshQueue = () => { void pendingCount().then(setQueued).catch(() => setQueued(0)); };
+  useEffect(refreshQueue, [connection?.url]);
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
      reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
@@ -164,6 +170,7 @@ export function App() {
         onNavigate={navigate}
         connected={connection !== null}
         stale={register.error !== ''}
+        queued={queued}
         onOpenConnection={() => setConnectOpen(true)}
         onClose={() => setCollapsed(true)}
       />
@@ -358,7 +365,16 @@ export function App() {
         >
           <ConnectPanel
             connection={connection}
+            queued={queued}
             onChange={(c) => { setConnection(c); setFreshTxns([]); }}
+            onSendQueued={() => {
+              /* Sending needs a PIN like any other write — the queue holds no credential, so
+                 there is nothing to send it WITH. An empty batch is right: the pending entries
+                 are picked up ahead of it. */
+              setConnectOpen(false);
+              setPinError('');
+              setPinFor([]);
+            }}
           />
         </Sheet>
 
@@ -381,20 +397,46 @@ export function App() {
                   try {
                     const session = await openSession(connection.url, connection.deviceSecret, pin);
                     token = session.token;
-                    const result = await append(connection.url, token, pinFor);
+
+                    /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was
+                       recorded — the log is a sequence, and sending today's withdrawal ahead of
+                       yesterday's invents a different one. */
+                    const waiting = await pending().catch(() => []);
+                    const batch = [...waiting.map((w) => w.entry), ...pinFor];
+
+                    const result = await append(connection.url, token, batch);
+                    /* Duplicates count as settled: the gateway already holds them, and leaving
+                       them queued would retry for ever against rows that exist. */
+                    await settle([
+                      ...result.appended.map((t) => t.clientTxnId),
+                      ...result.duplicates,
+                    ]).catch(() => undefined);
+
                     setFreshTxns((prev) => [...prev, ...result.appended]);
                     setPinFor(null);
+                    refreshQueue();
                     // Re-read rather than trusting the local fold: the sheet is the register,
                     // and anything another device did belongs on this screen too.
                     register.refresh();
                   } catch (err) {
                     const code = err instanceof GatewayError ? err.code : 'offline';
-                    setPinError(
-                      code === 'invalid_pin' ? 'PIN salah.'
-                        : code === 'locked' ? 'Terkunci sementara karena terlalu banyak percobaan.'
-                        : code === 'offline' ? 'Tidak bisa menghubungi gateway. Coba lagi.'
-                        : `Gagal: ${code}`,
-                    );
+
+                    /* Only a NETWORK failure is queued. A refused PIN or a revoked device is
+                       not something a retry will fix, and queueing it would hide the reason
+                       behind a badge that never clears. */
+                    if (code === 'offline') {
+                      await Promise.all(pinFor.map((e) => enqueue(e, 'perangkat ini')))
+                        .catch(() => undefined);
+                      refreshQueue();
+                      setPinFor(null);
+                      setPinError('');
+                    } else {
+                      setPinError(
+                        code === 'invalid_pin' ? 'PIN salah.'
+                          : code === 'locked' ? 'Terkunci sementara karena terlalu banyak percobaan.'
+                          : `Gagal: ${code}`,
+                      );
+                    }
                   } finally {
                     setPinBusy(false);
                     /* Closed even when the append failed: the session covers one visit, and

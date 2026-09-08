@@ -40,6 +40,8 @@ interface Props {
   connected: boolean;
   /** Set when the register is being shown but could not be refreshed. */
   stale?: boolean;
+  /** Movements recorded on this device but not yet in the sheet. */
+  queued?: number;
   onOpenConnection: () => void;
 }
 
@@ -192,9 +194,14 @@ export function Sidebar(p: Props) {
                   class="px-2 text-left text-[11px] text-slate-400 underline hover:text-slate-200"
                   onClick={p.onOpenConnection}
                 >
-                  {p.connected
-                    ? (p.stale ? 'Tersambung · data mungkin tertinggal' : 'Tersambung ke gateway')
-                    : 'Belum terhubung — ketuk untuk menyambungkan'}
+                  {/* The queue outranks everything else this line could say. An unsent
+                      movement is the one state where the register on screen and the register
+                      in the sheet genuinely disagree, and it must never be quiet about it. */}
+                  {p.queued
+                    ? `${p.queued} catatan belum terkirim — ketuk`
+                    : p.connected
+                      ? (p.stale ? 'Tersambung · data mungkin tertinggal' : 'Tersambung ke gateway')
+                      : 'Belum terhubung — ketuk untuk menyambungkan'}
                 </button>
               </>
             )}

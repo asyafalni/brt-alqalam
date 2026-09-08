@@ -29,8 +29,14 @@ const REASON: Record<string, string> = {
 const explain = (code: string) => REASON[code] ?? `Gateway menolak: ${code}`;
 
 export function ConnectPanel(
-  { connection, onChange }:
-  { connection: Connection | null; onChange: (c: Connection | null) => void },
+  { connection, onChange, queued = 0, onSendQueued }:
+  {
+    connection: Connection | null;
+    onChange: (c: Connection | null) => void;
+    /** Movements recorded here but not yet in the sheet. */
+    queued?: number;
+    onSendQueued?: () => void;
+  },
 ) {
   const [url, setUrl] = useState(connection?.url ?? '');
   const [secret, setSecret] = useState('');
@@ -83,6 +89,24 @@ export function ConnectPanel(
   if (connection && !found) {
     return (
       <div>
+        {/* Above the "all fine" panel, because it is the one thing here that is not fine: the
+            register on this screen and the register in the sheet disagree until it is sent. */}
+        {queued > 0 && (
+          <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4" role="status">
+            <p class="font-bold text-slate-900">
+              {queued} catatan belum masuk ke spreadsheet.
+            </p>
+            <p class="mt-1 text-sm leading-relaxed text-slate-600">
+              Tersimpan di perangkat ini saat jaringan sedang tidak bisa dihubungi. Mengirimnya
+              perlu PIN, karena antrean ini memang tidak menyimpan PIN siapa pun — dan itu
+              berarti catatannya akan tercatat atas nama yang memasukkan PIN sekarang.
+            </p>
+            {onSendQueued && (
+              <Button size="touch" class="mt-3" onClick={onSendQueued}>Kirim sekarang</Button>
+            )}
+          </div>
+        )}
+
         <div class="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
           <CircleCheck class="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
           <div class="min-w-0">
