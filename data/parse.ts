@@ -304,6 +304,21 @@ export const buildRequest = (r: Record<string, string>): PurchaseRequest => {
   return out;
 };
 
+/**
+ * The same row, as the PUBLIC tier delivers it.
+ *
+ * Two correct decisions collide here. §39 says an unauthenticated reader must never see who
+ * did what, so the gateway strips `actorUserId` from that tier — and `buildTxn` requires one,
+ * because a movement in the log always has an actor. Fed the public tier, the strict builder
+ * quarantines every transaction ever recorded, and the dashboard shows an empty masjid.
+ *
+ * So the public projection gets its own reader rather than the domain being weakened for it or
+ * a fake actor being invented. An empty `actorUserId` HERE means withheld, not unknown — and it
+ * can only arise on this path, which is what makes that reading safe.
+ */
+export const buildPublicTxn = (r: Record<string, string>): Txn =>
+  buildTxn({ ...r, actoruserid: r['actoruserid'] || 'WITHHELD' });
+
 export const buildTxn = (r: Record<string, string>): Txn => {
     const t: Txn = {
       txnId: req(r, 'txnid'),
