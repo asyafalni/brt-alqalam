@@ -17,6 +17,22 @@
 
 const KEY = 'brt.gateway.connection';
 
+/**
+ * A separate note that this device HAS been connected, once.
+ *
+ * It exists because losing the connection is silent and looks like something else. Every screen
+ * renders from `draft`, and with no connection that is the LOCAL stock-take draft — so a tablet
+ * whose storage was cleared shows a full-looking register that is this device's own months-old
+ * copy, under the same headings, with no hint that the sheet is no longer being read. That is
+ * the same mistake as showing "none" for withheld data or "no data" for data still loading, in a
+ * fourth costume, and it is the worst of the four: the numbers are plausible.
+ *
+ * Deliberately NOT part of the connection object, so it survives the object disappearing — which
+ * is the exact event it exists to detect. A deliberate `Putuskan` clears it too, because that is
+ * somebody choosing to disconnect rather than a connection going missing.
+ */
+const SEEN_KEY = 'brt.gateway.seen';
+
 export interface Connection {
   /** The Apps Script `/exec` URL. */
   url: string;
@@ -59,14 +75,25 @@ export function saveConnection(url: string, deviceSecret?: string): Connection {
     ...(secret ? { deviceSecret: secret } : {}),
     connectedTs: Date.now(),
   };
-  try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* private window */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(c));
+    localStorage.setItem(SEEN_KEY, '1');
+  } catch { /* private window */ }
   return c;
 }
 
 /** Whether this device may append movements, as opposed to only reading the register. */
 export const canRecord = (c: Connection | null): boolean => !!c?.deviceSecret;
 
+/** True when this device was connected at some point and no longer is. */
+export function connectionLost(current: Connection | null): boolean {
+  if (current) return false;
+  try { return localStorage.getItem(SEEN_KEY) === '1'; } catch { return false; }
+}
+
 export function clearConnection(): void {
+  // Chosen, not lost — so the device stops claiming a connection went missing.
+  try { localStorage.removeItem(SEEN_KEY); } catch { /* private window */ }
   try { localStorage.removeItem(KEY); } catch { /* private window */ }
 }
 

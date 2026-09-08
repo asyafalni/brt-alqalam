@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
 import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package, TriangleAlert } from '@octanejs/lucide';
 import { Sidebar, railRightEdge } from './components/Sidebar';
 import { Flyout } from './components/Flyout';
-import { RegisterLoading, TopProgress } from './components/Progress';
+import { ConnectionLost, RegisterLoading, TopProgress } from './components/Progress';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card, PageHeader } from './components/ui';
@@ -65,7 +65,7 @@ import { SubmitRequest } from './features/requests/SubmitRequest';
 import { newRequestId } from './features/requests/newRequestId';
 import { restoreAdmin } from './features/admin/restore';
 import { PinFlow } from './features/gateway/PinFlow';
-import { canRecord, loadConnection } from './state/connection';
+import { canRecord, connectionLost, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
@@ -130,6 +130,9 @@ export function App() {
      still in flight. That is the same mistake as showing "none" for data that is withheld, in a
      third costume. */
   const firstLoad = connection != null && register.state == null;
+  /* Connected once, not connected now. The local draft is still there and would render happily,
+     which is precisely the danger — see `ConnectionLost`. */
+  const lostConnection = connectionLost(connection);
 
   const draft = register.state
     ? gatewayDraft(
@@ -372,7 +375,9 @@ export function App() {
               </button>
             </div>
           )}
-          {firstLoad ? (
+          {lostConnection ? (
+            <ConnectionLost onReconnect={() => setConnectOpen(true)} />
+          ) : firstLoad ? (
             /* The whole content area, because every block below renders from an empty draft
                until the gateway answers — zeroes, "belum ada data", and a button offering demo
                rows. Replacing them is the only honest option; overlaying a spinner would leave
