@@ -21,10 +21,26 @@ const REASON: Record<string, string> = {
   needs_admin_utama: 'Hanya Admin Utama yang bisa mengundang admin.',
   offline: 'Tidak bisa menghubungi gateway.',
 };
+/**
+ * The one failure worth intercepting rather than relaying.
+ *
+ * Google's message explains the PERMISSION — "you do not have permission to call
+ * UrlFetchApp.fetch, required scope script.external_request" — and not the fix, which is that
+ * the manifest now asks for a scope the owner's old authorisation does not cover. A manifest
+ * change re-authorises nothing; somebody has to open the editor and accept the prompt.
+ */
+const needsAuthorisation = (hint: string) =>
+  hint.includes('script.external_request') || hint.includes('UrlFetchApp');
+
 const explain = (e: unknown) => {
   if (!(e instanceof GatewayError)) return REASON.offline;
   if (REASON[e.code]) return REASON[e.code];
-  // Clerk's own wording — it says things like "duplicate invitation" better than a paraphrase.
+  if (needsAuthorisation(e.hint)) {
+    return 'Gateway belum diizinkan menghubungi Clerk. Buka Apps Script, jalankan '
+      + 'checkSpreadsheet() sekali, dan setujui izin baru yang muncul — lalu coba lagi.';
+  }
+  // Clerk's own wording otherwise: it says things like "duplicate invitation" better than a
+  // paraphrase would.
   return e.hint ? `Clerk menolak: ${e.hint}` : `Gateway menolak: ${e.code}`;
 };
 

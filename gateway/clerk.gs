@@ -22,6 +22,14 @@
  * FAILS CLOSED AND ABSENT. With no key in Script Properties every endpoint here answers
  * `clerk_not_configured`, so deploying this code does not by itself give the gateway the ability
  * to do any of it. That only begins when somebody adds the key on purpose.
+ *
+ * ⚠️ IT ALSO NEEDS AN OAUTH SCOPE, and this is the part that bites once. `UrlFetchApp.fetch`
+ * requires `script.external_request`, and until this file existed the gateway never called out —
+ * so the scope was never inferred, and the authorisation the owner granted long ago does not
+ * cover it. `appsscript.json` now declares scopes explicitly, but a manifest change does not
+ * re-authorise anything: the owner has to open the editor, run one function, and accept the new
+ * prompt. Nothing here can do that for them, so the failure says exactly that instead of
+ * relaying Google's own wording, which explains the permission and not the fix.
  */
 
 var CLERK_API = 'https://api.clerk.com/v1';
