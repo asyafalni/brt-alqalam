@@ -45,5 +45,9 @@ export function useInventory(draft: Draft, now: number): Inventory {
     [draft.items, draft.stock, txns, now],
   );
 
-  return { instances, txns, derived, notifications, offline: true };
+  /* `offline` used to be a constant, written when there was no gateway to be online with. It
+     is now a fact about where these numbers came from: a gateway-backed draft is read-only, and
+     nothing else in the app is. Screens key their "not connected yet" wording off it, and a
+     banner that states something false about the data above it is worse than no banner. */
+  return { instances, txns, derived, notifications, offline: draft.readOnly !== true };
 }

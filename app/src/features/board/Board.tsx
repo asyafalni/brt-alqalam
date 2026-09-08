@@ -208,6 +208,8 @@ export function Board(
         <div class={`${CARD} border-slate-200`}>
           <p class="text-sm leading-relaxed text-slate-600">
             <span class="font-bold text-slate-900">Belum terhubung ke gateway.</span>{' '}
+            {/* Only shown while that is true. `offline` is passed from `useInventory`, which
+                knows whether the numbers came from this device or from the sheet. */}
             {inventory.txns.length === 0
               ? 'Riwayat transaksi masih kosong, jadi yang tampil adalah stok awal hasil opname.'
               : `Angka di bawah dihitung dari ${inventory.txns.length} catatan yang tersimpan di perangkat ini saja — belum tersinkron ke mana pun.`}

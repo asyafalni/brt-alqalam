@@ -39,6 +39,15 @@ import { Board } from './features/board/Board';
 import { History } from './features/history/History';
 import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
+import { ConnectPanel } from './features/gateway/ConnectPanel';
+import { PinPad } from './features/gateway/PinPad';
+import { loadConnection } from './state/connection';
+import type { Connection } from './state/connection';
+import { useRegister } from './state/useRegister';
+import { gatewayDraft } from './state/useDraft';
+import { append, closeSession, GatewayError, openSession } from '../../data/gateway';
+import type { AppendEntry } from '../../data/gateway';
+import type { Txn } from '../../domain/types';
 import type { MovementTarget } from './features/movement/MovementSheet';
 
 
@@ -48,7 +57,22 @@ const RAIL_KEY = 'brt.sidebar.collapsed';
 export function App() {
   // One draft, shared. Two screens each loading from storage would be two sources of truth,
   // and the label sheet would quietly print a stale count.
-  const draft = useDraft();
+  const localDraft = useDraft();
+  const [connection, setConnection] = useState<Connection | null>(() => loadConnection());
+  const register = useRegister(connection);
+  /* Rows appended in this visit, shown ahead of the next poll: somebody who records a
+     withdrawal has to see the number move now, not in a minute. */
+  const [freshTxns, setFreshTxns] = useState<Txn[]>([]);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [pinFor, setPinFor] = useState<AppendEntry[] | null>(null);
+  const [pinError, setPinError] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
+
+  /* The catalog comes from the sheet the moment this device is connected. Every screen already
+     reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
+  const draft = register.state
+    ? gatewayDraft(register.state, [...register.state.txns, ...freshTxns])
+    : localDraft;
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
   /* The bell opens the list where you are, rather than navigating you to a screen that has it.
@@ -138,6 +162,9 @@ export function App() {
         requestCount={openRequests(draft.requests).length}
         assetIssues={assetIssues}
         onNavigate={navigate}
+        connected={connection !== null}
+        stale={register.error !== ''}
+        onOpenConnection={() => setConnectOpen(true)}
         onClose={() => setCollapsed(true)}
       />
 
@@ -323,13 +350,84 @@ export function App() {
           )}
         </Sheet>
 
+        <Sheet
+          open={connectOpen}
+          title="Sambungkan ke gateway"
+          description="Sekali per perangkat, oleh admin."
+          onClose={() => setConnectOpen(false)}
+        >
+          <ConnectPanel
+            connection={connection}
+            onChange={(c) => { setConnection(c); setFreshTxns([]); }}
+          />
+        </Sheet>
+
+        <Sheet
+          open={pinFor !== null}
+          title="Masukkan PIN"
+          description="Sekali untuk satu kunjungan."
+          onClose={() => setPinFor(null)}
+        >
+          {pinFor && connection && (
+            <PinPad
+              busy={pinBusy}
+              error={pinError}
+              onCancel={() => setPinFor(null)}
+              onSubmit={(pin) => {
+                setPinBusy(true);
+                setPinError('');
+                void (async () => {
+                  let token = '';
+                  try {
+                    const session = await openSession(connection.url, connection.deviceSecret, pin);
+                    token = session.token;
+                    const result = await append(connection.url, token, pinFor);
+                    setFreshTxns((prev) => [...prev, ...result.appended]);
+                    setPinFor(null);
+                    // Re-read rather than trusting the local fold: the sheet is the register,
+                    // and anything another device did belongs on this screen too.
+                    register.refresh();
+                  } catch (err) {
+                    const code = err instanceof GatewayError ? err.code : 'offline';
+                    setPinError(
+                      code === 'invalid_pin' ? 'PIN salah.'
+                        : code === 'locked' ? 'Terkunci sementara karena terlalu banyak percobaan.'
+                        : code === 'offline' ? 'Tidak bisa menghubungi gateway. Coba lagi.'
+                        : `Gagal: ${code}`,
+                    );
+                  } finally {
+                    setPinBusy(false);
+                    /* Closed even when the append failed: the session covers one visit, and
+                       leaving it open on a shared tablet is exactly the misattribution §58.5
+                       set out to make structurally impossible. */
+                    if (token) await closeSession(connection.url, token).catch(() => undefined);
+                  }
+                })();
+              }}
+            />
+          )}
+        </Sheet>
+
         <MovementSheet
           target={moving}
           derived={moving ? inventory.derived.items[moving.item.itemId] : undefined}
           locations={draft.locations}
-          /* Appended, never edited: the stock number is folded back out of this log, so a
-             movement is a new fact rather than a correction of the old one. */
-          onCommit={(txn) => { draft.setTxns((prev) => [...prev, txn]); setMoving(null); }}
+          /* Two destinations, one action. Connected, a movement goes to the gateway and needs
+             a PIN — so the entry is held until that PIN is given rather than written first and
+             attributed afterwards. Not connected, it is the local log, as during a stock-take. */
+          onCommit={(txn) => {
+            if (connection) {
+              setPinError('');
+              setPinFor([{
+                clientTxnId: txn.clientTxnId, type: txn.type, itemId: txn.itemId,
+                assetId: txn.assetId, locationId: txn.locationId, qtyDelta: txn.qtyDelta,
+                recipient: txn.recipient, condition: txn.condition, note: txn.note,
+              }]);
+            } else {
+              localDraft.setTxns((prev) => [...prev, txn]);
+            }
+            setMoving(null);
+          }}
           onClose={() => setMoving(null)}
         />
       </div>

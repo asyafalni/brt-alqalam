@@ -5,8 +5,11 @@ import { SEED_CATEGORIES } from '../data/seedCategories';
 import type { StoredDraft } from './persist';
 import { clearDraft, loadDraft, saveDraft } from './persist';
 import { demoDraft } from '../data/demo';
+import type { GatewayState } from '../../../data/gateway';
 
 export interface Draft {
+  /** True when the catalog is the spreadsheet's, and this device may only append movements. */
+  readOnly?: boolean;
   items: Item[];
   categories: Category[];
   locations: Location[];
@@ -99,5 +102,44 @@ export function useDraft(): Draft {
     },
     loadDemo: () => setState(demoDraft()),
     loadFrom: (parts) => setState((prev) => ({ ...prev, ...parts })),
+  };
+}
+
+/**
+ * The same `Draft` shape, but backed by the spreadsheet instead of this device.
+ *
+ * Every screen already reads `draft.items`, `draft.stock`, `draft.locations`. Making the SOURCE
+ * swappable here means none of them has to know which mode the app is in — which is the same
+ * reason `domain/` never learned where its data comes from.
+ *
+ * The setters do nothing on purpose, and `readOnly` says so out loud rather than leaving them
+ * to fail quietly: when connected, the catalog belongs to the sheet. The gateway is the only
+ * writer of `Transactions` and it has no endpoint for anything else, and that is not an
+ * omission — one writer over an append-only log is what makes every derived number trustworthy.
+ */
+export function gatewayDraft(state: GatewayState, txns: Txn[]): Draft {
+  const noop = () => {};
+  return {
+    items: state.items,
+    categories: state.categories,
+    locations: state.locations,
+    stock: state.stock,
+    /* Rows appended in this session are shown immediately, ahead of the next poll: a marbot
+       who records a withdrawal must see the number move now, not in a minute. */
+    txns,
+    requests: state.requests,
+    readOnly: true,
+    setItems: noop,
+    setCategories: noop,
+    setLocations: noop,
+    setStock: noop,
+    setRequests: noop,
+    setTxns: noop,
+    setRepair: noop,
+    setPurchase: noop,
+    setCatalog: noop,
+    reset: noop,
+    loadDemo: noop,
+    loadFrom: noop,
   };
 }

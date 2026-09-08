@@ -1,0 +1,180 @@
+// Connecting this device to the gateway.
+//
+// Done ONCE per tablet, by an admin, and then never again — so it lives in a sheet rather than
+// on a screen of its own. What makes it worth care is that both failure modes are silent: a
+// `/dev` URL answers with a Google sign-in page carrying HTTP 200, and a mistyped device secret
+// fails only later, at the first PIN, as a refusal nobody can explain.
+//
+// So it TESTS before it saves. Pasting a wrong value and finding out in the gudang is the
+// outcome this screen exists to prevent.
+
+import { useState } from 'octane';
+import { CircleCheck, Link2, TriangleAlert, Unlink } from '@octanejs/lucide';
+import { fetchState, GatewayError, openSession, closeSession } from '../../../../data/gateway';
+import { clearConnection, saveConnection, urlProblem } from '../../state/connection';
+import type { Connection } from '../../state/connection';
+import { Button, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
+
+/** What went wrong, in words that say what to do about it. */
+const REASON: Record<string, string> = {
+  'not-json': 'Gateway menjawab dengan halaman login, bukan data. Di Apps Script, Deploy → '
+    + 'Manage deployments → Who has access harus "Anyone" (bukan "Anyone with Google account").',
+  offline: 'Tidak bisa menghubungi alamat itu. Periksa koneksi, dan periksa alamatnya.',
+  device_not_enrolled: 'Kode perangkat ini tidak dikenali gateway. Jalankan enrollDevice() lagi '
+    + 'di Apps Script dan salin kode yang baru.',
+  device_revoked: 'Perangkat ini sudah dicabut aksesnya.',
+  invalid_pin: 'Perangkatnya dikenali — PIN-nya yang salah, dan itu wajar di layar ini.',
+  gateway_misconfigured: 'Gateway belum selesai disetel. Jalankan setupGateway() di Apps Script.',
+};
+const explain = (code: string) => REASON[code] ?? `Gateway menolak: ${code}`;
+
+export function ConnectPanel(
+  { connection, onChange }:
+  { connection: Connection | null; onChange: (c: Connection | null) => void },
+) {
+  const [url, setUrl] = useState(connection?.url ?? '');
+  const [secret, setSecret] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [found, setFound] = useState('');
+
+  async function connect() {
+    setError('');
+    setFound('');
+
+    const problem = urlProblem(url);
+    if (problem) { setError(problem); return; }
+    if (secret.trim() === '') { setError('Kode perangkat belum diisi.'); return; }
+
+    setBusy(true);
+    try {
+      /* Two checks, because they fail for different reasons and a single one would leave the
+         other undiagnosed. First: can we read at all — this catches the sign-in-page trap and
+         a wrong address. */
+      const state = await fetchState(url.trim());
+
+      /* Second: is this device actually enrolled. A deliberately impossible PIN is used, so
+         the reply distinguishes "device unknown" from "device fine, PIN wrong" WITHOUT anyone
+         having to type a real PIN into a setup screen. */
+      try {
+        const session = await openSession(url.trim(), secret.trim(), '000000000');
+        // Should not happen — but if a PIN that long ever matched, do not leave it open.
+        await closeSession(url.trim(), session.token).catch(() => undefined);
+      } catch (err) {
+        const code = err instanceof GatewayError ? err.code : 'unknown';
+        // `invalid_pin` is the SUCCESS case here: the gateway got past the device check.
+        if (code !== 'invalid_pin' && code !== 'locked') {
+          setError(explain(code));
+          setBusy(false);
+          return;
+        }
+      }
+
+      setFound(`${state.items.length} barang · ${state.locations.length} rak`);
+      onChange(saveConnection(url, secret));
+      setSecret('');
+    } catch (err) {
+      setError(explain(err instanceof GatewayError ? err.code : 'offline'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (connection && !found) {
+    return (
+      <div>
+        <div class="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
+          <CircleCheck class="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+          <div class="min-w-0">
+            <p class="font-bold text-slate-900">Perangkat ini tersambung.</p>
+            <p class={`${CODE} mt-1 break-all`}>{connection.url}</p>
+          </div>
+        </div>
+
+        <p class="mt-4 text-sm leading-relaxed text-slate-600">
+          Katalog dibaca dari spreadsheet, dan setiap pengambilan dicatat lewat gateway. Kode
+          perangkat tersimpan di perangkat ini saja — tidak ditampilkan lagi, karena gateway
+          menyimpannya untuk dibandingkan, bukan untuk dikeluarkan.
+        </p>
+
+        <div class="mt-5">
+          <Button
+            variant="secondary"
+            size="touch"
+            onClick={() => { clearConnection(); onChange(null); setUrl(connection.url); }}
+          >
+            <Unlink class="h-5 w-5" /> Putuskan sambungan
+          </Button>
+        </div>
+        <p class="mt-3 text-xs leading-relaxed text-slate-400">
+          Memutuskan hanya menghapus kode dari perangkat ini. Untuk mencabut aksesnya sungguhan
+          — tablet hilang, misalnya — jalankan revokeDevice() di Apps Script.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {found && (
+        <p role="status" class="mb-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50/60 p-4">
+          <CircleCheck class="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+          <span class="min-w-0 text-sm text-slate-700">
+            <span class="font-bold text-slate-900">Tersambung.</span> Gateway menjawab dengan{' '}
+            {found}.
+          </span>
+        </p>
+      )}
+
+      <label class={LABEL} for="gw-url">Alamat gateway</label>
+      <input
+        id="gw-url"
+        class={`${FIELD} min-h-touch font-mono text-sm`}
+        value={url}
+        placeholder="https://script.google.com/macros/s/…/exec"
+        autocomplete="off"
+        onInput={(e: Event) => setUrl((e.target as HTMLInputElement).value)}
+      />
+      <p class="mt-1.5 text-xs text-slate-400">
+        Dari Apps Script: Deploy → Manage deployments. Harus yang berakhiran <b>/exec</b>.
+      </p>
+
+      <div class="mt-4">
+        <label class={LABEL} for="gw-secret">Kode perangkat</label>
+        <input
+          id="gw-secret"
+          class={`${FIELD} min-h-touch font-mono text-sm`}
+          value={secret}
+          placeholder="dicetak sekali oleh enrollDevice()"
+          autocomplete="off"
+          onInput={(e: Event) => setSecret((e.target as HTMLInputElement).value)}
+        />
+        <p class="mt-1.5 text-xs leading-relaxed text-slate-400">
+          Dicetak sekali di Execution log saat admin menjalankan enrollDevice(), dan tidak
+          ditampilkan lagi. Kode inilah yang membuat PIN 4 angka berarti.
+        </p>
+      </div>
+
+      {error && (
+        <p role="alert" class="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/60 p-3">
+          <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
+          <span class={`${ERROR_TEXT} mt-0 leading-relaxed`}>{error}</span>
+        </p>
+      )}
+
+      <div class="mt-5">
+        <Button size="touch" disabled={busy} onClick={() => void connect()}>
+          <Link2 class="h-5 w-5" /> {busy ? 'Menguji…' : 'Sambungkan'}
+        </Button>
+      </div>
+
+      {/* Said out loud because it was decided out loud: this is the trade the design already
+          assumed, and §65.2's answer to it is that revoking is one deleted row. */}
+      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        Kode perangkat disimpan di perangkat ini saja. Artinya siapa pun yang memegang tablet
+        ini bisa membuka layar PIN — jadi tempatkan tabletnya sebagaimana Anda menempatkan kunci
+        gudang.
+      </p>
+    </div>
+  );
+}

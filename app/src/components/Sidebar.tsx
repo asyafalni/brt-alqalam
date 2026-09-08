@@ -36,6 +36,11 @@ interface Props {
   onClose: () => void;
   /** Desktop only: narrow the rail to icons, or widen it back. */
   onToggle: () => void;
+  /** Whether this device is reading from the shared spreadsheet. */
+  connected: boolean;
+  /** Set when the register is being shown but could not be refreshed. */
+  stale?: boolean;
+  onOpenConnection: () => void;
 }
 
 export function Sidebar(p: Props) {
@@ -180,7 +185,17 @@ export function Sidebar(p: Props) {
                 <p class="px-2 text-[10px] font-bold uppercase tracking-tighter text-slate-500">
                   Masjid Al-Qalam
                 </p>
-                <p class="px-2 text-[11px] text-slate-600">Belum terhubung ke gateway</p>
+                {/* The status IS the control. It was a dead line of text saying the one thing
+                    somebody would want to act on, and there was nowhere to act on it. */}
+                <button
+                  type="button"
+                  class="px-2 text-left text-[11px] text-slate-400 underline hover:text-slate-200"
+                  onClick={p.onOpenConnection}
+                >
+                  {p.connected
+                    ? (p.stale ? 'Tersambung · data mungkin tertinggal' : 'Tersambung ke gateway')
+                    : 'Belum terhubung — ketuk untuk menyambungkan'}
+                </button>
               </>
             )}
           </div>
