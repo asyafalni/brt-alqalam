@@ -16,7 +16,7 @@
 // and so flips only once the panel has finished leaving.
 
 import { useRef } from 'octane';
-import { ChartColumn, ChevronLeft, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShieldCheck, ShoppingCart, Wrench } from '@octanejs/lucide';
+import { ChartColumn, ChevronLeft, ChevronRight, ClipboardList, History, LayoutDashboard, MapPin, Package, QrCode, ShieldCheck, ShieldOff, ShoppingCart, Wrench } from '@octanejs/lucide';
 import type { Route } from '../state/route';
 import { Logo } from './Logo';
 import { useDialog } from './useDialog';
@@ -44,7 +44,10 @@ interface Props {
   queued?: number;
   /** False when this device is connected only to read — the takmir's phone, say. */
   canRecord?: boolean;
+  /** Who is signed in as an admin, if anyone. */
+  admin?: { name: string; role: string } | null;
   onOpenConnection: () => void;
+  onOpenAdmin: () => void;
 }
 
 export function Sidebar(p: Props) {
@@ -249,6 +252,40 @@ export function Sidebar(p: Props) {
                       {status.title}
                     </span>
                     <span class="block truncate text-[11px] text-slate-500">{status.hint}</span>
+                  </span>
+                  <ChevronRight class="h-4 w-4 shrink-0 text-slate-600" />
+                </>
+              )}
+            </button>
+
+            {/* The SECOND fact this footer carries, and it needed its own row rather than being
+                folded into the first: "connected to the sheet" and "signed in as an admin" are
+                different questions with different answers and different fixes. Somebody who
+                lands on the dashboard and finds they cannot edit anything should be able to see
+                why from here, and get to the door in one tap. */}
+            <button
+              type="button"
+              class={`mt-1 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 ${showText ? '' : 'justify-center'}`}
+              aria-label={p.admin
+                ? `Masuk sebagai ${p.admin.name || 'admin'}, peran ${p.admin.role}. Ketuk untuk keluar.`
+                : 'Belum masuk sebagai admin. Ketuk untuk masuk dan bisa mengubah katalog.'}
+              title={p.admin
+                ? `${p.admin.name || 'Admin'} — ${p.admin.role}`
+                : 'Belum masuk sebagai admin'}
+              onClick={p.onOpenAdmin}
+            >
+              {p.admin
+                ? <ShieldCheck class="h-3.5 w-3.5 shrink-0 text-green-400" />
+                : <ShieldOff class="h-3.5 w-3.5 shrink-0 text-slate-600" />}
+              {showText && (
+                <>
+                  <span class="min-w-0 flex-1">
+                    <span class={`block truncate text-xs font-semibold ${p.admin ? 'text-slate-200' : 'text-slate-300'}`}>
+                      {p.admin ? (p.admin.name || 'Admin') : 'Belum masuk'}
+                    </span>
+                    <span class="block truncate text-[11px] text-slate-500">
+                      {p.admin ? p.admin.role : 'Ketuk untuk masuk sebagai admin'}
+                    </span>
                   </span>
                   <ChevronRight class="h-4 w-4 shrink-0 text-slate-600" />
                 </>

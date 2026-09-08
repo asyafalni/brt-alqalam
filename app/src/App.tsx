@@ -158,6 +158,19 @@ export function App() {
 
   // The camera takes the whole screen: it is a viewfinder, and chrome around a viewfinder
   // is just something to mis-tap while aiming.
+  /* Outside the shell entirely, until somebody is signed in. A sign-in wrapped in the sidebar
+     and navbar of the app it guards reads as a settings panel; on its own it reads as a door. */
+  if (route.name === 'admin' && !admin) {
+    return (
+      <AdminPanel
+        connection={connection}
+        admin={admin}
+        onAdmin={setAdmin}
+        onHome={() => navigate({ name: 'beranda' })}
+      />
+    );
+  }
+
   if (route.name === 'pindai') {
     return (
       <Suspense fallback={<Loading label="Menyiapkan kamera…" />}>
@@ -189,6 +202,8 @@ export function App() {
         stale={register.error !== ''}
         queued={queued}
         canRecord={canRecord(connection)}
+        admin={admin ? { name: admin.who.name, role: admin.who.role } : null}
+        onOpenAdmin={() => navigate({ name: 'admin' })}
         onOpenConnection={() => setConnectOpen(true)}
         onClose={() => setCollapsed(true)}
       />
@@ -329,10 +344,7 @@ export function App() {
           )}
           {route.name === 'admin' && (
             <div class="space-y-6 pt-2">
-              <PageHeader
-                title="Admin"
-                subtitle="Masuk dengan akun Clerk untuk mengubah katalog bersama."
-              />
+              <PageHeader title="Admin" subtitle="Kamu bisa mengubah katalog bersama." />
               <AdminPanel connection={connection} admin={admin} onAdmin={setAdmin} />
             </div>
           )}

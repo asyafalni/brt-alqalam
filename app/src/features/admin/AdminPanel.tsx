@@ -19,6 +19,8 @@ import { ClerkUnavailable, clerkMessage, gatewayToken, loadClerk } from '../../d
 import type { ClerkClient } from '../../data/clerkLoader';
 import type { Connection } from '../../state/connection';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
+import { Logo } from '../../components/Logo';
+import { MasjidArt } from '../../components/MasjidArt';
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
 export interface AdminSession {
@@ -30,12 +32,68 @@ export interface AdminSession {
 
 type Phase = 'loading' | 'signed-out' | 'checking' | 'ready' | 'error';
 
+/**
+ * The full-bleed half of the sign-in screen.
+ *
+ * A photograph of the prayer hall if one has been put on the server, and the drawing underneath
+ * it either way — so the page is composed before the photograph arrives and never shows a broken
+ * image if it never does. The drawing is not a placeholder to be replaced; it is the floor the
+ * photograph lies on.
+ */
+function HallPanel() {
+  const [photo, setPhoto] = useState(true);
+  return (
+    <div class="relative h-full w-full overflow-hidden bg-slate-900">
+      <MasjidArt class="absolute inset-0 h-full w-full" />
+      {photo && (
+        <img
+          src="/masjid.jpg"
+          alt=""
+          class="absolute inset-0 h-full w-full object-cover"
+          onError={() => setPhoto(false)}
+        />
+      )}
+      {/* Ink from the bottom, so the wordmark sits on something dark whichever image is behind. */}
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/55 to-slate-950/15" />
+      {/* A pointed arch drawn in light over the room — the one motif the building repeats, and
+          the only ornament on this page that is ours rather than the photographer's. */}
+      <svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          d="M22 96 V44 Q50 8 78 44 V96"
+          fill="none"
+          stroke="rgba(233,213,167,0.30)"
+          stroke-width="0.5"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+
+      <div class="absolute inset-x-0 bottom-0 hidden p-8 lg:block lg:p-12">
+        <div class="flex items-center gap-3">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white">
+            <Logo size={38} />
+          </div>
+          <div>
+            <p class="text-lg font-bold leading-tight text-white">BRT Masjid Al-Qalam</p>
+            <p class="text-sm text-slate-300">Sistem Inventaris</p>
+          </div>
+        </div>
+        <p class="mt-5 max-w-sm text-sm leading-relaxed text-slate-300">
+          Supaya kita bisa fokus beribadah di masjid — barangnya tercatat, dan tidak ada yang
+          perlu mencari-cari lagi.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function AdminPanel(
-  { connection, admin, onAdmin }:
+  { connection, admin, onAdmin, onHome }:
   {
     connection: Connection | null;
     admin: AdminSession | null;
     onAdmin: (a: AdminSession | null) => void;
+    /** Standalone mode needs a way out; inside the shell the sidebar already is one. */
+    onHome?: () => void;
   },
 ) {
   const [phase, setPhase] = useState<Phase>(admin ? 'ready' : 'loading');
@@ -134,8 +192,8 @@ export function AdminPanel(
     }
   }
 
-  if (!connection) {
-    return (
+  const content = !connection ? (
+    (
       <Card>
         <h2 class="text-base font-bold text-slate-900">Belum terhubung ke gateway</h2>
         <p class="mt-2 text-sm text-slate-600">
@@ -144,10 +202,8 @@ export function AdminPanel(
           kiri bawah.
         </p>
       </Card>
-    );
-  }
-
-  return (
+    )
+  ) : (
     <div class="space-y-4">
       {phase === 'loading' && (
         <Card><p class="text-sm text-slate-600">Memuat Clerk…</p></Card>
@@ -170,7 +226,7 @@ export function AdminPanel(
       )}
 
       {phase === 'signed-out' && (
-        <Card>
+        <Card class="border-t-4 border-t-[#c9a86a] shadow-xl">
           <h2 class="text-base font-bold text-slate-900">Masuk sebagai admin</h2>
           <p class="mt-1 text-sm text-slate-600">
             Pakai email atau username Clerk-mu. Marbot tidak perlu masuk di sini — mereka pakai
@@ -268,6 +324,64 @@ export function AdminPanel(
           </div>
         </Card>
       )}
+    </div>
+  );
+
+  /* INSIDE the shell once somebody is signed in, STANDALONE until then.
+   *
+   * A sign-in that sits in a page of the app it is guarding reads as a settings panel — the
+   * sidebar, the search field and nine destinations are all still there, none of which work for
+   * the person looking at it. Standalone, the screen has one thing to do and says so. */
+  if (!onHome) return content;
+
+  return (
+    <div class="relative min-h-screen lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* On a phone the hall is the BACKGROUND, not a band across the top. The band version put
+          white text on a 200px strip and the tagline immediately overflowed it onto a grey gap —
+          a full bleed with the card floating over it has neither problem and looks better. */}
+      <div class="absolute inset-0 lg:relative lg:inset-auto lg:h-auto">
+        <HallPanel />
+      </div>
+
+      <div class="relative flex min-h-screen items-center justify-center px-5 py-12 sm:px-10 lg:min-h-0 lg:bg-[#faf7f2]">
+        {/* The building's one motif, at a whisper, CENTRED so the form sits inside the arch
+            rather than beside it. Hung off the edge it read as two stray vertical rules; framing
+            the card is the only placement where a half-visible arch is not simply a stray line.
+            Desktop only — on a phone this half IS the photograph. */}
+        <svg
+          class="pointer-events-none absolute left-1/2 top-1/2 hidden h-[115%] w-auto -translate-x-1/2 -translate-y-1/2 lg:block"
+          viewBox="0 0 100 140"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path d="M8 140 V52 Q50 4 92 52 V140" stroke="#c9a86a" stroke-opacity="0.16" stroke-width="1.2" />
+          <path d="M22 140 V60 Q50 24 78 60 V140" stroke="#c9a86a" stroke-opacity="0.11" stroke-width="1.2" />
+        </svg>
+
+        <div class="relative w-full max-w-md">
+          {/* The phone's brand lockup, over the photograph. The desktop's lives in the hall
+              panel, where there is room for the tagline as well. */}
+          <div class="mb-6 flex items-center gap-3 lg:hidden">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg">
+              <Logo size={38} />
+            </div>
+            <div>
+              <p class="text-lg font-bold leading-tight text-white drop-shadow">BRT Masjid Al-Qalam</p>
+              <p class="text-sm text-slate-300 drop-shadow">Sistem Inventaris</p>
+            </div>
+          </div>
+
+          {content}
+
+          <button
+            type="button"
+            class="mt-6 text-sm font-semibold text-slate-300 underline-offset-4 hover:text-white hover:underline lg:text-slate-500 lg:hover:text-slate-900"
+            onClick={onHome}
+          >
+            &larr; Kembali ke beranda
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
