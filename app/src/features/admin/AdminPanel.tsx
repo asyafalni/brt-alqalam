@@ -524,7 +524,7 @@ export function AdminSummary(
           Perangkat ini bisa melihat, tidak bisa mengubah katalog.
         </p>
         {/* The button keeps its full size. Type shrinks to match the rail; targets do not. */}
-        <Button class="mt-3 w-full" onClick={onSignIn}>
+        <Button size="panel" class="mt-3 w-full" onClick={onSignIn}>
           <ShieldCheck class="h-4 w-4" />
           Masuk sebagai admin
         </Button>

@@ -80,6 +80,19 @@ export class GatewayError extends Error {
     super(code);
     this.name = 'GatewayError';
   }
+
+  /**
+   * What the gateway said beyond the code, when it said anything.
+   *
+   * `server_error` is a catch-all wrapping a real exception, and the gateway already sends the
+   * exception's message — the client was discarding it. A roster call failed with nothing but
+   * "server_error" while the reply named the exact undefined function. The code stays matchable;
+   * this is for showing.
+   */
+  get hint(): string {
+    const d = this.detail as { message?: unknown } | undefined;
+    return typeof d?.message === 'string' ? d.message : '';
+  }
 }
 
 /** Keys arrive as `itemId`; every builder reads `itemid`. Lowercased once, here. */

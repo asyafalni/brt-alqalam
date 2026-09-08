@@ -55,6 +55,15 @@ const SIZE = {
   md: 'px-4 py-2 text-sm',
   lg: 'px-6 py-3 text-base',
   touch: 'px-6 min-h-touch text-base font-semibold', // field-ops extension
+  /*
+   * For the side flyouts, where `touch` was out of proportion: a 56px box around 16px text,
+   * inside a 304px panel whose own type is 12–14px, reads as a button from a different app.
+   *
+   * The height is NOT dropped to `md`. That would be ~34px, under the 44px minimum a finger
+   * needs, and these panels are opened on the same gudang tablet as everything else — the
+   * proportion was the complaint, not the target. 44px with 14px text is both.
+   */
+  panel: 'px-4 min-h-11 text-sm font-semibold',
 } as const;
 
 export function Button(props: {

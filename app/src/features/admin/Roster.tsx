@@ -32,8 +32,13 @@ const REASON: Record<string, string> = {
   'not-admin': 'Hanya admin yang bisa mengelola PIN.',
   offline: 'Tidak bisa menghubungi gateway.',
 };
-const explain = (e: unknown) =>
-  REASON[e instanceof GatewayError ? e.code : 'offline'] ?? `Gateway menolak: ${(e as GatewayError).code}`;
+function explain(e: unknown): string {
+  if (!(e instanceof GatewayError)) return REASON.offline;
+  const known = REASON[e.code];
+  if (known) return known;
+  // The hint is what the gateway actually threw. Without it `server_error` is a dead end.
+  return e.hint ? `Gateway menolak: ${e.code} — ${e.hint}` : `Gateway menolak: ${e.code}`;
+}
 
 export function Roster(
   { url, getToken }: { url: string; getToken: () => Promise<string> },
@@ -156,7 +161,7 @@ export function Roster(
           {error && <p class={ERROR_TEXT} role="alert">{error}</p>}
 
           <div class="flex items-center gap-2">
-            <Button type="submit" disabled={busy || !name.trim() || pin.length < 4}>
+            <Button type="submit" size="panel" disabled={busy || !name.trim() || pin.length < 4}>
               {busy ? 'Menyimpan…' : editing === 'new' ? 'Buat' : 'Ganti PIN'}
             </Button>
             <button

@@ -111,7 +111,7 @@ export function ConnectPanel(
               memang tidak menyimpan PIN.
             </p>
             {onSendQueued && (
-              <Button size="touch" class="mt-3" onClick={onSendQueued}>Kirim sekarang</Button>
+              <Button size="panel" class="mt-3" onClick={onSendQueued}>Kirim sekarang</Button>
             )}
           </div>
         )}
@@ -137,7 +137,7 @@ export function ConnectPanel(
         <div class="mt-5">
           <Button
             variant="secondary"
-            size="touch"
+            size="panel"
             onClick={() => { clearConnection(); onChange(null); setUrl(connection.url); }}
           >
             <Unlink class="h-5 w-5" /> Putuskan sambungan
@@ -200,7 +200,7 @@ export function ConnectPanel(
       )}
 
       <div class="mt-5">
-        <Button size="touch" disabled={busy} onClick={() => void connect()}>
+        <Button size="panel" disabled={busy} onClick={() => void connect()}>
           <Link2 class="h-5 w-5" />
           {busy ? 'Menguji…' : secret.trim() === '' ? 'Sambungkan untuk melihat' : 'Sambungkan'}
         </Button>

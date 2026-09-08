@@ -1,8 +1,15 @@
 # clasp uploads .js/.gs/.ts/.html by default, which would send the vitest suite to Apps Script.
-# Only the four scripts and the manifest belong up there.
+# Only the scripts and the manifest belong up there.
+#
+# ⚠️ THIS IS A WHITELIST, so a NEW .gs file is silently left behind. That has happened once:
+# roster.gs was written, tested, committed and deployed, and the gateway answered `server_error`
+# on every roster call because the function it named did not exist up there. `clasp push` says
+# how many files it sent and lists them — it does not say what it skipped.
+# `test/claspignore.test.ts` now fails if any .gs file in this directory is missing below.
 **/**
 !Code.gs
 !auth.gs
 !sheets.gs
 !setup.gs
+!roster.gs
 !appsscript.json
