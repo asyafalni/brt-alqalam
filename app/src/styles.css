@@ -312,3 +312,35 @@ textarea:focus-visible {
   .label-sheet { break-after: page; page-break-after: always; }
   .label-sheet:last-of-type { break-after: auto; page-break-after: auto; }
 }
+
+/* ---------------------------------------------------------------------------
+   LOADING — the difference between "nothing here" and "not here YET".
+
+   A connected device that has not finished its first read renders the SAME
+   screens as a device with an empty register, so it said "Belum ada data" and
+   offered to load demo rows — a screen actively telling somebody their masjid
+   owns nothing while the answer was in flight. Tailwind ships `animate-spin`
+   for the first-load spinner; the indeterminate bar needs a keyframe, so it is
+   declared here.
+--------------------------------------------------------------------------- */
+
+@keyframes brt-progress {
+  0%   { transform: translateX(-100%) scaleX(0.4); }
+  50%  { transform: translateX(25%)   scaleX(0.6); }
+  100% { transform: translateX(100%)  scaleX(0.4); }
+}
+
+.progress-indeterminate {
+  transform-origin: left center;
+  animation: brt-progress 1.15s ease-in-out infinite;
+}
+
+/* Somebody who has asked for less motion still needs to know it is working: the
+   bar stops travelling and pulses in place instead of disappearing. */
+@media (prefers-reduced-motion: reduce) {
+  .progress-indeterminate {
+    animation: none;
+    transform: none;
+    opacity: 0.75;
+  }
+}

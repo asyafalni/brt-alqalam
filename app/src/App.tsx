@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
 import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package, TriangleAlert } from '@octanejs/lucide';
 import { Sidebar, railRightEdge } from './components/Sidebar';
 import { Flyout } from './components/Flyout';
+import { RegisterLoading, TopProgress } from './components/Progress';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card, PageHeader } from './components/ui';
@@ -89,6 +90,13 @@ export function App() {
     connection?.url, register.state?.rev ?? 0, admin?.getToken, register.refresh,
   );
 
+  /* Connected, with nothing read yet. Every screen below renders from `draft`, and the fallback
+     when the gateway has not answered is the LOCAL draft — which on a connected tablet is empty.
+     So the dashboard said "Belum ada data" and offered to load demo rows, while the register was
+     still in flight. That is the same mistake as showing "none" for data that is withheld, in a
+     third costume. */
+  const firstLoad = connection != null && register.state == null;
+
   const draft = register.state
     ? gatewayDraft(
       register.state,
@@ -169,6 +177,10 @@ export function App() {
      admin or admin_utama — `onAdmin(null)` is what a valid token with any other role produces —
      so this is the same test the sidebar uses, not a second one to keep in step. Unconnected
      devices are exempt for the reason given there: that mode has no accounts. */
+  const progress = register.loading && (
+    <TopProgress label={firstLoad ? 'Memuat register' : 'Memperbarui data'} />
+  );
+
   if ((route.name === 'pengajuan' || route.name === 'histori') && connection && !admin) {
     navigate({ name: 'beranda' });
   }
@@ -204,6 +216,11 @@ export function App() {
           They are pure ornament — the opposite of DOSS's restraint — and two full-viewport
           120px blur layers are the most expensive thing that can sit behind a scrolling list
           on a tablet. "Minimalist and fast" is one decision here, not two. */}
+
+      {/* At the FRAME, not inside `main`. `main` scrolls, and a `position: fixed` child of an
+          overflow container is clipped by it in some browsers — the one place a progress bar
+          must never be is invisible. */}
+      {progress}
 
       <Sidebar
         route={route}
@@ -265,6 +282,18 @@ export function App() {
               </button>
             </div>
           )}
+          {firstLoad ? (
+            /* The whole content area, because every block below renders from an empty draft
+               until the gateway answers — zeroes, "belum ada data", and a button offering demo
+               rows. Replacing them is the only honest option; overlaying a spinner would leave
+               those wrong numbers legible underneath it. */
+            <RegisterLoading
+              error={register.error}
+              onRetry={register.refresh}
+              onOpenConnection={() => setConnectOpen(true)}
+            />
+          ) : (
+            <>
           {route.name === 'beranda' && (
             <Dashboard
               draft={draft}
@@ -401,6 +430,8 @@ export function App() {
                 </button>
               </Card>
             </div>
+          )}
+            </>
           )}
         </main>
 
