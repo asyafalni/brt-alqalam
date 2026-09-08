@@ -140,12 +140,27 @@ the gateway maintains: stock levels, low-stock, and status *counts* only.
    **The symptom if you skip this:** sign-in works, the Admin screen says your token is valid,
    and the role shows as empty — which looks exactly like "you are not an admin". The screen says
    which of the two it is, because from the app they are otherwise identical.
-4. **Create the users.** Each marbot gets a Clerk user record even though they never log in —
-   it is where their name and `privateMetadata.pinHash` live.
+4. **Create Clerk users ONLY for the people who sign in** — you, and your boss. That is admins.
+
+   > ⚠️ **CORRECTED 2026-09-08.** This step used to read *"each marbot gets a Clerk user record …
+   > it is where their name and `privateMetadata.pinHash` live."* **That is not how it was built.**
+   > §65.4 had already found that Clerk cannot look a user up by `private_metadata`, so the
+   > `pinHash → userId` map had to live in the gateway's own store — and it does. Verified in the
+   > code: `resolvePin()` reads `PropertiesService`, and **the gateway contains no `UrlFetchApp`
+   > call at all**, so it never talks to Clerk's API under any circumstance.
+   >
+   > **Consequences, both in your favour:**
+   > - **Marbot need no Clerk record.** Their name, role and PIN hash are created by
+   >   `setUserPin()` in the Apps Script editor and live only in Script Properties.
+   > - **The Clerk secret key `sk_...` is never needed anywhere.** Do not paste it into Script
+   >   Properties, or anywhere else. Nothing reads it.
 
 **What I need:** the **publishable key** (`pk_...`) and your Clerk **instance/frontend API URL**.
-**Keep the secret key (`sk_...`) to yourself** — it goes straight into Apps Script Script
-Properties in Stage 3. Clerk's free tier (10,000 MAU) is far beyond what this needs.
+**Keep the secret key (`sk_...`) to yourself — and note it is never used at all** (see the
+correction above; the gateway makes no calls to Clerk's API). The gateway needs exactly seven
+Script Properties, and no Clerk secret key is among them: `CLERK_JWT_KEY`, `CLERK_ISSUER`,
+`SPREADSHEET_ID`, `PIN_PEPPER`, `USERS`, `DEVICES`, `CATALOG_REV`. Clerk's free tier
+(10,000 MAU) is far beyond what this needs.
 
 ### PINs — how they actually work
 Each person gets one 4-digit PIN that both identifies and verifies them (Model C). The PIN is
@@ -287,17 +302,21 @@ Nothing below blocks Stage 0 — the app is usable today. These unblock *me*.
 - [x] **Stage 1** — spreadsheet created, all seven tabs imported, **not published**
 - [x] **Stage 1** — `checkSpreadsheet()` green: 7/7 tabs, every header matching column for column
 - [x] **Stage 3** — the four `.gs` files and the manifest pasted in; `setupGateway()` run
-- [ ] **Stage 1** — send me the spreadsheet ID
 - [x] **Stage 2** — ~~check Clerk → Configure → JWT Templates~~ **available on the free plan**
 - [x] **Stage 2** — app created, **Email + Username** both enabled *(a marbot may have no email,
       and Clerk cannot create a user with no identifier at all — see below)*
 - [x] **Stage 2** — JWT template `gateway`, custom **HS256** signing key, claims `uid`/`role`/`name`
 - [x] **Stage 2** — publishable key collected → `app/src/data/clerk.ts` *(committed; it is base64
       of the instance domain, not a credential)*
-- [ ] **Stage 2** — create the three roles and the user records
+- [ ] **Stage 2** — create a Clerk user for **yourself**, set Public metadata `{"role":
+      "admin_utama"}`, and sign in at `#/admin` *(marbot need no Clerk record — see step 4)*
+- [ ] **Stage 2** — `setUserPin()` in the Apps Script editor, once per marbot
+- [x] **Stage 1** — ~~send me the spreadsheet ID~~ *(given: recorded below)*
 - [x] **Stage 1** — spreadsheet ID: `1-qc4klyhOUvaNDmYgKcA-TgwOlpgCD7CG9AI4RQ9cz0`
       *(not a credential — the sheet's own sharing settings are what protect it)*
-- [ ] **Stage 3** — create the bound Apps Script, set the three Script Properties
+- [x] **Stage 3** — bound Apps Script created, deployed, `CLERK_JWT_KEY` confirmed present
+      *(a token signed with a wrong key is rejected as `bad-signature`, which only happens after
+      the key check — so the key is set, proven without anybody revealing it)*
 - [ ] **Stage 3** — deploy as *Execute as: Me* + *Who has access: Anyone*, send me the URL
 - [ ] **Stage 4** — decide which device is the kiosk, and where it physically lives
 - [x] **Stage 5** — deployed to **Fly.io**: https://brt-alqalam.fly.dev *(hash routing, so no
