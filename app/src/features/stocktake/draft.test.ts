@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   archiveLocation,
@@ -21,6 +23,8 @@ import {
   toInput,
   toInstancesCsv,
   toItemsCsv,
+  toLocationsCsv,
+  toRequestsCsv,
   toStockCsv,
   updateEntry,
   updateItem,
@@ -105,10 +109,27 @@ describe('CSV export', () => {
     expect(parsed.ok[1].trackBy).toBe('instance');
   });
 
-  it('emits the exact header the Items sheet tab expects', () => {
-    expect(toItemsCsv([]).trim())
-      // No `initialStock` or `locationId`: those are the Stock tab now, one row per rack.
-      .toBe('itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId');
+  /*
+   * Compared against `sheets/*.csv`, NOT against a string written out here.
+   *
+   * The previous version asserted the header the writer already emitted, so it pinned the
+   * writer to itself and stayed green while the writer, the sheet template and the gateway's
+   * own header check disagreed: `keterangan` (§67) was missing from the export, and an Items
+   * file produced by the stock-take would have been rejected by `checkSpreadsheet()`. A test
+   * that reads the same file the sheet is imported from cannot drift that way.
+   */
+  it.each([
+    ['Items', () => toItemsCsv([])],
+    ['Stock', () => toStockCsv([])],
+    ['Requests', () => toRequestsCsv([])],
+    ['Categories', () => toCategoriesCsv([])],
+    ['Locations', () => toLocationsCsv([])],
+  ])('emits the exact header the %s sheet tab expects', (tab, write) => {
+    // From `process.cwd()` (which is `app/`), not `import.meta.url`: the test environment
+    // rewrites module URLs to `/@fs/...`, which `readFileSync` cannot open.
+    const template = readFileSync(resolve(process.cwd(), '..', 'sheets', `${tab}.csv`), 'utf8')
+      .split('\n')[0].trim();
+    expect(write().trim().split('\n')[0]).toBe(template);
   });
 
   it('round-trips a chosen drawing, and leaves it blank when the guess is being trusted', () => {

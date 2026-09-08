@@ -1,0 +1,8 @@
+requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note
+REQ-0001,beli,Sapu ijuk besar,,,2,buah,27500,"Gagang sapu yang lama patah, tinggal satu yang bisa dipakai.",https://www.tokopedia.com/,diajukan,USR-DEMO,2026-09-06T00:46:25.109Z,,,
+REQ-0002,beli,Karpet sajadah 5 meter,,,3,roll,,Untuk shaf tambahan saat Ramadhan. Harga belum dicek.,,diajukan,USR-DEMO,2026-09-03T00:46:25.109Z,,,
+REQ-0003,beli,Sabun cuci tangan,ITM-0001,,4,galon,38000,Stok menipis menjelang Ramadhan.,,selesai,USR-DEMO,2026-08-19T00:46:25.109Z,USR-DEMO,2026-08-21T00:46:25.109Z,Dibeli di toko depan masjid.
+REQ-0004,beli,Mesin cuci karpet,,,1,unit,4200000,Supaya tidak perlu menyewa tiap tahun.,,dibatalkan,USR-DEMO,2026-07-30T00:46:25.109Z,USR-DEMO,2026-08-04T00:46:25.109Z,Belum masuk anggaran tahun ini. Tetap sewa dulu.
+REQ-0005,perbaikan,Obeng set #2,ITM-0011,ALQ-ITM-0011-002,1,,85000,"Mata obeng aus dan chucknya oblak. Motornya masih bagus, sayang kalau dibuang.",,diajukan,USR-DEMO,2026-09-05T00:46:25.109Z,,,
+REQ-0006,beli,Pisau potong (pengganti yang hilang),ITM-0013,ALQ-ITM-0013-007,2,buah,95000,Dua bilah tidak kembali setelah qurban dan sampai sekarang tidak ketemu.,,diajukan,USR-DEMO,2026-09-07T00:46:25.109Z,,,
+REQ-0007,perbaikan,Pisau potong #3,ITM-0013,ALQ-ITM-0013-003,1,,60000,Gagangnya retak sampai ke pangkal.,,dibatalkan,USR-DEMO,2026-08-24T00:46:25.109Z,USR-DEMO,2026-08-25T00:46:25.109Z,Biaya perbaikannya hampir sama dengan beli baru. Ajukan beli saja.

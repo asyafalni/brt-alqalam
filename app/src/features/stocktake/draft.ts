@@ -114,7 +114,8 @@ export const isBlocking = (p: DraftProblem): boolean => !p.message.endsWith('tet
 // Export — must match sheets/Items.csv exactly, because it is imported into that tab.
 // ---------------------------------------------------------------------------
 
-const ITEMS_HEADER = 'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,artId';
+const ITEMS_HEADER =
+  'itemId,barcode,name,categoryId,kind,unit,trackBy,minStock,active,keterangan,artId';
 const STOCK_HEADER = 'itemId,locationId,initialStock';
 const REQUESTS_HEADER =
   'requestId,type,name,itemId,assetId,qty,unit,price,reason,url,status,requestedBy,requestedTs,decidedBy,decidedTs,note';
@@ -132,6 +133,12 @@ export function toItemsCsv(items: readonly Item[]): string {
     i.trackBy,
     i.minStock == null ? '(-)' : String(i.minStock),
     i.active ? 'TRUE' : 'FALSE',
+    /* §67: the NOTIFIKASI STOK screen sources its KETERANGAN column from the item, not from
+       the breaching transaction. It was missing from this writer while the sheet template and
+       the gateway's own header check both expected it — so an export from the stock-take
+       produced a file `checkSpreadsheet()` would reject, and the round trip the whole CSV
+       path exists for did not close. */
+    i.keterangan ?? '',
     i.artId ?? '',
   ].map(cell).join(','));
   return [ITEMS_HEADER, ...rows].join('\n') + '\n';

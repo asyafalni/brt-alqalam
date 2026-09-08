@@ -1,0 +1,15 @@
+locationId,code,name,zone,order,active,artId
+LOC-A1,A1,Sabun & pembersih,Gudang Utama,1,TRUE,rak
+LOC-A2,A2,Kain & kanebo,Gudang Utama,2,TRUE,lemari
+LOC-A3,A3,Plastik & kantong,Gudang Utama,3,TRUE,keranjang
+LOC-A4,A4,Tisu & pengharum,Gudang Utama,4,TRUE,dinding
+LOC-B1,B1,Alat listrik,Gudang Utama,5,TRUE,laci
+LOC-B2,B2,Lampu & kabel,Gudang Utama,6,TRUE,gantungan
+LOC-B3,B3,Elektronik & audio,Gudang Utama,7,TRUE,lemari
+LOC-C1,C1,Pipa & kran,Gudang Utama,8,TRUE,rak
+LOC-C2,C2,Alat tukang,Gudang Utama,9,TRUE,gantungan
+LOC-P1,P1,Pisau & talenan,Gudang PHBI,1,TRUE,lemari
+LOC-P2,P2,Terpal & tali,Gudang PHBI,2,TRUE,palet
+LOC-P3,P3,Timbangan & wadah,Gudang PHBI,3,TRUE,keranjang
+LOC-K1,K1,Alat kebersihan harian,Ruang Marbot,1,TRUE,rak
+LOC-K2,K2,Stok harian,Ruang Marbot,2,TRUE,peti
