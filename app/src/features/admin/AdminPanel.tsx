@@ -23,6 +23,7 @@ import type { Connection } from '../../state/connection';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 import { Logo } from '../../components/Logo';
 import { MasjidArt } from '../../components/MasjidArt';
+import { Lanterns } from '../../components/Lanterns';
 import { Roster } from './Roster';
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
@@ -62,28 +63,21 @@ function HallPanel() {
              and down in brightness so the ink gradient has something to sit on rather than
              something to fight. */
           class="absolute inset-0 h-full w-full object-cover
-                 [filter:saturate(0.78)_contrast(1.06)_brightness(0.86)_sepia(0.22)]"
+                 [filter:saturate(0.7)_contrast(1.1)_brightness(0.6)_sepia(0.28)]"
           onError={() => setPhoto(false)}
         />
       )}
 
       {/* Warm ink from the bottom, NOT slate: a cool grey scrim over a warm photograph reads as
           a dirty window. Same hue family as the brass. */}
-      <div class="absolute inset-0 bg-gradient-to-t from-[#0d0a06] via-[#0d0a06]/45 to-[#0d0a06]/5" />
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b0805] via-[#0b0805]/55 to-[#0b0805]/25" />
       {/* A vignette, so the eye goes to the mihrab rather than to the corners. */}
-      <div class="absolute inset-0 [background:radial-gradient(ellipse_at_50%_45%,transparent_45%,rgba(13,10,6,0.42)_100%)]" />
+      <div class="absolute inset-0 [background:radial-gradient(ellipse_at_50%_42%,transparent_30%,rgba(11,8,5,0.62)_100%)]" />
 
-      {/* The one motif the building repeats, drawn in light over the room — the only ornament on
-          this half that is ours rather than the photographer's. */}
-      <svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <path
-          d="M22 96 V44 Q50 8 78 44 V96"
-          fill="none"
-          stroke="rgba(233,213,167,0.28)"
-          stroke-width="0.5"
-          vector-effect="non-scaling-stroke"
-        />
-      </svg>
+      {/* Lamps instead of the arch that used to be stroked across the whole frame. At full
+          width that line read as a ghost doorway standing in the hall — an ornament has to be
+          quiet enough to be taken for part of the room, and that one was not. */}
+      <Lanterns />
 
       <div class="absolute inset-x-0 bottom-0 hidden p-8 lg:block lg:p-12">
         <div class="flex items-center gap-3">
