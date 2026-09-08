@@ -56,6 +56,9 @@ function doPost(e) {
       case 'putCatalog': return handlePutCatalog(body);
       case 'whoami': return handleWhoami(body);
       case 'stateDetailed': return handleDetailedRead(body);
+      case 'listUsers': return handleListUsers(body);
+      case 'setUserPin': return handleSetUserPin(body);
+      case 'setUserActive': return handleSetUserActive(body);
       default: return fail('unknown_op');
     }
   } catch (err) {
@@ -69,7 +72,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.4.0-admin-read';
+var GATEWAY_VERSION = '0.5.0-roster';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -311,4 +314,49 @@ function handlePutCatalog(body) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// The roster — who holds a PIN. Admin only, and a PIN never travels back out.
+// ---------------------------------------------------------------------------
+
+function handleListUsers(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  return respond({ ok: true, users: rosterList() });
+}
+
+/**
+ * Issue or replace somebody's PIN.
+ *
+ * The reply never contains the PIN, and neither does any log line: the admin who typed it is
+ * the one who tells the marbot, and after that the only copy is in that person's head. A PIN
+ * that can be read back out of the system is a PIN that will be, eventually, by somebody who
+ * should not have it.
+ */
+function handleSetUserPin(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return fail('busy');
+  try {
+    /* Under the lock, because uniqueness is a check-then-write: two admins issuing "1234" at the
+       same moment would both find it free and both write it, and the PIN alone resolves WHO you
+       are (Part VII) — so the loser's withdrawals would be recorded as the winner's. */
+    var result = rosterSetPin(body.name, body.role, body.pin, body.userId);
+    if (!result.ok) return fail(result.error);
+    return respond({ ok: true, userId: result.userId, users: rosterList() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function handleSetUserActive(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  var result = rosterDisable(body.userId, body.disabled === true);
+  if (!result.ok) return fail(result.error);
+  return respond({ ok: true, users: rosterList() });
 }

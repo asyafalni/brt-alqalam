@@ -318,3 +318,60 @@ export async function fetchStateAsAdmin(
   if (!json.state) throw new GatewayError('unexpected-reply', json);
   return readState(json.state as Record<string, unknown>);
 }
+
+// ---------------------------------------------------------------------------
+// The roster — who holds a PIN.
+// ---------------------------------------------------------------------------
+
+export type RosterRole = 'admin_utama' | 'admin' | 'anggota';
+
+export interface RosterUser {
+  userId: string;
+  name: string;
+  role: RosterRole;
+  /** Retired: their PIN no longer opens a session, their rows in the log are untouched. */
+  disabled: boolean;
+}
+
+const readUsers = (json: Record<string, unknown>): RosterUser[] =>
+  (Array.isArray(json.users) ? json.users : []).map((u) => {
+    const r = u as Record<string, unknown>;
+    return {
+      userId: String(r.userId ?? ''),
+      name: String(r.name ?? ''),
+      role: (String(r.role ?? 'anggota') as RosterRole),
+      disabled: r.disabled === true,
+    };
+  });
+
+export async function listRoster(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<RosterUser[]> {
+  return readUsers(await call(url, { op: 'listUsers', token }, fetchImpl));
+}
+
+/**
+ * Issue or replace somebody's PIN.
+ *
+ * The PIN goes ONE WAY. Nothing reads it back — not this function, not the roster list, not any
+ * log line — so the admin who typed it is the only person who can pass it on. A PIN that can be
+ * read out of the system is one that eventually will be, by somebody who should not have it.
+ *
+ * Omit `userId` to create somebody; pass it to change an existing person, which is what lets a
+ * name be corrected without minting a second record for the same human.
+ */
+export async function setRosterPin(
+  url: string,
+  token: string,
+  user: { userId?: string; name: string; role: RosterRole; pin: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<RosterUser[]> {
+  return readUsers(await call(url, { op: 'setUserPin', token, ...user }, fetchImpl));
+}
+
+export async function setRosterActive(
+  url: string, token: string, userId: string, disabled: boolean,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RosterUser[]> {
+  return readUsers(await call(url, { op: 'setUserActive', token, userId, disabled }, fetchImpl));
+}

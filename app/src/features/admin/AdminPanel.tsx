@@ -23,6 +23,7 @@ import type { Connection } from '../../state/connection';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 import { Logo } from '../../components/Logo';
 import { MasjidArt } from '../../components/MasjidArt';
+import { Roster } from './Roster';
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
 export interface AdminSession {
@@ -508,7 +509,17 @@ export function AdminSummary(
     onSignIn: () => void;
   },
 ) {
-  if (admin) return <AdminPanel connection={connection} admin={admin} onAdmin={onAdmin} />;
+  if (admin) {
+    return (
+      <div class="space-y-4">
+        <AdminPanel connection={connection} admin={admin} onAdmin={onAdmin} />
+        {/* Only for a signed-in admin, and only when there is a gateway to ask: the roster lives
+            in the gateway's own store, not in the spreadsheet, because a PIN hash must never be
+            in a document somebody can share (§65.4). */}
+        {connection && <Roster url={connection.url} getToken={admin.getToken} />}
+      </div>
+    );
+  }
 
   return (
     <div class="space-y-4">

@@ -42,7 +42,9 @@ function fakeBook(tabs: Record<string, Tab>) {
 }
 
 function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
-  const store: Record<string, string> = { CLERK_JWT_KEY: KEY, CLERK_ISSUER: ISS, ...props };
+  const store: Record<string, string> = {
+    CLERK_JWT_KEY: KEY, CLERK_ISSUER: ISS, PIN_PEPPER: 'test-pepper', ...props,
+  };
   const sandbox: Record<string, unknown> = {
     PropertiesService: {
       getScriptProperties: () => ({
@@ -65,12 +67,15 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
       newBlob: (b: number[]) => ({ getDataAsString: () => Buffer.from(b).toString('utf8') }),
     },
   };
-  const src = ['auth.gs', 'sheets.gs', 'Code.gs']
+  // Every .gs file, because Apps Script gives them ONE global scope and a harness that loads
+  // a subset will report "not defined" for code that works perfectly in production.
+  const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'Code.gs']
     .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
     .join('\n;\n');
   return new Function(
     ...Object.keys(sandbox),
-    `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, writeTab, txnRow, catalogRev,
+    `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
+       handleSetUserPin, handleSetUserActive, writeTab, txnRow, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -233,5 +238,73 @@ describe('the detailed tier accepts either credential', () => {
   it('refuses when neither credential is present', () => {
     const g = load(freshTabs());
     expect(g.handleDetailedRead({})).toMatchObject({ ok: false, error: 'no_session' });
+  });
+});
+
+describe('the roster', () => {
+  const load2 = () => load(freshTabs());
+
+  it('refuses to issue a PIN without an admin token', () => {
+    const g = load2();
+    expect(g.handleSetUserPin({ name: 'Budi', role: 'anggota', pin: '1234' }).ok).toBe(false);
+  });
+
+  it('refuses a role outside the three', () => {
+    const g = load2();
+    expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'Admin', pin: '1234' }))
+      .toMatchObject({ ok: false, error: 'bad_role' });
+  });
+
+  it.each([['12'], ['abcd'], ['123456789'], ['']])('refuses the PIN %s', (pin) => {
+    const g = load2();
+    expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin }))
+      .toMatchObject({ ok: false, error: 'bad_pin' });
+  });
+
+  it('refuses a PIN somebody else already has — the PIN IS the identity', () => {
+    const g = load2();
+    expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' }).ok).toBe(true);
+    expect(g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' }))
+      .toMatchObject({ ok: false, error: 'pin_taken' });
+  });
+
+  it('lets one person keep their own PIN while changing their name', () => {
+    const g = load2();
+    const first = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    const again = g.handleSetUserPin({
+      token: admin, userId: first.userId, name: 'Budi Santoso', role: 'anggota', pin: '4321',
+    });
+    expect(again.ok).toBe(true);
+    expect(again.users).toHaveLength(1);
+    expect(again.users[0].name).toBe('Budi Santoso');
+  });
+
+  it('never returns a hash, a salt or the PIN', () => {
+    const g = load2();
+    const r = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    const text = JSON.stringify(r);
+    expect(text).not.toContain('4321');
+    expect(text).not.toContain('pinHash');
+    expect(text).not.toContain('salt');
+    expect(Object.keys(r.users[0]).sort()).toEqual(['disabled', 'name', 'role', 'userId']);
+  });
+
+  it('keeps a retired person’s PIN reserved, so old log rows stay theirs', () => {
+    const g = load2();
+    const made = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    g.handleSetUserActive({ token: admin, userId: made.userId, disabled: true });
+    expect(g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' }))
+      .toMatchObject({ ok: false, error: 'pin_taken' });
+  });
+
+  it('will not disable admin_utama, which the spec draws as Tetap', () => {
+    const g = load2();
+    const made = g.handleSetUserPin({ token: admin, name: 'Bos', role: 'admin_utama', pin: '9999' });
+    expect(g.handleSetUserActive({ token: admin, userId: made.userId, disabled: true }))
+      .toMatchObject({ ok: false, error: 'admin_utama_permanent' });
+  });
+
+  it('lists nobody before anybody is added', () => {
+    expect(load2().handleListUsers({ token: admin })).toMatchObject({ ok: true, users: [] });
   });
 });
