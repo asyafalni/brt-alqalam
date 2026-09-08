@@ -31,9 +31,17 @@ const explain = (e: unknown) => {
 };
 
 export function SubmitRequest(
-  { url, deviceSecret, getToken, units, onDone }:
+  { url, deviceSecret, getToken, units, prefill, onDone }:
   {
     url: string;
+    /**
+     * Arrived from a broken or lost unit on the Aset screen.
+     *
+     * This is the path that matters most for repairs: the person who FINDS a broken knife is a
+     * marbot, not an admin, and before this the link took them to a screen they are not allowed
+     * to open and bounced them back to Beranda.
+     */
+    prefill?: { type: 'beli' | 'perbaikan'; assetId?: string; name?: string };
     /** Set on an enrolled kiosk: lets somebody file with a PIN and no account. */
     deviceSecret?: string;
     /** Set when an admin is signed in: no PIN step at all. */
@@ -43,8 +51,8 @@ export function SubmitRequest(
     onDone: () => void;
   },
 ) {
-  const [type, setType] = useState<'beli' | 'perbaikan'>('beli');
-  const [name, setName] = useState('');
+  const [type, setType] = useState<'beli' | 'perbaikan'>(prefill?.type ?? 'beli');
+  const [name, setName] = useState(prefill?.name ?? '');
   const [qty, setQty] = useState('1');
   const [unit, setUnit] = useState(units[0] ?? 'buah');
   const [reason, setReason] = useState('');
@@ -66,6 +74,9 @@ export function SubmitRequest(
     reason: reason.trim(),
     ...(price.trim() ? { price: Number(price) } : {}),
     ...(url_.trim() ? { url: url_.trim() } : {}),
+    /* Carried through so the request points at the actual unit. Without it a repair says
+       "Pisau potong" and leaves somebody to work out which of the six. */
+    ...(prefill?.assetId ? { assetId: prefill.assetId } : {}),
   });
 
   async function send(e: Event) {
@@ -135,6 +146,12 @@ export function SubmitRequest(
 
   return (
     <form class="space-y-4" onSubmit={send}>
+      {prefill?.assetId && (
+        <p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Untuk unit <span class="font-mono font-semibold text-slate-900">{prefill.assetId}</span>
+        </p>
+      )}
+
       {/* Two buttons, not a dropdown: there are exactly two kinds and the choice changes what
           the rest of the form means. */}
       <div class="grid grid-cols-2 gap-2">

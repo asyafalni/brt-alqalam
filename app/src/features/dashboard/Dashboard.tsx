@@ -364,8 +364,8 @@ export function Dashboard(
         ) : onAjukan ? (
           <Action
             icon={ShoppingCart}
-            title="Ajukan pembelian"
-            body="Ada yang habis atau rusak? Ajukan di sini — pengurus yang memutuskan."
+            title="Ajukan barang"
+            body="Perlu beli baru, atau ada yang rusak dan bisa diperbaiki? Ajukan di sini."
             onClick={onAjukan}
           />
         ) : null}

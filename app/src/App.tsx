@@ -43,6 +43,7 @@ import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
 import { SubmitRequest } from './features/requests/SubmitRequest';
+import { nameOfAsset } from './features/requests/assetName';
 import { PinPad } from './features/gateway/PinPad';
 import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
@@ -118,7 +119,9 @@ export function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   /* Filing a request is open to everybody; reading the list is not (§39). So the form is a
      panel anybody can open, and the list stays a screen only an admin has. */
-  const [ajukanOpen, setAjukanOpen] = useState(false);
+  const [ajukanOpen, setAjukanOpen] = useState<
+    { type: 'beli' | 'perbaikan'; assetId?: string; name?: string } | null
+  >(null);
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
   const [moving, setMoving] = useState<MovementTarget | null>(null);
@@ -185,7 +188,22 @@ export function App() {
     <TopProgress label={firstLoad ? 'Memuat register' : 'Memperbarui data'} />
   );
 
-  if ((route.name === 'pengajuan' || route.name === 'histori') && connection && !admin) {
+  /* `!firstLoad` is load-bearing, not caution: this runs during render, and on the first pass a
+     connected device still has the EMPTY local draft — so the prefilled name resolved to '' and,
+     because the panel was already open by then, never resolved again. Waiting for the register
+     costs one render and is the difference between "Pisau potong (Pisau #1)" and a blank field. */
+  if ((route.name === 'pengajuan' || route.name === 'histori') && connection && !admin && !firstLoad) {
+    /* A prefilled link is somebody trying to FILE, not to read — and it is the important case
+       for repairs, because the person who finds a broken knife is a marbot, not an admin.
+       Bouncing them to Beranda made "Ajukan perbaikan" a dead button for everyone who is most
+       likely to press it. They get the form instead of the list. */
+    if (route.name === 'pengajuan' && route.type && route.assetId && !ajukanOpen) {
+      setAjukanOpen({
+        type: route.type,
+        assetId: route.assetId,
+        name: nameOfAsset(draft, inventory, route.assetId),
+      });
+    }
     navigate({ name: 'beranda' });
   }
 
@@ -304,7 +322,7 @@ export function App() {
               inventory={inventory}
               now={now}
               canReview={!connection || admin != null}
-              onAjukan={() => setAjukanOpen(true)}
+              onAjukan={() => setAjukanOpen({ type: 'beli' })}
               onNavigate={navigate}
             />
           )}
@@ -470,10 +488,10 @@ export function App() {
         </Sheet>
 
         <Sheet
-          open={ajukanOpen}
-          title="Ajukan pembelian atau perbaikan"
+          open={ajukanOpen !== null}
+          title={ajukanOpen?.type === 'perbaikan' ? 'Ajukan perbaikan' : 'Ajukan pembelian atau perbaikan'}
           description="Pengurus yang memutuskan."
-          onClose={() => setAjukanOpen(false)}
+          onClose={() => setAjukanOpen(null)}
         >
           {connection ? (
             <SubmitRequest
@@ -481,7 +499,11 @@ export function App() {
               deviceSecret={connection.deviceSecret}
               getToken={admin?.getToken}
               units={[...new Set(draft.items.map((i) => i.unit).filter(Boolean))].sort()}
-              onDone={() => setAjukanOpen(false)}
+              prefill={ajukanOpen ?? undefined}
+              /* Remounts on a different unit, so arriving from a second broken knife does not
+                 reuse the first one's half-typed form. */
+              key={ajukanOpen?.assetId ?? 'baru'}
+              onDone={() => setAjukanOpen(null)}
             />
           ) : (
             <p class="text-sm text-slate-600">
