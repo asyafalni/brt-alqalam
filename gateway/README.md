@@ -48,9 +48,15 @@ skip without noticing.
 
 ```bash
 cd gateway
-npx clasp login          # once, opens a browser
-npm run ship             # tests, then push, then redeploy the SAME deployment id
+npm install                        # installs clasp locally
+npx @google/clasp login            # once, opens a browser
+npm run ship                       # tests, then push, then redeploy the SAME deployment id
 ```
+
+> `npx clasp` does **not** work: the package is `@google/clasp`, and bare `clasp` resolves to a
+> different package entirely — npm reports "could not determine executable to run", which reads
+> like a broken install rather than a wrong name. After `npm install` the npm scripts find the
+> local binary, so only the login needs the long form.
 
 `npm run deploy` passes `-i <deploymentId>`, so it updates the deployment already in use rather
 than making a new one. That matters more than convenience: a new deployment means a new URL, and
