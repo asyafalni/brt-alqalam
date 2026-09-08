@@ -23,6 +23,19 @@ import { useDialog } from './useDialog';
 
 interface NavItem { name: string; icon: typeof Package; route: Route; badge?: number }
 
+/**
+ * How wide the rail is, in px — the one place that decides it.
+ *
+ * Exported because the footer's flyouts have to open just past its right edge, and a second copy
+ * of these three numbers somewhere else would drift the moment one of them changed.
+ */
+export const railWidth = (isMobile: boolean, collapsed: boolean) =>
+  (isMobile ? 280 : collapsed ? 90 : 260);
+
+/** Where that edge actually is, including the 16px margin the rail carries on desktop. */
+export const railRightEdge = (isMobile: boolean, collapsed: boolean) =>
+  railWidth(isMobile, collapsed) + (isMobile ? 0 : 16) + 8;
+
 interface Props {
   route: Route;
   collapsed: boolean;
@@ -71,11 +84,10 @@ export function Sidebar(p: Props) {
     // drop to when the summary looks wrong.
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
     { name: 'Histori Data', icon: History, route: { name: 'histori' } },
-    /* Last, and the only entry that leads anywhere a marbot has no business going. It stays in
-       the list rather than hiding behind a gesture: an admin has to be able to FIND it, and
-       hiding it would protect nothing — the password is what protects it, and tapping through
-       to a sign-in form costs a curious marbot ten seconds and teaches them it is not for them. */
-    { name: 'Admin', icon: ShieldCheck, route: { name: 'admin' } },
+    /* No `Admin` entry here. It moved to the footer beside the gateway connection, which is
+       where it belongs — both are facts about THIS DEVICE rather than places in the register,
+       and both now open the same kind of flyout. Leaving a nav item as well would be two doors
+       to one room, which §82 spends a whole Part arguing against. */
   ];
 
   /*
@@ -119,7 +131,7 @@ export function Sidebar(p: Props) {
             : 'Tersambung ke gateway. Perangkat ini hanya membaca — tidak bisa mencatat.',
         };
 
-  const width = p.isMobile ? '280px' : p.collapsed ? '90px' : '260px';
+  const width = `${railWidth(p.isMobile, p.collapsed)}px`;
   const showText = !p.collapsed || p.isMobile;
 
   return (

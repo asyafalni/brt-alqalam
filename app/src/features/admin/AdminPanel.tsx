@@ -45,25 +45,40 @@ type Phase = 'loading' | 'signed-out' | 'checking' | 'ready' | 'error';
 function HallPanel() {
   const [photo, setPhoto] = useState(true);
   return (
-    <div class="relative h-full w-full overflow-hidden bg-slate-900">
+    <div class="relative h-full w-full overflow-hidden bg-[#14100b]">
+      {/* The drawing stays UNDERNEATH the photograph rather than being replaced by it. It costs
+          a few kilobytes, it paints instantly, and it means this panel is never a broken image
+          or an empty black rectangle while a photo is still arriving on gudang wifi. */}
       <MasjidArt class="absolute inset-0 h-full w-full" />
+
       {photo && (
         <img
-          src="/masjid.jpg"
+          src="/masjid.webp"
           alt=""
-          class="absolute inset-0 h-full w-full object-cover"
+          /* GRADED, not merely darkened. The photograph is bright daylight — cream walls, a
+             green carpet — and the rest of this screen is brass on ink. Dropped in untouched it
+             put two unrelated palettes side by side. The filter pulls it toward the warm end
+             and down in brightness so the ink gradient has something to sit on rather than
+             something to fight. */
+          class="absolute inset-0 h-full w-full object-cover
+                 [filter:saturate(0.78)_contrast(1.06)_brightness(0.86)_sepia(0.22)]"
           onError={() => setPhoto(false)}
         />
       )}
-      {/* Ink from the bottom, so the wordmark sits on something dark whichever image is behind. */}
-      <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/55 to-slate-950/15" />
-      {/* A pointed arch drawn in light over the room — the one motif the building repeats, and
-          the only ornament on this page that is ours rather than the photographer's. */}
+
+      {/* Warm ink from the bottom, NOT slate: a cool grey scrim over a warm photograph reads as
+          a dirty window. Same hue family as the brass. */}
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0d0a06] via-[#0d0a06]/45 to-[#0d0a06]/5" />
+      {/* A vignette, so the eye goes to the mihrab rather than to the corners. */}
+      <div class="absolute inset-0 [background:radial-gradient(ellipse_at_50%_45%,transparent_45%,rgba(13,10,6,0.42)_100%)]" />
+
+      {/* The one motif the building repeats, drawn in light over the room — the only ornament on
+          this half that is ours rather than the photographer's. */}
       <svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <path
           d="M22 96 V44 Q50 8 78 44 V96"
           fill="none"
-          stroke="rgba(233,213,167,0.30)"
+          stroke="rgba(233,213,167,0.28)"
           stroke-width="0.5"
           vector-effect="non-scaling-stroke"
         />
@@ -76,10 +91,10 @@ function HallPanel() {
           </div>
           <div>
             <p class="text-lg font-bold leading-tight text-white">BRT Masjid Al-Qalam</p>
-            <p class="text-sm text-slate-300">Sistem Inventaris</p>
+            <p class="text-sm text-[#d8c9a8]">Sistem Inventaris</p>
           </div>
         </div>
-        <p class="mt-5 max-w-sm text-sm leading-relaxed text-slate-300">
+        <p class="mt-5 max-w-sm text-sm leading-relaxed text-[#c7b795]">
           Supaya kita bisa fokus beribadah di masjid — barangnya tercatat, dan tidak ada yang
           perlu mencari-cari lagi.
         </p>
@@ -474,6 +489,52 @@ export function AdminPanel(
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The admin panel as a side sheet, opened from the sidebar's own status row.
+ *
+ * SIGNED IN, this is the whole admin screen — who you are, what the gateway says your role is,
+ * and the way out. It was a route with a page header and one card on it, which is a whole
+ * destination for a fact you want to glance at; the sheet puts it beside whatever you were
+ * doing, like the gateway connection beneath it.
+ *
+ * SIGNED OUT, it does NOT hold the sign-in form. Signing in is the one thing on this screen that
+ * deserves the full page — it is a door, not a setting — so this offers the door instead of
+ * becoming a second, smaller one that would drift out of step with it.
+ */
+export function AdminSummary(
+  { connection, admin, onAdmin, onSignIn }:
+  {
+    connection: Connection | null;
+    admin: AdminSession | null;
+    onAdmin: (a: AdminSession | null) => void;
+    onSignIn: () => void;
+  },
+) {
+  if (admin) return <AdminPanel connection={connection} admin={admin} onAdmin={onAdmin} />;
+
+  return (
+    <div class="space-y-4">
+      <Card>
+        <h2 class="text-base font-bold text-slate-900">Belum masuk sebagai admin</h2>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+          Tanpa masuk, perangkat ini bisa melihat register tetapi tidak bisa mengubah katalog —
+          barang, rak, kategori, stok awal, dan pengajuan. Pengajuan juga tidak ditampilkan sama
+          sekali, karena isinya menyebut nama orang.
+        </p>
+        <Button class="mt-4" onClick={onSignIn}>
+          <ShieldCheck class="h-4 w-4" />
+          Masuk sebagai admin
+        </Button>
+      </Card>
+
+      <p class="px-1 text-xs leading-relaxed text-slate-500">
+        Marbot tidak perlu masuk di sini. Mereka mencatat pengambilan dengan PIN di kios, dan
+        itu memerlukan perangkat yang sudah didaftarkan — bukan akun.
+      </p>
     </div>
   );
 }

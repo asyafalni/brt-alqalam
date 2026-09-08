@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'octane';
 import { CircleCheck, ClipboardList, LayoutDashboard, MapPin, Package, TriangleAlert } from '@octanejs/lucide';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, railRightEdge } from './components/Sidebar';
+import { Flyout } from './components/Flyout';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card, PageHeader } from './components/ui';
@@ -46,7 +47,7 @@ import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
 import { useCatalogWriter } from './state/useCatalogWriter';
-import { AdminPanel } from './features/admin/AdminPanel';
+import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
 import type { AdminSession } from './features/admin/AdminPanel';
 import { append, closeSession, GatewayError, openSession } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
@@ -102,6 +103,10 @@ export function App() {
      Notifikasi Stok is a thing to glance at and act on, not a destination, and sending someone
      to Beranda from the middle of a stock-take costs them their place. */
   const [alertsOpen, setAlertsOpen] = useState(false);
+  /* The admin panel is a side sheet like the gateway connection, not a destination: it is a
+     fact you glance at and a way out, and it belongs beside whatever you were doing. Signing IN
+     is the exception and keeps its own full page — a door is not a setting. */
+  const [adminOpen, setAdminOpen] = useState(false);
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
   const [moving, setMoving] = useState<MovementTarget | null>(null);
@@ -160,6 +165,11 @@ export function App() {
   // is just something to mis-tap while aiming.
   /* Outside the shell entirely, until somebody is signed in. A sign-in wrapped in the sidebar
      and navbar of the app it guards reads as a settings panel; on its own it reads as a door. */
+  if (route.name === 'admin' && admin && !adminOpen) {
+    setAdminOpen(true);
+    navigate({ name: 'beranda' });
+  }
+
   if (route.name === 'admin' && !admin) {
     return (
       <AdminPanel
@@ -203,7 +213,7 @@ export function App() {
         queued={queued}
         canRecord={canRecord(connection)}
         admin={admin ? { name: admin.who.name, role: admin.who.role } : null}
-        onOpenAdmin={() => navigate({ name: 'admin' })}
+        onOpenAdmin={() => setAdminOpen(true)}
         onOpenConnection={() => setConnectOpen(true)}
         onClose={() => setCollapsed(true)}
       />
@@ -342,12 +352,6 @@ export function App() {
           {route.name === 'laporan' && (
             <Report draft={draft} inventory={inventory} now={now} />
           )}
-          {route.name === 'admin' && (
-            <div class="space-y-6 pt-2">
-              <PageHeader title="Admin" subtitle="Kamu bisa mengubah katalog bersama." />
-              <AdminPanel connection={connection} admin={admin} onAdmin={setAdmin} />
-            </div>
-          )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>
               <LabelSheet
@@ -420,8 +424,24 @@ export function App() {
           )}
         </Sheet>
 
-        <Sheet
+        <Flyout
+          open={adminOpen}
+          anchor={isMobile ? null : railRightEdge(isMobile, collapsed)}
+          title="Admin"
+          description="Siapa yang masuk, dan apa yang boleh diubah."
+          onClose={() => setAdminOpen(false)}
+        >
+          <AdminSummary
+            connection={connection}
+            admin={admin}
+            onAdmin={setAdmin}
+            onSignIn={() => { setAdminOpen(false); navigate({ name: 'admin' }); }}
+          />
+        </Flyout>
+
+        <Flyout
           open={connectOpen}
+          anchor={isMobile ? null : railRightEdge(isMobile, collapsed)}
           title="Sambungkan ke gateway"
           description="Sekali per perangkat, oleh admin."
           onClose={() => setConnectOpen(false)}
@@ -439,7 +459,7 @@ export function App() {
               setPinFor([]);
             }}
           />
-        </Sheet>
+        </Flyout>
 
         <Sheet
           open={pinFor !== null}
