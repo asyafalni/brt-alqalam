@@ -63,7 +63,12 @@ export function App() {
   // and the label sheet would quietly print a stale count.
   const localDraft = useDraft();
   const [connection, setConnection] = useState<Connection | null>(() => loadConnection());
-  const register = useRegister(connection);
+  /* An admin signed in with Clerk. Held here rather than inside the Admin screen because it is
+     what turns every catalog setter in the app from a noop into a write — the sign-in is on one
+     screen, the editing is on all of them. */
+  const [admin, setAdmin] = useState<AdminSession | null>(null);
+  /* Declared BEFORE the register, because an admin changes which tier it reads. */
+  const register = useRegister(connection, admin?.getToken);
   /* Rows appended in this visit, shown ahead of the next poll: somebody who records a
      withdrawal has to see the number move now, not in a minute. */
   const [freshTxns, setFreshTxns] = useState<Txn[]>([]);
@@ -79,10 +84,6 @@ export function App() {
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
      reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
-  /* An admin signed in with Clerk. Held here rather than inside the Admin screen because it is
-     what turns every catalog setter in the app from a noop into a write — the sign-in is on one
-     screen, the editing is on all of them. */
-  const [admin, setAdmin] = useState<AdminSession | null>(null);
   const writer = useCatalogWriter(
     connection?.url, register.state?.rev ?? 0, admin?.getToken, register.refresh,
   );
@@ -302,6 +303,9 @@ export function App() {
               draft={draft}
               inventory={inventory}
               now={now}
+              /* The public tier omits Requests entirely (§39), so an empty list here may mean
+                 "withheld" rather than "none" — and only this level knows which. */
+              withheld={register.state?.tier === 'public'}
               /* Keyed by the prefill so arriving from a second broken unit remounts the form
                  rather than reusing the state of the first. */
               key={route.assetId ?? 'pengajuan'}

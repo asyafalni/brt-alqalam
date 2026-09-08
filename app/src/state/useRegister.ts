@@ -15,7 +15,7 @@
 // failure this whole design exists to prevent — so it says it is stale and shows what it has.
 
 import { useEffect, useState } from 'octane';
-import { fetchState, GatewayError } from '../../../data/gateway';
+import { fetchState, fetchStateAsAdmin, GatewayError } from '../../../data/gateway';
 import type { GatewayState } from '../../../data/gateway';
 import type { Connection } from './connection';
 
@@ -33,7 +33,17 @@ export interface Register {
 /** How often a connected kiosk re-reads. Long, because Apps Script quotas are finite (§17). */
 const POLL_MS = 60_000;
 
-export function useRegister(connection: Connection | null): Register {
+export function useRegister(
+  connection: Connection | null,
+  /**
+   * Present when an admin is signed in, and it changes WHICH TIER this reads.
+   *
+   * Without it the app reads the public tier, which omits `Requests` entirely because those rows
+   * name people (§39) — so a signed-in admin saw an empty Pengajuan screen and no reason for it.
+   * The read function existed and simply was not wired to anything; this is that wire.
+   */
+  getAdminToken?: () => Promise<string>,
+): Register {
   const [state, setState] = useState<GatewayState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,7 +55,10 @@ export function useRegister(connection: Connection | null): Register {
 
     let alive = true;
     setLoading(true);
-    fetchState(connection.url)
+    const read = getAdminToken
+      ? getAdminToken().then((token) => fetchStateAsAdmin(connection.url, token))
+      : fetchState(connection.url);
+    read
       .then((next) => {
         if (!alive) return;
         setState(next);
@@ -61,7 +74,7 @@ export function useRegister(connection: Connection | null): Register {
       .finally(() => { if (alive) setLoading(false); });
 
     return () => { alive = false; };
-  }, [connection?.url, tick]);
+  }, [connection?.url, tick, !!getAdminToken]);
 
   useEffect(() => {
     if (!connection) return;
