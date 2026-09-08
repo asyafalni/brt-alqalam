@@ -65,11 +65,17 @@ export function Button(props: {
   disabled?: boolean;
   title?: string;
   'aria-label'?: string;
+  /* Defaults to `button`. A submit button inside a form needs `submit`, and without this the
+     form could only ever be sent by pressing Enter in a field — which is exactly the kind of
+     thing that works for whoever built it and for nobody else. */
+  type?: 'button' | 'submit';
   onClick?: () => void;
 }) {
-  const { variant = 'primary', size = 'md', class: cls = '', children, ...rest } = props;
+  const {
+    variant = 'primary', size = 'md', class: cls = '', type = 'button', children, ...rest
+  } = props;
   return (
-    <button type="button" class={`${BUTTON_BASE} ${VARIANT[variant]} ${SIZE[size]} ${cls}`} {...rest}>
+    <button type={type} class={`${BUTTON_BASE} ${VARIANT[variant]} ${SIZE[size]} ${cls}`} {...rest}>
       {children}
     </button>
   );

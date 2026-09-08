@@ -21,14 +21,32 @@ export interface ClerkUser {
   username?: string | null;
   fullName?: string | null;
 }
+/** Clerk's own error shape. Its messages are English, and better than anything we would invent. */
+export interface ClerkApiError {
+  errors?: { message?: string; longMessage?: string; code?: string }[];
+  message?: string;
+}
+
+export interface ClerkSignIn {
+  create(params: {
+    strategy: 'password'; identifier: string; password: string;
+  }): Promise<{ status: string; createdSessionId?: string }>;
+}
+
 export interface ClerkClient {
   load(opts?: Record<string, unknown>): Promise<void>;
-  mountSignIn(el: HTMLElement, opts?: Record<string, unknown>): void;
-  unmountSignIn(el: HTMLElement): void;
+  setActive(opts: { session: string }): Promise<void>;
   signOut(): Promise<void>;
   addListener(fn: (payload: unknown) => void): () => void;
+  client?: { signIn: ClerkSignIn } | null;
   session?: ClerkSession | null;
   user?: ClerkUser | null;
+}
+
+/** The first line Clerk gives us, which is usually the actionable one. */
+export function clerkMessage(err: unknown): string {
+  const e = err as ClerkApiError;
+  return e?.errors?.[0]?.longMessage ?? e?.errors?.[0]?.message ?? e?.message ?? String(err);
 }
 
 /**
@@ -53,19 +71,24 @@ function frontendApiHost(): string {
 const CLERK_JS_VERSION = '6';
 
 /**
- * `clerk.js`, NOT the `clerk.browser.js` that Clerk's own quickstart names.
+ * The browser build — which in v6 is HEADLESS, and that is why we draw our own sign-in form.
  *
- * Found by deploying the quickstart version and watching the admin route go blank:
- * `mountSignIn` threw "Clerk was not loaded with Ui components". `clerk.browser.js` is the
- * 308kB core, which fetches its UI components separately afterwards — so mounting a sign-in the
- * moment `load()` resolves is a race, and on a gudang tablet it is a race against gudang wifi.
- * `clerk.js` is 1.5MB with the components already in it: one request, no readiness to guess at.
+ * Established by probing the real CDN rather than by reading docs, after `mountSignIn` threw
+ * "Clerk was not loaded with Ui components" and took the admin route blank with it:
  *
- * The size is affordable precisely BECAUSE of §64.2 — this is never bundled and never fetched on
- * the kiosk path. It costs an admin one cached download on a screen they open rarely, and it
- * buys a sign-in that cannot half-arrive.
+ *   - `clerk.browser.js` (309kB) has no UI components, and still has none after waiting four
+ *     seconds. It is not a race. In v6 the components live in a separate `@clerk/ui` package
+ *     fetched at runtime, exactly as OCTANE-FINDINGS §62 recorded.
+ *   - `clerk.js` (1.5MB) is the CommonJS entry. Loaded in a script tag it throws
+ *     `exports is not defined` before it does anything at all.
+ *   - `clerk.legacy.browser.js` exists but is the build for older browsers, not a UI build.
+ *
+ * So the honest choice was between chasing a UI bundle that may or may not arrive on gudang
+ * wifi, and using the headless API this build is actually made of. We take the second: the
+ * sign-in form is ours, in Bahasa, styled like every other screen, and it cannot half-load.
+ * What Clerk still does is the part that matters — verifying the password and minting the token.
  */
-const CLERK_JS_FILE = 'clerk.js';
+const CLERK_JS_FILE = 'clerk.browser.js';
 
 let loading: Promise<ClerkClient> | null = null;
 

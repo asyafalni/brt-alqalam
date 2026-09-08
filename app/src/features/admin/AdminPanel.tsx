@@ -15,10 +15,10 @@ import { useEffect, useRef, useState } from 'octane';
 import { CircleCheck, LogOut, ShieldCheck, TriangleAlert } from '@octanejs/lucide';
 import { whoami } from '../../../../data/gateway';
 import type { Whoami } from '../../../../data/gateway';
-import { ClerkUnavailable, gatewayToken, loadClerk } from '../../data/clerkLoader';
+import { ClerkUnavailable, clerkMessage, gatewayToken, loadClerk } from '../../data/clerkLoader';
 import type { ClerkClient } from '../../data/clerkLoader';
 import type { Connection } from '../../state/connection';
-import { Button, Card, CODE } from '../../components/ui';
+import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
 export interface AdminSession {
@@ -41,8 +41,11 @@ export function AdminPanel(
   const [phase, setPhase] = useState<Phase>(admin ? 'ready' : 'loading');
   const [error, setError] = useState('');
   const [who, setWho] = useState<Whoami | null>(admin?.who ?? null);
-  const signInBox = useRef<HTMLDivElement | null>(null);
   const clerkRef = useRef<ClerkClient | null>(null);
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [signingIn, setSigningIn] = useState(false);
+  const [formError, setFormError] = useState('');
 
   /* Confirms with the gateway, not with the browser's copy of the user. Called on load and
      again after Clerk reports a session change, because signing in does not remount this. */
@@ -95,28 +98,41 @@ export function AdminPanel(
   }, [connection?.url]);
 
   /*
-   * Mounting is a side effect on a DOM node Clerk owns, so it happens after the box exists.
+   * Signing in with Clerk's headless API, through our own form.
    *
-   * WRAPPED, because an exception here took the WHOLE APP down — `#/admin` rendered a blank
-   * page, not a broken card. That is the wrong failure by a wide margin: a third-party script
-   * that cannot mount its own form must cost an admin one screen, never the register. The
-   * specific throw was "Clerk was not loaded with Ui components", from mounting against the
-   * core build before its components had arrived; the loader now fetches the build that has
-   * them. This catch is not for that bug — it is for the next one.
+   * The password goes straight from this field into Clerk's SDK over HTTPS and is never held
+   * anywhere else — not in the outbox, not in localStorage, not in a variable that outlives the
+   * submit. What we gain over Clerk's mounted widget is that this form is in Bahasa, matches
+   * every other screen, and cannot half-load (see `CLERK_JS_FILE`).
    */
-  useEffect(() => {
+  async function signIn(e: Event) {
+    e.preventDefault();
     const clerk = clerkRef.current;
-    const box = signInBox.current;
-    if (phase !== 'signed-out' || !clerk || !box) return;
+    if (!clerk?.client) { setFormError('Clerk belum siap. Muat ulang halaman.'); return; }
+
+    setSigningIn(true);
+    setFormError('');
     try {
-      clerk.mountSignIn(box);
+      const result = await clerk.client.signIn.create({
+        strategy: 'password', identifier: identifier.trim(), password,
+      });
+      if (result.status !== 'complete' || !result.createdSessionId) {
+        // Two-factor and the like. Not supported here, and saying so beats a silent no-op.
+        setFormError(`Clerk meminta langkah tambahan (${result.status}), yang belum didukung `
+          + 'layar ini. Selesaikan lewat dashboard Clerk.');
+        return;
+      }
+      await clerk.setActive({ session: result.createdSessionId });
+      setPassword('');
+      await confirm(clerk);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setPhase('error');
-      return;
+      // Clerk's own wording, which is more accurate than a guess — it is the side that knows
+      // whether this was a wrong password, a breached one, or a locked account.
+      setFormError(clerkMessage(err));
+    } finally {
+      setSigningIn(false);
     }
-    return () => { try { clerk.unmountSignIn(box); } catch { /* already gone */ } };
-  }, [phase]);
+  }
 
   if (!connection) {
     return (
@@ -153,10 +169,48 @@ export function AdminPanel(
         </Card>
       )}
 
-      {/* Clerk paints its own sign-in form in here. Deliberately given nothing but a box: its
-          styling is Clerk's, and fighting it would be work with no return on a screen two
-          people see. */}
-      <div ref={signInBox} class={phase === 'signed-out' ? '' : 'hidden'} />
+      {phase === 'signed-out' && (
+        <Card>
+          <h2 class="text-base font-bold text-slate-900">Masuk sebagai admin</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Pakai email atau username Clerk-mu. Marbot tidak perlu masuk di sini — mereka pakai
+            PIN di kios.
+          </p>
+
+          <form class="mt-4 space-y-4" onSubmit={signIn}>
+            <div>
+              <label class={LABEL} for="admin-id">Email atau username</label>
+              <input
+                id="admin-id"
+                class={FIELD}
+                type="text"
+                autocomplete="username"
+                value={identifier}
+                /* onInput, never onChange: these are native DOM events under Octane, and
+                   `change` only fires on blur (§62). */
+                onInput={(e: Event) => setIdentifier((e.target as HTMLInputElement).value)}
+              />
+            </div>
+            <div>
+              <label class={LABEL} for="admin-pw">Password</label>
+              <input
+                id="admin-pw"
+                class={FIELD}
+                type="password"
+                autocomplete="current-password"
+                value={password}
+                onInput={(e: Event) => setPassword((e.target as HTMLInputElement).value)}
+              />
+            </div>
+
+            {formError && <p class={ERROR_TEXT} role="alert">{formError}</p>}
+
+            <Button type="submit" disabled={signingIn || !identifier || !password}>
+              {signingIn ? 'Memeriksa…' : 'Masuk'}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       {phase === 'ready' && who && (
         <Card class={who.isAdmin ? 'border-green-200' : 'border-amber-200 bg-amber-50/40'}>
