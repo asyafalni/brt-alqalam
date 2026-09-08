@@ -133,3 +133,40 @@ function disableUser() {
   props.setProperty('USERS', JSON.stringify(users));
   Logger.log('Disabled ' + NAME);
 }
+
+/**
+ * Run this once from the editor after adding CLERK_SECRET_KEY. It does two jobs.
+ *
+ * FIRST, IT FORCES THE CONSENT PROMPT. `UrlFetchApp.fetch` needs the
+ * `script.external_request` scope, and until `clerk.gs` existed this gateway never called out —
+ * so the authorisation granted long ago does not cover it. Declaring the scope in the manifest
+ * does NOT grant it; somebody has to accept a prompt. The editor only prompts when the function
+ * it is about to run needs something it lacks, which is why running `checkSpreadsheet()`
+ * finishes quietly and changes nothing: that function never calls out. This one does, on
+ * purpose.
+ *
+ * SECOND, IT TELLS YOU WHETHER THE KEY WORKS, which is the question you actually have. A key
+ * that is present but wrong looks identical, from the app, to a missing permission.
+ *
+ * Reads nothing and changes nothing: one listing call, discarded.
+ */
+function authorizeClerk() {
+  var key = PropertiesService.getScriptProperties().getProperty('CLERK_SECRET_KEY');
+  if (!key) {
+    Logger.log('NO KEY. Project Settings -> Script Properties -> add CLERK_SECRET_KEY (sk_...).');
+    return;
+  }
+  Logger.log('Key found, starts with: ' + key.slice(0, 7) + '...');
+
+  var result = clerkCall('get', '/invitations?limit=1', null);
+  if (result.ok) {
+    Logger.log('OK. Permission granted and the key works - invitations will send now.');
+    return;
+  }
+  if (result.error === 'clerk_401' || result.error === 'clerk_403') {
+    Logger.log('PERMISSION IS FINE, THE KEY IS NOT: Clerk refused it (' + result.error
+      + '). Copy the Secret key again from Clerk -> Configure -> API Keys. ' + result.detail);
+    return;
+  }
+  Logger.log('Clerk answered ' + result.error + ': ' + result.detail);
+}
