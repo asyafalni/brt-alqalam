@@ -627,6 +627,10 @@ export function App() {
           onClose={() => setConnectOpen(false)}
         >
           <ConnectPanel
+            /* Disconnecting an established kiosk is `admin_utama` only. Connecting a device that
+               has none stays open — the admin screen needs a gateway to verify anybody against,
+               so gating that would leave a fresh device unconnectable by anyone. */
+            canManage={admin?.who.role === 'admin_utama'}
             connection={connection}
             queued={queued}
             onChange={(c) => { setConnection(c); setFreshTxns([]); }}

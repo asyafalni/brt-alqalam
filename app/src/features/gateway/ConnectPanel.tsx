@@ -19,7 +19,7 @@
 // outcome this screen exists to prevent.
 
 import { useState } from 'octane';
-import { CircleCheck, Link2, TriangleAlert, Unlink } from '@octanejs/lucide';
+import { CircleCheck, Link2, Lock, TriangleAlert, Unlink } from '@octanejs/lucide';
 import { fetchState, GatewayError, openSession, closeSession } from '../../../../data/gateway';
 import { clearConnection, saveConnection, urlProblem } from '../../state/connection';
 import type { Connection } from '../../state/connection';
@@ -39,13 +39,29 @@ const REASON: Record<string, string> = {
 const explain = (code: string) => REASON[code] ?? `Gateway menolak: ${code}`;
 
 export function ConnectPanel(
-  { connection, onChange, queued = 0, onSendQueued }:
+  { connection, onChange, queued = 0, onSendQueued, canManage = false }:
   {
     connection: Connection | null;
     onChange: (c: Connection | null) => void;
     /** Movements recorded here but not yet in the sheet. */
     queued?: number;
     onSendQueued?: () => void;
+    /**
+     * Whether the person looking at this may CHANGE an existing connection.
+     *
+     * `admin_utama` only. Disconnecting an established kiosk is how a tablet stops being able to
+     * record anything until somebody with the URL and a device secret comes back to it, and the
+     * person most likely to press it is the one least able to undo it.
+     *
+     * Connecting a device that has NO connection stays open, and that is not an oversight: the
+     * admin screen needs a gateway to verify anybody against, so requiring an admin to connect
+     * would mean a fresh device could never be connected by anyone, including an admin.
+     *
+     * This guards against an accident, not an attack — it is device-local state, and somebody
+     * determined can clear it. What actually stops a reconnection being casual is that it needs
+     * the gateway URL and an enrolled device secret.
+     */
+    canManage?: boolean;
   },
 ) {
   const [url, setUrl] = useState(connection?.url ?? '');
@@ -138,16 +154,25 @@ export function ConnectPanel(
             the visual weight of a primary one — a wide pill with a 20px icon, in a panel whose
             own type is 12px. The icon says "disconnect"; the label no longer has to say it
             twice, and the full phrase stays in the accessible name. */}
-        <div class="mt-4">
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="Putuskan sambungan perangkat ini"
-            onClick={() => { clearConnection(); onChange(null); setUrl(connection.url); }}
-          >
-            <Unlink class="h-3.5 w-3.5" /> Putuskan
-          </Button>
-        </div>
+        {canManage ? (
+          <div class="mt-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Putuskan sambungan perangkat ini"
+              onClick={() => { clearConnection(); onChange(null); setUrl(connection.url); }}
+            >
+              <Unlink class="h-3.5 w-3.5" /> Putuskan
+            </Button>
+          </div>
+        ) : (
+          /* Said rather than hidden without explanation: somebody who came here to fix a
+             connection problem should learn who can, not just find nothing to press. */
+          <p class="mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-600">
+            <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+            Hanya Admin Utama yang bisa memutus sambungan perangkat ini.
+          </p>
+        )}
         <p class="mt-2.5 text-[11px] leading-relaxed text-slate-400">
           Tablet hilang? Cabut dengan revokeDevice() di Apps Script.
         </p>
