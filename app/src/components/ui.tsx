@@ -24,7 +24,7 @@ export function PageHeader(
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
-        {subtitle && <p class="text-sm text-slate-500 sm:text-base">{subtitle}</p>}
+        {subtitle && <p class="text-sm text-slate-600 sm:text-base">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -42,12 +42,12 @@ const BUTTON_BASE =
 // the highest-contrast pairing available, leaving colour free to mean *status*.
 const VARIANT = {
   primary: 'bg-slate-900 text-slate-50 hover:bg-slate-800 shadow-sm',
-  secondary: 'bg-white text-slate-900 border border-slate-400 hover:bg-slate-100',
+  secondary: 'bg-white text-slate-900 border border-slate-500 hover:bg-slate-100',
   danger: 'bg-red-500 text-white hover:bg-red-600',
   ghost: 'bg-transparent hover:bg-slate-100 text-slate-600',
   success: 'bg-[#22C55E] text-white',
   warning: 'bg-[#F59E0B] text-white',
-  outline: 'bg-white border border-slate-400 text-slate-700 hover:bg-slate-50',
+  outline: 'bg-white border border-slate-500 text-slate-700 hover:bg-slate-50',
 } as const;
 
 const SIZE = {
@@ -92,8 +92,16 @@ export function Button(props: {
 
 // --- Input — SmartInv components/Input.tsx:12-25 ----------------------------------------
 export const LABEL = 'block text-sm font-medium text-slate-700 mb-1.5';
+/*
+ * `slate-500`, not `slate-400`, and the reason is a measurement rather than taste.
+ *
+ * WCAG 1.4.11 wants 3:1 on a control's boundary, and `slate-400` gives 3.62:1 on a white card —
+ * which is where §77 measured it — but only 2.67:1 on the page's own beige ground, where plenty
+ * of these controls actually sit. A border cannot know which background it landed on, so the
+ * value has to clear 3:1 on BOTH: `slate-500` is 5.61 on white and 4.14 on the ground.
+ */
 export const FIELD =
-  'w-full px-4 rounded-lg border border-slate-400 bg-white text-slate-900 transition-all ' +
+  'w-full px-4 rounded-lg border border-slate-500 bg-white text-slate-900 transition-all ' +
   'duration-200 focus:ring-2 focus:ring-slate-900/40 focus:border-slate-900 ' +
   'placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
 export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
@@ -163,7 +171,7 @@ export function Stat(
       <div class={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold sm:h-12 sm:w-12 sm:text-xl ${tint}`}>
         {value}
       </div>
-      <p class="text-[10px] font-semibold uppercase leading-tight tracking-wider text-slate-500 sm:text-xs">
+      <p class="text-[10px] font-semibold uppercase leading-tight tracking-wider text-slate-600 sm:text-xs">
         {label}
       </p>
     </div>
@@ -171,6 +179,7 @@ export function Stat(
 }
 
 // --- Table conventions — Inventory.tsx:134-186 ------------------------------------------
-export const TH = 'px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500';
+// `slate-600`: 4.14:1 on the beige ground is under the 4.5 a header needs, 6.10 clears it.
+export const TH = 'px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-600';
 export const TD = 'px-6 py-4';
 export const CODE = 'text-[10px] font-mono uppercase tracking-tighter text-slate-400';

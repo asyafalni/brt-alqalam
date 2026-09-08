@@ -43,8 +43,8 @@ const PRINT_COLOR = 'print-color-adjust:exact;-webkit-print-color-adjust:exact';
 function SectionTitle({ children, note }: { children?: unknown; note?: string }) {
   return (
     <div class="mb-4 flex items-baseline justify-between gap-3">
-      <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">{children}</h2>
-      {note && <span class="shrink-0 text-xs tabular-nums text-slate-400">{note}</span>}
+      <h2 class="text-sm font-bold uppercase tracking-wider text-slate-600">{children}</h2>
+      {note && <span class="shrink-0 text-xs tabular-nums text-slate-600">{note}</span>}
     </div>
   );
 }
@@ -74,8 +74,8 @@ export function Report(
         <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">Laporan</h1>
         <div class={`${CARD} py-20 text-center`}>
           <FileText class="mx-auto mb-3 h-10 w-10 text-slate-300" />
-          <p class="italic text-slate-400">Belum ada data untuk dilaporkan.</p>
-          <p class="mx-auto mt-1 max-w-sm text-sm text-slate-400">
+          <p class="italic text-slate-600">Belum ada data untuk dilaporkan.</p>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-slate-600">
             Laporan ini terisi sendiri begitu barang pertama dicatat di Opname Gudang.
           </p>
         </div>
@@ -118,14 +118,14 @@ export function Report(
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
             <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">Laporan</h1>
-            <p class="text-xs text-slate-500 sm:text-sm">Keadaan per {today}</p>
+            <p class="text-xs text-slate-600 sm:text-sm">Keadaan per {today}</p>
           </div>
           <Button variant="secondary" size="sm" class="mt-1 shrink-0" onClick={() => print()}>
             <Printer class="h-4 w-4" />
             <span class="hidden sm:inline">Cetak</span>
           </Button>
         </div>
-        <p class="mt-2 max-w-2xl text-sm text-slate-500">
+        <p class="mt-2 max-w-2xl text-sm text-slate-600">
           Ringkasan untuk takmir dan pengurus. Tidak memuat nama siapa pun.
         </p>
       </div>
@@ -133,7 +133,7 @@ export function Report(
       {/* Only on paper: a printed sheet has no navigation to say what it is, whose it is, or
           when it was true. A masthead is the cheapest way to stop a stray page being anonymous. */}
       <header class="hidden print:block">
-        <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">
+        <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-600">
           Badan Rumah Tangga · Masjid Al-Qalam
         </p>
         <h1 class="mt-1 text-2xl font-bold text-slate-900">Laporan Inventaris</h1>

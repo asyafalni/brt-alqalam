@@ -142,7 +142,7 @@ export function History(
           {r.txn.qtyDelta > 0 ? `+${r.txn.qtyDelta}` : r.txn.qtyDelta}
         </span>
       ) : (
-        <span class="text-sm text-slate-400">—</span>
+        <span class="text-sm text-slate-500">—</span>
       )),
     },
     {
@@ -164,7 +164,7 @@ export function History(
           <p class="truncate text-sm text-slate-700">
             {keteranganLabel(r.txn.type, r.txn.condition)}
           </p>
-          {r.txn.note && <p class="truncate text-xs text-slate-400">{r.txn.note}</p>}
+          {r.txn.note && <p class="truncate text-xs text-slate-500">{r.txn.note}</p>}
         </div>
       ),
     },
@@ -210,7 +210,7 @@ export function History(
           <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
             <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <h2 class="text-sm font-bold text-slate-900">Semua catatan</h2>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">
                 {rows.length} baris
               </span>
             </div>
@@ -238,7 +238,7 @@ export function History(
             keyOf={(r) => r.txn.txnId}
             empty={(
               <div class="px-6 py-16 text-center">
-                <p class="italic text-slate-400">Tidak ada catatan yang cocok.</p>
+                <p class="italic text-slate-500">Tidak ada catatan yang cocok.</p>
               </div>
             )}
           />

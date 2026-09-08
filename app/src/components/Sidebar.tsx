@@ -185,7 +185,7 @@ export function Sidebar(p: Props) {
             there, the half that sticks out would simply be cut off. */}
         <button
           type="button"
-          class="absolute -right-3 top-24 z-10 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-md transition-colors hover:border-slate-900 hover:text-slate-900 md:flex"
+          class="absolute -right-3 top-24 z-10 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-500 bg-white text-slate-600 shadow-md transition-colors hover:border-slate-900 hover:text-slate-900 md:flex"
           aria-label={p.collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
           aria-expanded={!p.collapsed}
           title={p.collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
@@ -281,7 +281,7 @@ export function Sidebar(p: Props) {
                     <span class={`block truncate text-xs font-semibold ${status.tone}`}>
                       {status.title}
                     </span>
-                    <span class="block truncate text-[11px] text-slate-500">{status.hint}</span>
+                    <span class="block truncate text-[11px] text-slate-400">{status.hint}</span>
                   </span>
                   <ChevronRight class="h-4 w-4 shrink-0 text-slate-600" />
                 </>
@@ -313,7 +313,7 @@ export function Sidebar(p: Props) {
                     <span class={`block truncate text-xs font-semibold ${p.admin ? 'text-slate-200' : 'text-slate-300'}`}>
                       {p.admin ? (p.admin.name || 'Admin') : 'Belum masuk'}
                     </span>
-                    <span class="block truncate text-[11px] text-slate-500">
+                    <span class="block truncate text-[11px] text-slate-400">
                       {p.admin ? p.admin.role : 'Ketuk untuk masuk sebagai admin'}
                     </span>
                   </span>
@@ -323,7 +323,7 @@ export function Sidebar(p: Props) {
             </button>
 
             {showText && (
-              <p class="mt-2 px-2.5 text-[10px] font-bold uppercase tracking-tighter text-slate-600">
+              <p class="mt-2 px-2.5 text-[10px] font-bold uppercase tracking-tighter text-slate-400">
                 Masjid Al-Qalam
               </p>
             )}

@@ -275,7 +275,7 @@ export function Board(
                   Daftar Stok
                   {q !== '' && <span class="ml-2 font-normal text-slate-500">· hasil cari "{search}"</span>}
                 </h2>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">
                   {rows.length} baris
                 </span>
               </div>

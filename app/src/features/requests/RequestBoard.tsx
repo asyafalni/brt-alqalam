@@ -386,7 +386,7 @@ export function RequestBoard(
             Perkiraan biaya
           </p>
           {money.unpriced > 0 && (
-            <p class="mt-1 text-xs text-slate-400">
+            <p class="mt-1 text-xs text-slate-500">
               {money.unpriced} pengajuan belum ada harganya
             </p>
           )}
@@ -464,7 +464,7 @@ export function RequestBoard(
                           {r.assetId ? ' · ' : ''}{rupiah(total)}
                         </span>
                       )}
-                      <span class="text-slate-400"> · {when(r.requestedTs)}</span>
+                      <span class="text-slate-500"> · {when(r.requestedTs)}</span>
                     </p>
                   ) : (
                     <p class="mt-0.5 text-sm tabular-nums text-slate-500">
@@ -475,11 +475,11 @@ export function RequestBoard(
                           {total != null && <span class="font-semibold text-slate-900"> · {rupiah(total)}</span>}
                         </>
                       )}
-                      {r.itemId && <span class="text-slate-400"> · tambah stok yang sudah ada</span>}
+                      {r.itemId && <span class="text-slate-500"> · tambah stok yang sudah ada</span>}
                       {/* A replacement says what it replaces: that is what turns the loss log
                           into a procurement list somebody can close out. */}
-                      {r.assetId && <span class="text-slate-400"> · pengganti {r.assetId}</span>}
-                      <span class="text-slate-400"> · {when(r.requestedTs)}</span>
+                      {r.assetId && <span class="text-slate-500"> · pengganti {r.assetId}</span>}
+                      <span class="text-slate-500"> · {when(r.requestedTs)}</span>
                     </p>
                   )}
 
@@ -495,7 +495,7 @@ export function RequestBoard(
                   )}
 
                   {r.status !== 'diajukan' && r.decidedTs && (
-                    <p class="mt-2 text-xs text-slate-400">Diputuskan {when(r.decidedTs)}</p>
+                    <p class="mt-2 text-xs text-slate-500">Diputuskan {when(r.decidedTs)}</p>
                   )}
                 </div>
 
@@ -747,7 +747,7 @@ function BoughtForm(
         </button>
       </div>
 
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      <p class="mt-4 text-xs leading-relaxed text-slate-500">
         Setelah ini barangnya masuk ke daftar stok dan pengajuan ini ditandai sudah dibeli.
       </p>
     </div>
@@ -798,7 +798,7 @@ function RepairedForm(
         </button>
       </div>
 
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      <p class="mt-4 text-xs leading-relaxed text-slate-500">
         Riwayat kerusakannya tetap tersimpan — yang dicatat adalah perbaikannya, bukan
         penghapusan kejadiannya.
       </p>
