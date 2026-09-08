@@ -73,7 +73,7 @@ describe('talking to Apps Script at all', () => {
     // Not a style choice: Apps Script has no `doOptions` and `TextOutput` cannot set headers,
     // so a preflighted request can never be answered. Getting this wrong is unfixable later.
     const f = reply({ ok: true, session: { token: 't' } });
-    await openSession(URL, 'secret', '1234', f);
+    await openSession(URL, 'secret', '1234', undefined, f);
     const init = f.mock.calls[0][1] as RequestInit;
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('text/plain');
     expect(Object.keys(init.headers as object)).toEqual(['Content-Type']);
@@ -82,7 +82,7 @@ describe('talking to Apps Script at all', () => {
 
   it('reads failure from the BODY, because every reply is HTTP 200', async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ ok: false, error: 'invalid_pin' }), { status: 200 }));
-    await expect(openSession(URL, 's', '9999', f)).rejects.toMatchObject({ code: 'invalid_pin' });
+    await expect(openSession(URL, 's', '9999', undefined, f)).rejects.toMatchObject({ code: 'invalid_pin' });
   });
 
   it('names the sign-in-page trap when HTML comes back', async () => {
@@ -174,5 +174,33 @@ describe('the public tier is a different projection, not a lesser copy', () => {
   it('keeps a real actor when the detailed tier supplies one', () => {
     const s = readState({ txns: [{ ...row, actorUserId: 'USR-1' }], tier: 'detailed' });
     expect(s.txns[0].actorUserId).toBe('USR-1');
+  });
+});
+
+describe('a PIN two people share', () => {
+  it('comes back as a question, not a session', async () => {
+    const f = reply({
+      ok: true,
+      choose: [{ userId: 'USR-1', name: 'Budi' }, { userId: 'USR-2', name: 'Sari' }],
+    });
+    const r = await openSession(URL, 'secret', '1234', undefined, f);
+    expect(r.session).toBeUndefined();
+    expect(r.choose?.map((c) => c.name)).toEqual(['Budi', 'Sari']);
+  });
+
+  it('sends the chosen person back, and only then', async () => {
+    const f = reply({ ok: true, session: { token: 't', actorUserId: 'USR-2' } });
+    await openSession(URL, 'secret', '1234', 'USR-2', f);
+    expect(JSON.parse(String(f.mock.calls[0][1]?.body))).toMatchObject({ userId: 'USR-2' });
+
+    const g = reply({ ok: true, session: { token: 't', actorUserId: 'USR-1' } });
+    await openSession(URL, 'secret', '1234', undefined, g);
+    // No `userId` at all on the fast path — an empty one would be a name nobody picked.
+    expect(JSON.parse(String(g.mock.calls[0][1]?.body))).not.toHaveProperty('userId');
+  });
+
+  it('still refuses a reply that is neither a session nor a question', async () => {
+    await expect(openSession(URL, 'secret', '1234', undefined, reply({ ok: true })))
+      .rejects.toThrow();
   });
 });

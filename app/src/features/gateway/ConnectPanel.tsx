@@ -73,9 +73,9 @@ export function ConnectPanel(
          "device fine, PIN wrong" WITHOUT anyone having to type a real PIN into a setup screen.
          A viewer skips this entirely — there is nothing to check. */
       if (secret.trim() !== '') try {
-        const session = await openSession(url.trim(), secret.trim(), '000000000');
+        const result = await openSession(url.trim(), secret.trim(), '000000000');
         // Should not happen — but if a PIN that long ever matched, do not leave it open.
-        await closeSession(url.trim(), session.token).catch(() => undefined);
+        if (result.session) await closeSession(url.trim(), result.session.token).catch(() => undefined);
       } catch (err) {
         const code = err instanceof GatewayError ? err.code : 'unknown';
         // `invalid_pin` is the SUCCESS case here: the gateway got past the device check.

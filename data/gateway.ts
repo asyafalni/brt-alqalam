@@ -215,13 +215,44 @@ export function readState(raw: Record<string, unknown>): GatewayState {
  * and no client IP, so there is nothing else to rate-limit against and a browser-invented id
  * would just be rotated (§65.2).
  */
+/** Who holds the PIN that was typed, when more than one person does. */
+export interface PinChoice { userId: string; name: string }
+
+/**
+ * Either a session, or the question of whose PIN that was.
+ *
+ * PINs are no longer unique. With 10–15 people a collision is about a one-percent event, so the
+ * fast path stays one step and the ambiguity is only asked about when it actually occurs —
+ * putting a name-picker in front of every sign-in would add a tap to every visit to save one.
+ */
+export type SessionResult =
+  | { session: Session; choose?: undefined }
+  | { session?: undefined; choose: PinChoice[] };
+
 export async function openSession(
-  url: string, deviceSecret: string, pin: string, fetchImpl: typeof fetch = fetch,
-): Promise<Session> {
-  const json = await call(url, { op: 'openSession', deviceSecret, pin }, fetchImpl);
+  url: string,
+  deviceSecret: string,
+  pin: string,
+  /** Which of the people holding this PIN. Only meaningful after a `choose` reply. */
+  userId?: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SessionResult> {
+  const json = await call(
+    url, { op: 'openSession', deviceSecret, pin, ...(userId ? { userId } : {}) }, fetchImpl,
+  );
+
+  if (Array.isArray(json.choose)) {
+    return {
+      choose: (json.choose as Record<string, unknown>[]).map((c) => ({
+        userId: String(c.userId ?? ''),
+        name: String(c.name ?? ''),
+      })),
+    };
+  }
+
   const s = json.session as Session | undefined;
   if (!s?.token) throw new GatewayError('no-session-returned', json);
-  return s;
+  return { session: s };
 }
 
 export async function closeSession(

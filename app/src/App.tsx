@@ -23,6 +23,15 @@ import { AssetBoard } from './features/assets/AssetBoard';
 const LabelSheet = lazy(() => import('./features/labels/LabelSheet').then((m) => ({ default: m.LabelSheet })));
 const ScannerView = lazy(() => import('./features/scan/ScannerView').then((m) => ({ default: m.ScannerView })));
 
+/** One wording for a refused sign-in, whether it failed opening the session or appending. */
+function explainPin(code: string): string {
+  if (code === 'invalid_pin') return 'PIN salah.';
+  if (code === 'locked') return 'Terkunci sementara karena terlalu banyak percobaan.';
+  if (code === 'device_not_enrolled') return 'Perangkat ini tidak dikenali gateway.';
+  if (code === 'offline') return 'Tidak bisa menghubungi gateway.';
+  return `Gagal: ${code}`;
+}
+
 /** Deliberately plain. A spinner that appears for 80ms reads as a flicker, not as progress. */
 function Loading({ label }: { label: string }) {
   return (
@@ -44,7 +53,7 @@ import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
 import { SubmitRequest } from './features/requests/SubmitRequest';
 import { newRequestId } from './features/requests/newRequestId';
-import { PinPad } from './features/gateway/PinPad';
+import { PinFlow } from './features/gateway/PinFlow';
 import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
@@ -52,7 +61,7 @@ import { gatewayDraft } from './state/useDraft';
 import { useCatalogWriter } from './state/useCatalogWriter';
 import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
 import type { AdminSession } from './features/admin/AdminPanel';
-import { append, closeSession, GatewayError, openSession } from '../../data/gateway';
+import { append, closeSession, GatewayError } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
 import { enqueue, pending, pendingCount, settle } from '../../data/outbox';
 import type { Txn } from '../../domain/types';
@@ -571,19 +580,21 @@ export function App() {
             // Narrowed once, so the closures below carry a string rather than re-asserting it.
             const { url, deviceSecret } = connection;
             return (
-            <PinPad
+            <PinFlow
+              url={url}
+              deviceSecret={deviceSecret}
               busy={pinBusy}
               error={pinError}
               onCancel={() => setPinFor(null)}
-              onSubmit={(pin) => {
+              onError={(code) => setPinError(code === '' ? '' : explainPin(code))}
+              /* Signing in is `PinFlow`'s job, including the "whose PIN was that?" step. What is
+                 left here is the part that is actually ours: flushing the queue and appending. */
+              onSession={(session) => {
                 setPinBusy(true);
                 setPinError('');
                 void (async () => {
-                  let token = '';
+                  const token = session.token;
                   try {
-                    const session = await openSession(url, deviceSecret, pin);
-                    token = session.token;
-
                     /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was
                        recorded — the log is a sequence, and sending today's withdrawal ahead of
                        yesterday's invents a different one. */
@@ -617,11 +628,7 @@ export function App() {
                       setPinFor(null);
                       setPinError('');
                     } else {
-                      setPinError(
-                        code === 'invalid_pin' ? 'PIN salah.'
-                          : code === 'locked' ? 'Terkunci sementara karena terlalu banyak percobaan.'
-                          : `Gagal: ${code}`,
-                      );
+                      setPinError(explainPin(code));
                     }
                   } finally {
                     setPinBusy(false);

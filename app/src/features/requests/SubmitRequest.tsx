@@ -17,11 +17,12 @@
 
 import { useState } from 'octane';
 import { CircleCheck } from '@octanejs/lucide';
-import { GatewayError, closeSession, openSession, submitRequest } from '../../../../data/gateway';
+import { GatewayError, closeSession, submitRequest } from '../../../../data/gateway';
+import type { Session } from '../../../../data/gateway';
 import type { Item } from '../../../../domain/types';
 import type { DerivedInstance } from '../../../../domain/types';
 import { Button } from '../../components/ui';
-import { PinPad } from '../gateway/PinPad';
+import { PinFlow } from '../gateway/PinFlow';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
 
@@ -85,21 +86,16 @@ export function SubmitRequest(
     setHeld(input);
   }
 
-  async function sendWithPin(pin: string) {
+  /* `PinFlow` owns the sign-in, including the "whose PIN was that?" step when two people share
+     one. What is left here is sending the request the session was opened for. */
+  async function sendWithSession(session: Session) {
     if (!held) return;
-    setBusy(true);
-    setError('');
-    let token = '';
     try {
-      token = (await openSession(url, deviceSecret as string, pin)).token;
-      await send(held, { session: token });
-    } catch (err) {
-      setError(explain(err));
-      setBusy(false);
+      await send(held, { session: session.token });
     } finally {
       /* One visit, one session (§58.5): a request filed at the kiosk must not leave a session
          open behind whoever walks away next. */
-      if (token) void closeSession(url, token).catch(() => {});
+      void closeSession(url, session.token).catch(() => {});
     }
   }
 
@@ -120,11 +116,14 @@ export function SubmitRequest(
 
   if (held) {
     return (
-      <PinPad
+      <PinFlow
+        url={url}
+        deviceSecret={deviceSecret as string}
         busy={busy}
         error={error}
         onCancel={() => { setHeld(null); setError(''); }}
-        onSubmit={(pin) => void sendWithPin(pin)}
+        onError={(code) => setError(code === '' ? '' : (REASON[code] ?? `Gagal: ${code}`))}
+        onSession={(session) => void sendWithSession(session)}
       />
     );
   }
