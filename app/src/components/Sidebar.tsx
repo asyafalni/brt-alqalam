@@ -68,6 +68,43 @@ export function Sidebar(p: Props) {
     { name: 'Histori Data', icon: History, route: { name: 'histori' } },
   ];
 
+  /*
+   * One place decides what the footer says, because the four states are ranked and the ranking
+   * is the point: an unsent movement outranks everything, since it is the only state where the
+   * register on screen and the register in the sheet genuinely disagree.
+   */
+  const status = p.queued
+    ? {
+      dot: 'bg-amber-400',
+      tone: 'text-amber-300',
+      title: `${p.queued} belum terkirim`,
+      hint: 'Ketuk untuk mengirim',
+      aria: `${p.queued} catatan belum terkirim ke spreadsheet. Ketuk untuk mengirim.`,
+    }
+    : !p.connected
+      ? {
+        dot: 'bg-slate-600',
+        tone: 'text-slate-300',
+        title: 'Belum terhubung',
+        hint: 'Ketuk untuk menyambungkan',
+        aria: 'Belum terhubung ke gateway. Ketuk untuk menyambungkan perangkat ini.',
+      }
+      : p.stale
+        ? {
+          dot: 'bg-amber-400',
+          tone: 'text-amber-300',
+          title: 'Tersambung',
+          hint: 'Data mungkin tertinggal',
+          aria: 'Tersambung, tetapi data terakhir gagal diperbarui.',
+        }
+        : {
+          dot: 'bg-green-400',
+          tone: 'text-slate-200',
+          title: 'Tersambung',
+          hint: 'Membaca dari spreadsheet',
+          aria: 'Tersambung ke gateway dan membaca dari spreadsheet.',
+        };
+
   const width = p.isMobile ? '280px' : p.collapsed ? '90px' : '260px';
   const showText = !p.collapsed || p.isMobile;
 
@@ -178,32 +215,39 @@ export function Sidebar(p: Props) {
             })}
           </nav>
 
-          <div class="relative z-10 mt-auto border-t border-white/5 p-4">
-            {/* The name goes with the rest of the text. At 90px it wrapped onto three lines
-                and read as a layout fault rather than a signature — and the logo above is
-                already saying whose app this is. */}
+          <div class="relative z-10 mt-auto border-t border-white/5 p-3">
+            {/* A ROW, not an underlined sentence. It was two wrapped lines of link text in a
+                90px-to-260px column: it neither looked like a control nor read as a status, and
+                the one question it exists to answer — "am I connected, and what do I do about
+                it?" — took two readings. A dot, a short line, and a chevron answer it at a
+                glance, and the whole row is the target. */}
+            <button
+              type="button"
+              class={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 ${showText ? '' : 'justify-center'}`}
+              aria-label={status.aria}
+              title={status.aria}
+              onClick={p.onOpenConnection}
+            >
+              {/* Collapsed to 90px this dot is the ENTIRE indicator, which is why the colour
+                  carries the meaning rather than merely decorating the words. */}
+              <span class={`h-2.5 w-2.5 shrink-0 rounded-full ${status.dot}`} aria-hidden="true" />
+              {showText && (
+                <>
+                  <span class="min-w-0 flex-1">
+                    <span class={`block truncate text-xs font-semibold ${status.tone}`}>
+                      {status.title}
+                    </span>
+                    <span class="block truncate text-[11px] text-slate-500">{status.hint}</span>
+                  </span>
+                  <ChevronRight class="h-4 w-4 shrink-0 text-slate-600" />
+                </>
+              )}
+            </button>
+
             {showText && (
-              <>
-                <p class="px-2 text-[10px] font-bold uppercase tracking-tighter text-slate-500">
-                  Masjid Al-Qalam
-                </p>
-                {/* The status IS the control. It was a dead line of text saying the one thing
-                    somebody would want to act on, and there was nowhere to act on it. */}
-                <button
-                  type="button"
-                  class="px-2 text-left text-[11px] text-slate-400 underline hover:text-slate-200"
-                  onClick={p.onOpenConnection}
-                >
-                  {/* The queue outranks everything else this line could say. An unsent
-                      movement is the one state where the register on screen and the register
-                      in the sheet genuinely disagree, and it must never be quiet about it. */}
-                  {p.queued
-                    ? `${p.queued} catatan belum terkirim — ketuk`
-                    : p.connected
-                      ? (p.stale ? 'Tersambung · data mungkin tertinggal' : 'Tersambung ke gateway')
-                      : 'Belum terhubung — ketuk untuk menyambungkan'}
-                </button>
-              </>
+              <p class="mt-2 px-2.5 text-[10px] font-bold uppercase tracking-tighter text-slate-600">
+                Masjid Al-Qalam
+              </p>
             )}
           </div>
         </div>
