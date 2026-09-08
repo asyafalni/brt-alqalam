@@ -85,7 +85,7 @@ export function DataTable<T>(
                 <th
                   key={c.key}
                   scope="col"
-                  class={`px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 ${c.align === 'right' ? 'text-right' : ''}`}
+                  class={`px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-600 ${c.align === 'right' ? 'text-right' : ''}`}
                 >
                   {c.header}
                 </th>
@@ -128,7 +128,7 @@ export function DataTable<T>(
                 <dl class="flex flex-wrap gap-x-4 gap-y-0.5">
                   {meta.map((c) => (
                     <div key={c.key} class="flex items-baseline gap-1.5">
-                      <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-600">
                         {c.header}
                       </dt>
                       <dd class="text-sm text-slate-600">{c.cell(row)}</dd>

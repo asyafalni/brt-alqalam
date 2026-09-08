@@ -34,11 +34,22 @@ import { Sheet } from '../../components/Sheet';
 import { RackContents } from './RackContents';
 
 /** Cell skins. Literal class strings — Tailwind never sees an interpolated one. */
+/*
+ * Cell skins. Literal class strings — Tailwind never sees an interpolated one.
+ *
+ * The BORDERS carry the status and are also the tile's only boundary: measured, the fill is
+ * 1.35:1 against the page, so nothing else says where the control is. At `-200` the tinted
+ * borders came in at 1.24 and 1.45 against the ground, well under the 3:1 WCAG 1.4.11 asks of a
+ * control's edge — a rack whose colour is the whole point was the hardest one to see.
+ *
+ * Darkened to `-500`, which clears 3:1 while staying recognisably the same red and amber. The
+ * fills stay pale, so the tile still reads as tinted rather than as a warning banner.
+ */
 const CELL: Record<LocationStatus, string> = {
-  out: 'bg-red-50 border-red-200 text-red-800 hover:border-red-300',
-  low: 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300',
-  available: 'bg-white border-slate-400 text-slate-700 hover:border-slate-900',
-  empty: 'bg-slate-50 border-dashed border-slate-400 text-slate-500 hover:border-slate-900',
+  out: 'bg-red-50 border-red-500 text-red-800 hover:border-red-700',
+  low: 'bg-amber-50 border-amber-500 text-amber-800 hover:border-amber-700',
+  available: 'bg-white border-slate-500 text-slate-700 hover:border-slate-900',
+  empty: 'bg-slate-50 border-dashed border-slate-500 text-slate-600 hover:border-slate-900',
 };
 
 const ZONE_NOTE: Record<LocationStatus, string> = {
@@ -228,7 +239,7 @@ export function RackBoard(
                     <Pencil class="h-4 w-4 text-slate-400 group-hover:text-slate-900" />
                   </button>
                 )}
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">
                   {zone.racks.length} rak ·{' '}
                   {zone.racks.filter((r) => r.status === 'low' || r.status === 'out').length} perlu diurus ·{' '}
                   {zone.racks.reduce((n, r) => n + r.unitCount, 0)} unit
@@ -311,7 +322,7 @@ export function RackBoard(
                               // triple every status pill in the app uses, with a green-500 edge
                               // so the control boundary still clears 3:1.
                               ? 'border-green-500 bg-green-50 text-green-700 hover:bg-green-100'
-                              : 'border-slate-400 bg-white text-slate-500 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50'
+                              : 'border-slate-500 bg-white text-slate-600 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-50'
                           }`}
                           aria-label={`Cek Rak ${rack.location.code} — ${countNote}`}
                           title={countNote}

@@ -219,7 +219,7 @@ export function StockTake(
         <div class="whitespace-nowrap text-right">
           <span class="text-sm font-bold tabular-nums text-slate-900">{line.initialStock}</span>{' '}
           <span class="text-xs text-slate-400">{i.unit}</span>
-          {i.minStock != null && <p class="text-[10px] text-slate-400">min {i.minStock}</p>}
+          {i.minStock != null && <p class="text-[10px] text-slate-500">min {i.minStock}</p>}
         </div>
       ),
     },

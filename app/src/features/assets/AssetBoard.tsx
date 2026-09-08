@@ -135,7 +135,7 @@ export function AssetBoard(
       {/* The answer to "kenapa terpal saya tidak ada di sini?", stated where the question is
           asked. Only shown when there is something to explain. */}
       {counted > 0 && (
-        <p class="text-sm leading-relaxed text-slate-500">
+        <p class="text-sm leading-relaxed text-slate-600">
           {counted} barang tetap lainnya dicatat dengan cara{' '}
           <span class="font-semibold text-slate-700">hitung jumlahnya</span>, bukan dilabeli satu
           per satu, jadi tidak punya status per unit dan tidak muncul di sini.{' '}

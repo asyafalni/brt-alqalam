@@ -182,4 +182,4 @@ export function Stat(
 // `slate-600`: 4.14:1 on the beige ground is under the 4.5 a header needs, 6.10 clears it.
 export const TH = 'px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-600';
 export const TD = 'px-6 py-4';
-export const CODE = 'text-[10px] font-mono uppercase tracking-tighter text-slate-400';
+export const CODE = 'text-[10px] font-mono uppercase tracking-tighter text-slate-500';

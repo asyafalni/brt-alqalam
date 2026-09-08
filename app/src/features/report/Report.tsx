@@ -176,7 +176,7 @@ export function Report(
           >
             <div class="absolute inset-[9px] flex flex-col items-center justify-center rounded-full bg-white sm:inset-[11px]">
               <span class="text-2xl font-bold tabular-nums text-slate-900">{score}%</span>
-              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400">skor</span>
+              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-600">skor</span>
             </div>
           </div>
           <div class="min-w-0 flex-1">
@@ -242,7 +242,7 @@ export function Report(
                 class="flex items-center gap-3 rounded-md bg-white px-3 py-2 print:break-inside-avoid print:border print:border-amber-200"
               >
                 <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{n.name}</span>
-                <span class="shrink-0 text-xs tabular-nums text-slate-500">
+                <span class="shrink-0 text-xs tabular-nums text-slate-600">
                   sisa <span class="font-bold text-slate-900">{n.stokAkhir}</span> · min {n.setMin}
                 </span>
               </li>
@@ -253,8 +253,8 @@ export function Report(
 
       {!report.movementAvailable && (
         <section class={`rounded-lg border border-dashed border-slate-300 p-5 ${SHEET}`}>
-          <h2 class="mb-1 text-sm font-bold uppercase tracking-wider text-slate-500">Belum tersedia</h2>
-          <p class="max-w-3xl text-sm leading-relaxed text-slate-500">
+          <h2 class="mb-1 text-sm font-bold uppercase tracking-wider text-slate-600">Belum tersedia</h2>
+          <p class="max-w-3xl text-sm leading-relaxed text-slate-600">
             Pergerakan stok dari waktu ke waktu, kecepatan pemakaian, dan barang yang lama tidak
             bergerak membutuhkan riwayat transaksi. Riwayat itu tersimpan di gateway, yang belum
             terpasang — jadi bagian ini sengaja dikosongkan daripada menampilkan angka karangan.
@@ -264,7 +264,7 @@ export function Report(
 
       <footer class="hidden print:block print:break-inside-avoid">
         <hr class="mb-2 border-slate-300" />
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-slate-600">
           Laporan ini tidak memuat nama pengambil maupun peminjam. Dicetak {today}.
         </p>
       </footer>
@@ -318,12 +318,12 @@ function StatusPanel({ slices, total }: { slices: Slice[]; total: number }) {
               <div class="min-w-0">
                 <p class="text-lg font-bold tabular-nums text-slate-900">
                   {s.items}
-                  <span class="ml-1.5 text-xs font-semibold text-slate-400">
+                  <span class="ml-1.5 text-xs font-semibold text-slate-600">
                     {percent(s.items, total)}%
                   </span>
                 </p>
                 <p class={`text-xs font-semibold ${tone.text}`}>{s.label}</p>
-                <p class="text-xs text-slate-400 tabular-nums">{s.units} unit</p>
+                <p class="text-xs text-slate-600 tabular-nums">{s.units} unit</p>
               </div>
             </li>
           );
@@ -424,10 +424,10 @@ function TroubleColumn(
           {rows.length}
         </span>
       </div>
-      <p class="mb-3 text-xs leading-relaxed text-slate-500">{caption}</p>
+      <p class="mb-3 text-xs leading-relaxed text-slate-600">{caption}</p>
 
       {rows.length === 0 ? (
-        <p class="py-2 text-sm italic text-slate-400">Tidak ada.</p>
+        <p class="py-2 text-sm italic text-slate-600">Tidak ada.</p>
       ) : (
         <>
           <ul class="mb-3 space-y-1">
@@ -444,8 +444,8 @@ function TroubleColumn(
             {rows.map((r) => (
               <li key={r.assetId} class="flex items-baseline gap-2 text-xs print:break-inside-avoid">
                 <span class="min-w-0 truncate font-semibold text-slate-700">{r.label}</span>
-                {r.zone && <span class="shrink-0 text-slate-400">{r.zone}</span>}
-                <span class="ml-auto shrink-0 tabular-nums text-slate-400">{age(r.since, now)}</span>
+                {r.zone && <span class="shrink-0 text-slate-600">{r.zone}</span>}
+                <span class="ml-auto shrink-0 tabular-nums text-slate-600">{age(r.since, now)}</span>
               </li>
             ))}
           </ul>
@@ -514,7 +514,7 @@ function Donut({ slices, total, label }: { slices: Slice[]; total: number; label
     >
       <div class="absolute inset-[22%] flex flex-col items-center justify-center rounded-full bg-white">
         <span class="text-xl font-bold tabular-nums text-slate-900">{total}</span>
-        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400">jenis</span>
+        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-600">jenis</span>
       </div>
     </div>
   );
@@ -541,7 +541,7 @@ function Distribution({ title, slices, total }: { title: string; slices: Slice[]
               <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
                 {s.label || 'Belum ditempatkan'}
               </span>
-              <span class="shrink-0 text-xs tabular-nums text-slate-500">
+              <span class="shrink-0 text-xs tabular-nums text-slate-600">
                 <span class="font-bold text-slate-900">{percent(s.items, total)}%</span>
                 {' · '}{s.items} jenis · {s.units} unit
               </span>
@@ -557,7 +557,7 @@ function Figure({ value, label }: { value: number; label: string }) {
   return (
     <div class="min-w-0 px-4 py-4 sm:px-5 sm:py-5">
       <p class="text-3xl font-bold tabular-nums sm:text-4xl">{value}</p>
-      <p class="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400 print:text-slate-500">
+      <p class="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400 print:text-slate-600">
         {label}
       </p>
     </div>
@@ -597,7 +597,7 @@ function Health(
           <CircleCheck class="h-3 w-3 shrink-0" /> Lengkap.
         </p>
       ) : (
-        <p class="mt-2 text-xs leading-relaxed text-slate-500">
+        <p class="mt-2 text-xs leading-relaxed text-slate-600">
           <span class="font-bold text-amber-700">{bad} {badLabel}</span> — {note}
         </p>
       )}

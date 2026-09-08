@@ -128,7 +128,7 @@ export function Board(
         if (here.length === 0) {
           // Not blank: an unplaced item is a real, visible state and the thing most likely to
           // go missing, so it says so rather than leaving a gap that reads as a rendering bug.
-          return <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>;
+          return <span class="whitespace-nowrap text-sm italic text-slate-500">belum ditempatkan</span>;
         }
         return (
           <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
@@ -145,7 +145,7 @@ export function Board(
                 {/* Only when it is split. On a single shelf this number is the Stok column
                     said twice, and a number repeated is a number somebody has to reconcile. */}
                 {here.length > 1 && (
-                  <span class="text-slate-400 tabular-nums">{d.byLocation[rack.locationId]}</span>
+                  <span class="text-slate-500 tabular-nums">{d.byLocation[rack.locationId]}</span>
                 )}
               </button>
             ))}
@@ -160,7 +160,7 @@ export function Board(
       // rack — it matters when planning labels, which is a desk job.
       mobile: 'hidden',
       cell: (d) => (
-        <span class="whitespace-nowrap text-[10px] uppercase tracking-wider text-slate-400">
+        <span class="whitespace-nowrap text-[10px] uppercase tracking-wider text-slate-500">
           {d.item.trackBy === 'instance' ? 'label satu-satu' : 'hitung jumlah'}
         </span>
       ),
@@ -182,12 +182,12 @@ export function Board(
       cell: (d) => (
         <span class="whitespace-nowrap">
           <span class="text-sm font-bold tabular-nums text-slate-900">{d.qty}</span>{' '}
-          <span class="text-xs text-slate-400">{d.item.unit}</span>
+          <span class="text-xs text-slate-500">{d.item.unit}</span>
           {/* Only when they differ, which is only ever a labelled item with a unit out or
               broken. "3 buah" alone would lose the fact that a fourth exists and is coming
               back; "3 dari 4" every time would be the same number said twice. */}
           {d.ownedQty > d.qty && (
-            <span class="block text-xs text-slate-400">dari {d.ownedQty}</span>
+            <span class="block text-xs text-slate-500">dari {d.ownedQty}</span>
           )}
         </span>
       ),
@@ -309,7 +309,7 @@ export function Board(
                         onClick={() => onView({ filter: f })}
                       >
                         {FILTER_LABEL[f]}
-                        <span class={`text-xs tabular-nums ${filter === f ? 'text-white/60' : 'text-slate-400'}`}>
+                        <span class={`text-xs tabular-nums ${filter === f ? 'text-white/70' : 'text-slate-500'}`}>
                           {counts[f]}
                         </span>
                       </button>
@@ -393,7 +393,7 @@ export function Board(
                   <Package class="mx-auto mb-3 h-10 w-10 text-slate-300" />
                   {/* Blaming the search when a filter is what emptied the list sends somebody
                       to retype a word that was never the problem. */}
-                  <p class="italic text-slate-400">
+                  <p class="italic text-slate-500">
                     {q !== ''
                       ? `Tidak ada yang cocok dengan "${search}".`
                       : `Tidak ada barang yang ${FILTER_LABEL[filter].toLowerCase()}.`}
@@ -414,7 +414,7 @@ function EmptyState({ title, body }: { title: string; body: string }) {
     <div class={`${CARD} px-6 py-16 text-center`}>
       <Package class="mx-auto mb-4 h-10 w-10 text-slate-300" />
       <p class="text-base font-bold text-slate-600">{title}</p>
-      <p class="mx-auto mt-1 max-w-sm text-sm text-slate-400">{body}</p>
+      <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">{body}</p>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function Navbar(p: Props) {
           one of them would otherwise be invisible until someone happened to open it. */}
       <button
         type="button"
-        class="relative rounded-full border border-slate-400 bg-white p-3 text-slate-500 transition-transform active:scale-90 md:hidden"
+        class="relative rounded-full border border-slate-500 bg-white p-3 text-slate-600 transition-transform active:scale-90 md:hidden"
         onClick={p.onToggleSidebar}
         aria-label={p.drawerAlerts > 0 ? `Buka menu — ${p.drawerAlerts} perlu diurus` : 'Buka menu'}
       >
@@ -45,7 +45,7 @@ export function Navbar(p: Props) {
           the field reads as the one place you can type rather than as a differently-tinted
           patch of header. `slate-400` on the border, not a hairline: a form field's boundary
           has to clear 3:1 (WCAG 1.4.11), and white-on-beige is 1.28:1 by itself. */}
-      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-400 bg-white px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
+      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-500 bg-white px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
           class="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -68,7 +68,7 @@ export function Navbar(p: Props) {
 
       <button
         type="button"
-        class="relative rounded-full border border-slate-400 bg-white p-3 text-slate-500 transition-transform hover:-translate-y-0.5"
+        class="relative rounded-full border border-slate-500 bg-white p-3 text-slate-600 transition-transform hover:-translate-y-0.5"
         onClick={p.onShowAlerts}
         aria-label={
           p.alertCount > 0 ? `${p.alertCount} barang menipis` : 'Tidak ada notifikasi stok'

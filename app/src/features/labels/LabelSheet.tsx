@@ -139,7 +139,7 @@ export function LabelSheet(
     return (
       <div class="space-y-4 pt-4 sm:pt-6">
         <Header />
-        <p class={`${CARD} no-print py-20 text-center italic text-slate-500`}>
+        <p class={`${CARD} no-print py-20 text-center italic text-slate-600`}>
           Belum ada barang. Catat dulu di Opname Gudang.
         </p>
       </div>
@@ -213,8 +213,8 @@ export function LabelSheet(
                         })}
                       >
                         <span class="truncate text-sm font-bold text-slate-900">{g.title}</span>
-                        <span class="truncate text-xs text-slate-500">{g.subtitle}</span>
-                        <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-500">
+                        <span class="truncate text-xs text-slate-600">{g.subtitle}</span>
+                        <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-600">
                           {on > 0 && <span class="font-bold text-slate-900">{on}/</span>}{rows.length}
                         </span>
                       </button>
@@ -231,7 +231,7 @@ export function LabelSheet(
                                 onChange={() => toggle(l.code)}
                               />
                               <span class="min-w-0 flex-1 truncate text-sm text-slate-700">{l.title}</span>
-                              <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                              <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
                                 {KIND_LABEL[l.kind]}
                               </span>
                             </label>
@@ -243,7 +243,7 @@ export function LabelSheet(
                 );
               })}
               {groups.every((g) => visible(g).length === 0) && (
-                <p class="px-3 py-8 text-center text-sm italic text-slate-500">
+                <p class="px-3 py-8 text-center text-sm italic text-slate-600">
                   Tidak ada label yang cocok dengan “{query}”.
                 </p>
               )}
@@ -271,14 +271,14 @@ export function LabelSheet(
                   >
                     <div class="flex items-baseline justify-between gap-2">
                       <span class="text-sm font-bold">{f.name}</span>
-                      <span class={`shrink-0 text-[11px] tabular-nums ${active ? 'text-slate-300' : 'text-slate-500'}`}>
+                      <span class={`shrink-0 text-[11px] tabular-nums ${active ? 'text-slate-300' : 'text-slate-600'}`}>
                         {f.width}×{f.height}mm
                       </span>
                     </div>
-                    <p class={`mt-0.5 text-xs leading-snug ${active ? 'text-slate-300' : 'text-slate-500'}`}>
+                    <p class={`mt-0.5 text-xs leading-snug ${active ? 'text-slate-300' : 'text-slate-600'}`}>
                       {f.purpose}
                     </p>
-                    <p class={`mt-1 text-[11px] font-semibold tabular-nums ${active ? 'text-slate-500' : 'text-slate-500'}`}>
+                    <p class={`mt-1 text-[11px] font-semibold tabular-nums ${active ? 'text-slate-300' : 'text-slate-600'}`}>
                       {perSheet(f)} per lembar A4
                     </p>
                   </button>
@@ -298,7 +298,7 @@ export function LabelSheet(
               <span class="font-bold text-slate-900 tabular-nums">{chosen.length}</span> label
               {' · '}
               <span class="font-bold text-slate-900 tabular-nums">{sheetCount(chosen.length, format)}</span> lembar A4
-              <span class="text-slate-500"> · {format.name}</span>
+              <span class="text-slate-600"> · {format.name}</span>
             </p>
             <span class="ml-auto flex items-center gap-2">
               {/* The QR's destination is set once, when the app gets a real address, and then
@@ -309,8 +309,8 @@ export function LabelSheet(
               <button
                 type="button"
                 class={`flex h-touch w-touch shrink-0 items-center justify-center rounded-lg border ${risky
-                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                  : 'border-slate-400 bg-white text-slate-600 hover:bg-slate-100'}`}
+                  ? 'border-red-500 bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'border-slate-500 bg-white text-slate-600 hover:bg-slate-100'}`}
                 aria-label="Tujuan QR"
                 title="Tujuan QR"
                 onClick={() => setTargetOpen(true)}
@@ -340,15 +340,15 @@ export function LabelSheet(
               <span class="font-bold text-slate-900">Di dialog cetak, setel Skala ke 100%</span>{' '}
               (bukan “Fit to page” / “Sesuaikan halaman”) dan Margin ke Default. Kalau diperkecil,
               ukurannya meleset dan label tidak lagi pas di stikernya.{' '}
-              <span class="text-slate-500">Coba di kertas biasa dulu sebelum pakai lembar stiker.</span>
+              <span class="text-slate-600">Coba di kertas biasa dulu sebelum pakai lembar stiker.</span>
             </p>
           )}
 
           {chosen.length === 0 ? (
             <div class={`${CARD} no-print py-16 text-center`}>
               <QrCode class="mx-auto mb-3 h-10 w-10 text-slate-300" />
-              <p class="font-semibold text-slate-500">Belum ada label yang dipilih.</p>
-              <p class="mx-auto mt-1 max-w-xs text-sm text-slate-500">
+              <p class="font-semibold text-slate-600">Belum ada label yang dipilih.</p>
+              <p class="mx-auto mt-1 max-w-xs text-sm text-slate-600">
                 Centang satu rak untuk mencetak seluruh isinya sekaligus, atau pilih satu barang
                 saja kalau labelnya cuma lepas satu.
               </p>
@@ -356,7 +356,7 @@ export function LabelSheet(
           ) : (
             pages > 1 && (
               <div class="no-print flex flex-wrap items-center gap-1.5">
-                <span class="mr-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <span class="mr-1 text-xs font-semibold uppercase tracking-wider text-slate-600">
                   Lembar
                 </span>
                 {Array.from({ length: pages }, (_, i) => (
@@ -364,7 +364,7 @@ export function LabelSheet(
                     key={i}
                     type="button"
                     aria-current={i === page}
-                    class={`h-8 min-w-8 rounded-md px-2 text-sm font-bold tabular-nums transition-colors ${
+                    class={`h-8 min-w-8 rounded-md border-slate-500 px-2 text-sm font-bold tabular-nums transition-colors ${
                       i === page
                         ? 'bg-slate-900 text-slate-50'
                         : 'bg-white text-slate-700 border border-slate-400 hover:bg-slate-100'
@@ -374,7 +374,7 @@ export function LabelSheet(
                     {i + 1}
                   </button>
                 ))}
-                <span class="ml-2 text-xs text-slate-500">semua lembar ikut tercetak</span>
+                <span class="ml-2 text-xs text-slate-600">semua lembar ikut tercetak</span>
               </div>
             )
           )}
@@ -415,7 +415,7 @@ export function LabelSheet(
           autocomplete="off"
           onInput={(e: Event) => setBaseUrl((e.target as HTMLInputElement).value)}
         />
-        <p class="mt-1.5 text-xs text-slate-500">
+        <p class="mt-1.5 text-xs text-slate-600">
           Setiap QR berisi alamat ini. Diisi sekali, saat aplikasinya sudah punya alamat tetap.
         </p>
 
@@ -458,7 +458,7 @@ function Step({ n, title, note }: { n: number; title: string; note?: string }) {
         {n}
       </span>
       <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">{title}</h2>
-      {note && <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-500">{note}</span>}
+      {note && <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-600">{note}</span>}
     </div>
   );
 }

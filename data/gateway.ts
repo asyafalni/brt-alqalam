@@ -116,6 +116,8 @@ async function call(
   url: string,
   body: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
+  /** Set on the one retry, so a permanent misconfiguration still fails rather than looping. */
+  retried = false,
 ): Promise<Record<string, unknown>> {
   let res: Response;
   try {
@@ -136,9 +138,14 @@ async function call(
   try {
     json = JSON.parse(text);
   } catch {
-    /* HTML here means the deployment is answering with a Google sign-in page — `access` is
-       `ANYONE` in the manifest rather than `ANYONE_ANONYMOUS`. It arrives as HTTP 200, so
-       nothing else about the response gives it away. */
+    /* HTML has two very different causes, and one retry tells them apart.
+       PERMANENT: the deployment answers with a Google sign-in page, because `access` is `ANYONE`
+       in the manifest rather than `ANYONE_ANONYMOUS` — it arrives as HTTP 200, so nothing else
+       gives it away, and it will fail again.
+       TRANSIENT: Apps Script serves an error page for a second while a new deployment version
+       takes over. That one succeeds on the second try, and costs a user nothing.
+       Retrying once is cheap; making somebody re-press a button to find out is not. */
+    if (!retried) return call(url, body, fetchImpl, true);
     throw new GatewayError('not-json', text.slice(0, 200));
   }
 

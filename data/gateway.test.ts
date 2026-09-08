@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  append, closeSession, fetchState, GatewayError, openSession, readState,
+  append, closeSession, fetchState, GatewayError, listRoster, openSession, readState,
 } from './gateway';
 
 const URL = 'https://script.google.com/macros/s/X/exec';
@@ -202,5 +202,22 @@ describe('a PIN two people share', () => {
   it('still refuses a reply that is neither a session nor a question', async () => {
     await expect(openSession(URL, 'secret', '1234', undefined, reply({ ok: true })))
       .rejects.toThrow();
+  });
+});
+
+describe('an HTML reply', () => {
+  it('is retried once — a redeploy serves an error page for a second', async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(new Response('<!DOCTYPE html><html>'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, users: [] })));
+    await expect(listRoster(URL, 'tok', f)).resolves.toEqual([]);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up on the second, so a misconfigured deployment still fails loudly', async () => {
+    // `access: ANYONE` instead of ANYONE_ANONYMOUS serves a login page with HTTP 200, for ever.
+    const f = vi.fn(async () => new Response('<!DOCTYPE html><html>'));
+    await expect(listRoster(URL, 'tok', f)).rejects.toMatchObject({ code: 'not-json' });
+    expect(f).toHaveBeenCalledTimes(2);
   });
 });
