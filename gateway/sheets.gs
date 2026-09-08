@@ -354,3 +354,43 @@ function cachedPublicState() {
 function dropStateCache() {
   CacheService.getScriptCache().remove(STATE_CACHE_KEY);
 }
+
+
+// ---------------------------------------------------------------------------
+// The admin log — everything that is not a movement.
+// ---------------------------------------------------------------------------
+
+/*
+ * WHY IT IS NOT IN `Transactions`. HISTORI DATA has eight stock-shaped columns and nowhere to
+ * put "renamed a category" or "invited an admin" (§71.3). Worse, the client parses `type` with
+ * a closed union, so a `catalog_edit` row written into that tab is QUARANTINED on arrival — the
+ * audit trail would have been discarded by the thing meant to read it. No such row exists in
+ * the live sheet yet only because no admin had saved a catalog change through the app.
+ *
+ * The tab is created on demand rather than added to the setup checklist. A missing audit log is
+ * the kind of thing nobody notices until they need it, and one more manual step is one more way
+ * for a deployment to be subtly incomplete.
+ */
+var ADMIN_LOG_COLUMNS = ['ts', 'actorUserId', 'actorName', 'action', 'detail'];
+
+function adminLogSheet() {
+  var sheet = book().getSheetByName('AdminLog');
+  if (!sheet) {
+    sheet = book().insertSheet('AdminLog');
+    sheet.getRange(1, 1, 1, ADMIN_LOG_COLUMNS.length).setValues([ADMIN_LOG_COLUMNS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/** Append-only, like the movement log, and for the same reason: it is a record, not a state. */
+function adminLog(who, action, detail) {
+  var sheet = adminLogSheet();
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, ADMIN_LOG_COLUMNS.length).setValues([[
+    new Date().toISOString(),
+    who.uid || who.userId || '',
+    who.name || '',
+    String(action),
+    String(detail || ''),
+  ]]);
+}

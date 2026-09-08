@@ -70,6 +70,9 @@ function doPost(e) {
       case 'enrollDevice': return handleEnrollDevice(body);
       case 'setDeviceRevoked': return handleSetDeviceRevoked(body);
       case 'renameDevice': return handleRenameDevice(body);
+      case 'listInvitations': return handleListInvitations(body);
+      case 'inviteAdmin': return handleInviteAdmin(body);
+      case 'revokeInvitation': return handleRevokeInvitation(body);
       case 'submitRequest': return handleSubmitRequest(body);
       default: return fail('unknown_op');
     }
@@ -84,7 +87,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.10.0-admin-utama';
+var GATEWAY_VERSION = '0.11.0-invite';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -328,25 +331,11 @@ function handlePutCatalog(body) {
     for (var t = 0; t < names.length; t++) writeTab(names[t], tabs[names[t]]);
     dropStateCache();
 
-    /* The audit trail §29 asks for. One row per save, not per changed field: HISTORI DATA has
-       eight stock-shaped columns with nowhere to put a renamed category (§71.3), so what goes
-       in is the fact that an admin changed these tabs, when, and who — which is what somebody
-       reading the log actually wants to know. */
-    var audit = {
-      txnId: Utilities.getUuid(),
-      clientTxnId: 'catalog-' + Utilities.getUuid(),
-      ts: new Date().toISOString(),
-      type: 'catalog_edit',
-      itemId: '', assetId: '', locationId: '', qtyDelta: 0, recipient: '',
-      actorUserId: who.uid,
-      condition: '', toStatus: '', reversesTxnId: '',
-      note: names.map(function (n) { return n + '=' + tabs[n].length; }).join(' '),
-    };
-    var built = txnRow(audit);
-    if (!built.ok) return fail('column_not_built', { column: built.column });
-    var sheet = txnSheet();
-    sheet.getRange(sheet.getLastRow() + 1, 1, 1, TXN_COLUMNS.length).setValues([built.row]);
-      dropStateCache();
+    /* The audit §29 asks for, in `AdminLog` rather than `Transactions`: the movement log's
+       eight columns have nowhere to put "renamed a category", and its `type` is a closed union
+       the client quarantines anything outside of. One row per save, not per changed field —
+       what somebody reading it wants is that an admin changed these tabs, when, and who. */
+    adminLog(who, 'catalog_edit', names.map(function (n) { return n + '=' + tabs[n].length; }).join(' '));
 
     var rev = bumpCatalogRev();
     SpreadsheetApp.flush();
@@ -539,4 +528,56 @@ function handleRenameDevice(body) {
   var result = deviceRename(body.deviceId, body.label);
   if (!result.ok) return fail(result.error);
   return respond({ ok: true, devices: deviceList() });
+}
+
+
+// ---------------------------------------------------------------------------
+// Inviting an admin — admin_utama only, and only ever as `admin`.
+// ---------------------------------------------------------------------------
+
+/** The one role check that is not `requireAdmin`: this creates identities, not inventory rows. */
+function requireAdminUtama(token) {
+  var who = verifyClerk(token);
+  if (!who.ok) return who;
+  if (who.role !== 'admin_utama') return { ok: false, error: 'needs_admin_utama' };
+  return who;
+}
+
+function handleListInvitations(body) {
+  var who = requireAdminUtama(body.token);
+  if (!who.ok) return fail(who.error);
+  var result = clerkInvitations();
+  if (!result.ok) return fail(result.error, { message: result.detail });
+  return respond({ ok: true, invitations: result.invitations });
+}
+
+function handleInviteAdmin(body) {
+  var who = requireAdminUtama(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var result = clerkInvite(body.email, body.role, body.redirectUrl);
+  if (!result.ok) return fail(result.error, { message: result.detail });
+
+  // Logged BEFORE anything can go wrong afterwards: who granted whom access is the one fact
+  // this feature exists to keep answerable.
+  adminLog(who, 'invite_admin', result.email + ' as ' + body.role);
+
+  var listed = clerkInvitations();
+  return respond({
+    ok: true,
+    invitationId: result.invitationId,
+    invitations: listed.ok ? listed.invitations : [],
+  });
+}
+
+function handleRevokeInvitation(body) {
+  var who = requireAdminUtama(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var result = clerkRevokeInvitation(body.invitationId);
+  if (!result.ok) return fail(result.error, { message: result.detail });
+  adminLog(who, 'revoke_invitation', String(body.invitationId));
+
+  var listed = clerkInvitations();
+  return respond({ ok: true, invitations: listed.ok ? listed.invitations : [] });
 }

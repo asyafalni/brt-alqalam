@@ -29,6 +29,7 @@ function fakeBook(tabs: Record<string, Tab>) {
   const sheet = (name: string) => ({
     getDataRange: () => ({ getValues: () => tabs[name] }),
     getLastRow: () => tabs[name].length,
+    setFrozenRows: () => {},
     getRange: (row: number, col: number, numRows: number, numCols: number) => ({
       getValues: () => tabs[name].slice(row - 1, row - 1 + numRows),
       clearContent: () => { tabs[name] = tabs[name].slice(0, row - 1); },
@@ -38,10 +39,20 @@ function fakeBook(tabs: Record<string, Tab>) {
       },
     }),
   });
-  return { getSheetByName: (n: string) => (tabs[n] ? sheet(n) : null) };
+  return {
+    getSheetByName: (n: string) => (tabs[n] ? sheet(n) : null),
+    // The admin log creates itself on first use, so the fake has to be able to grow a tab too.
+    insertSheet: (n: string) => { tabs[n] = []; return sheet(n); },
+  };
 }
 
+/** What the fake Clerk was asked, and what it should answer. Reset per `load`. */
+let clerkCalls: { url: string; options: Record<string, unknown> }[] = [];
+let clerkReplies: { code: number; body: unknown }[] = [];
+
 function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
+  clerkCalls = [];
+  clerkReplies = [];
   const store: Record<string, string> = {
     CLERK_JWT_KEY: KEY, CLERK_ISSUER: ISS, PIN_PEPPER: 'test-pepper', ...props,
   };
@@ -67,6 +78,16 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
       MimeType: { TEXT: 'text' },
       createTextOutput: (s: string) => ({ setMimeType: () => JSON.parse(s) }),
     },
+    UrlFetchApp: {
+      fetch: (url: string, options: Record<string, unknown>) => {
+        clerkCalls.push({ url, options });
+        const reply = clerkReplies.shift() ?? { code: 200, body: { id: 'inv_1', email_address: 'x@y.z' } };
+        return {
+          getResponseCode: () => reply.code,
+          getContentText: () => JSON.stringify(reply.body),
+        };
+      },
+    },
     Utilities: {
       getUuid: () => randomUUID(),
       computeHmacSha256Signature: (v: string, k: string) => [...createHmac('sha256', k).update(v).digest()],
@@ -77,14 +98,15 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   };
   // Every .gs file, because Apps Script gives them ONE global scope and a harness that loads
   // a subset will report "not defined" for code that works perfectly in production.
-  const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'devices.gs', 'Code.gs']
+  const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'devices.gs', 'clerk.gs', 'Code.gs']
     .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
     .join('\n;\n');
   return new Function(
     ...Object.keys(sandbox),
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
        handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
-       handleSetDeviceRevoked, handleRenameDevice, writeTab, txnRow, catalogRev,
+       handleSetDeviceRevoked, handleRenameDevice, handleInviteAdmin,
+       handleListInvitations, handleRevokeInvitation, writeTab, txnRow, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -214,15 +236,28 @@ describe('two admins editing at once', () => {
 });
 
 describe('the audit trail', () => {
-  it('appends one catalog_edit row naming the admin and the tabs', () => {
+  it('logs the catalog edit to AdminLog, not to the movement log', () => {
     const tabs = freshTabs();
     const g = load(tabs);
     g.handlePutCatalog({ token: admin, tabs: { Items: [{ itemId: 'a' }], Categories: [] } });
-    const row = tabs.Transactions[1];
-    expect(row[TXN_HEADER.indexOf('type')]).toBe('catalog_edit');
-    expect(row[TXN_HEADER.indexOf('actorUserId')]).toBe('usr_1');
-    expect(row[TXN_HEADER.indexOf('note')]).toBe('Items=1 Categories=0');
-    expect(row).toHaveLength(TXN_HEADER.length);
+
+    /* NOT in Transactions. Its eight columns are stock-shaped, and its `type` is a closed union
+       the client quarantines anything outside of — an audit row written there would be
+       discarded by the very thing meant to read it. */
+    expect(tabs.Transactions).toHaveLength(1);
+
+    const log = tabs.AdminLog;
+    expect(log[0]).toEqual(['ts', 'actorUserId', 'actorName', 'action', 'detail']);
+    expect(log[1][1]).toBe('usr_1');
+    expect(log[1][3]).toBe('catalog_edit');
+    expect(log[1][4]).toBe('Items=1 Categories=0');
+  });
+
+  it('creates the AdminLog tab on demand, so it cannot be missing from a deployment', () => {
+    const tabs = freshTabs();
+    expect(tabs.AdminLog).toBeUndefined();
+    load(tabs).handlePutCatalog({ token: admin, tabs: { Items: [] } });
+    expect(tabs.AdminLog).toBeDefined();
   });
 
   it('txnRow refuses a row that is missing a column instead of writing it short', () => {
@@ -614,5 +649,90 @@ describe('only admin_utama may touch another admin', () => {
     const budi = g.handleSetUserPin({ token: plainAdmin, name: 'Budi', role: 'anggota', pin: '4321' });
     expect(g.handleSetUserActive({ token: plainAdmin, userId: budi.userId, disabled: true }).ok)
       .toBe(true);
+  });
+});
+
+describe('inviting an admin', () => {
+  const withKey = (tabs: Record<string, Tab>) => load(tabs, { CLERK_SECRET_KEY: 'sk_test_x' });
+
+  it('does nothing at all without a secret key — the capability is opt-in', () => {
+    // Deploying this code must not, by itself, give the gateway the power to mint identities.
+    const g = load(freshTabs());
+    expect(g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'admin' }))
+      .toMatchObject({ ok: false, error: 'clerk_not_configured' });
+    expect(clerkCalls).toHaveLength(0);
+  });
+
+  it('refuses an ordinary admin — this creates identities, not inventory rows', () => {
+    const g = withKey(freshTabs());
+    expect(g.handleInviteAdmin({ token: admin, email: 'a@b.c', role: 'admin' }))
+      .toMatchObject({ ok: false, error: 'needs_admin_utama' });
+    expect(clerkCalls).toHaveLength(0);
+  });
+
+  it('NEVER invites an admin_utama, however it is asked', () => {
+    const g = withKey(freshTabs());
+    expect(g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'admin_utama' }))
+      .toMatchObject({ ok: false, error: 'bad_role' });
+    expect(g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'anggota' }))
+      .toMatchObject({ ok: false, error: 'bad_role' });
+    expect(clerkCalls).toHaveLength(0);
+  });
+
+  it('refuses something that is not an email before spending a call on it', () => {
+    const g = withKey(freshTabs());
+    expect(g.handleInviteAdmin({ token: utama, email: 'budi', role: 'admin' }))
+      .toMatchObject({ ok: false, error: 'bad_email' });
+    expect(clerkCalls).toHaveLength(0);
+  });
+
+  it('sends the role as public_metadata, which is where the JWT reads it from', () => {
+    const g = withKey(freshTabs());
+    clerkReplies = [
+      { code: 200, body: { id: 'inv_9', email_address: 'rudi@masjid.id' } },
+      { code: 200, body: { data: [] } },
+    ];
+    const r = g.handleInviteAdmin({ token: utama, email: 'rudi@masjid.id', role: 'admin' });
+    expect(r.ok).toBe(true);
+
+    const sent = JSON.parse(String(clerkCalls[0].options.payload));
+    expect(clerkCalls[0].url).toContain('/invitations');
+    expect(sent).toMatchObject({
+      email_address: 'rudi@masjid.id',
+      public_metadata: { role: 'admin' },
+    });
+    // No password anywhere: the invited person sets their own, in Clerk.
+    expect(JSON.stringify(sent)).not.toContain('password');
+  });
+
+  it('pins the Clerk API version, so a dated breaking change cannot arrive silently', () => {
+    const g = withKey(freshTabs());
+    clerkReplies = [{ code: 200, body: { id: 'i' } }, { code: 200, body: { data: [] } }];
+    g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'admin' });
+    const headers = (clerkCalls[0].options.headers ?? {}) as Record<string, string>;
+    expect(headers['Clerk-API-Version']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(headers.Authorization).toBe('Bearer sk_test_x');
+  });
+
+  it('writes who invited whom to AdminLog', () => {
+    const tabs = freshTabs();
+    const g = withKey(tabs);
+    clerkReplies = [
+      { code: 200, body: { id: 'inv_9', email_address: 'rudi@masjid.id' } },
+      { code: 200, body: { data: [] } },
+    ];
+    g.handleInviteAdmin({ token: utama, email: 'rudi@masjid.id', role: 'admin' });
+    const row = tabs.AdminLog[tabs.AdminLog.length - 1];
+    expect(row[2]).toBe('Bos');
+    expect(row[3]).toBe('invite_admin');
+    expect(row[4]).toContain('rudi@masjid.id');
+  });
+
+  it("passes Clerk's own refusal through rather than inventing one", () => {
+    const g = withKey(freshTabs());
+    clerkReplies = [{ code: 422, body: { errors: [{ long_message: 'duplicate invitation' }] } }];
+    const r = g.handleInviteAdmin({ token: utama, email: 'a@b.c', role: 'admin' });
+    expect(r).toMatchObject({ ok: false, error: 'clerk_422' });
+    expect(r.message).toContain('duplicate invitation');
   });
 });

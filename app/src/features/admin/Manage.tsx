@@ -9,6 +9,7 @@ import { KeyRound, Smartphone, TriangleAlert } from '@octanejs/lucide';
 import { PageHeader } from '../../components/ui';
 import { Roster } from './Roster';
 import { Devices } from '../gateway/Devices';
+import { Invites } from './Invites';
 import type { AdminSession } from './AdminPanel';
 import type { Connection } from '../../state/connection';
 
@@ -45,6 +46,9 @@ export function Manage(
             <KeyRound class="h-4 w-4" /> Orang
           </h2>
           <Roster url={connection.url} getToken={admin.getToken} canManageAdmins={isUtama} />
+          {/* Only admin_utama sees it, and the gateway refuses anybody else regardless — the
+              panel being hidden is a courtesy, not the control. */}
+          {isUtama && <Invites url={connection.url} getToken={admin.getToken} />}
           {!isUtama && (
             <p class="px-1 text-xs leading-relaxed text-slate-500">
               Hanya Admin Utama yang bisa membuat atau mengubah Admin lain.
@@ -68,8 +72,8 @@ export function Manage(
           <p class="font-semibold text-slate-900">Peran di sini mengatur PIN, bukan akun.</p>
           <p class="mt-1">
             Seorang <strong>Admin</strong> di daftar ini punya PIN admin di kios. Untuk bisa
-            <em> masuk dengan password</em> dan mengubah katalog, akunnya harus dibuat di
-            dashboard Clerk — gateway sengaja tidak menyimpan kunci untuk membuat akun.
+            <em> masuk dengan password</em> dan mengubah katalog, orangnya perlu akun Clerk —
+            pakai <strong>Undang admin</strong> di atas, atau buat langsung di dashboard Clerk.
           </p>
         </div>
       </div>

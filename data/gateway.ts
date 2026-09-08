@@ -519,3 +519,59 @@ export async function renameDevice(
 ): Promise<GatewayDevice[]> {
   return readDevices(await call(url, { op: 'renameDevice', token, deviceId, label }, fetchImpl));
 }
+
+// ---------------------------------------------------------------------------
+// Admin invitations — admin_utama only.
+// ---------------------------------------------------------------------------
+
+export interface Invitation {
+  invitationId: string;
+  email: string;
+  role: string;
+  status: string;
+  createdTs: number;
+}
+
+const readInvitations = (json: Record<string, unknown>): Invitation[] =>
+  (Array.isArray(json.invitations) ? json.invitations : []).map((i) => {
+    const r = i as Record<string, unknown>;
+    return {
+      invitationId: String(r.invitationId ?? ''),
+      email: String(r.email ?? ''),
+      role: String(r.role ?? ''),
+      status: String(r.status ?? ''),
+      createdTs: Date.parse(String(r.createdTs ?? '')) || 0,
+    };
+  });
+
+export async function listInvitations(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<Invitation[]> {
+  return readInvitations(await call(url, { op: 'listInvitations', token }, fetchImpl));
+}
+
+/**
+ * Invite somebody to become an admin.
+ *
+ * An INVITATION, never a created account: Clerk emails a link, the person sets their own
+ * password there, and the role rides along as `public_metadata` — which is exactly where the
+ * gateway's JWT template reads `role` from. No credential passes through this app or the
+ * gateway at any point.
+ *
+ * `redirectUrl` is where they land after accepting, so the invitation ends on the register
+ * rather than on Clerk's own page.
+ */
+export async function inviteAdmin(
+  url: string, token: string, email: string, redirectUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Invitation[]> {
+  return readInvitations(
+    await call(url, { op: 'inviteAdmin', token, email, role: 'admin', redirectUrl }, fetchImpl),
+  );
+}
+
+export async function revokeInvitation(
+  url: string, token: string, invitationId: string, fetchImpl: typeof fetch = fetch,
+): Promise<Invitation[]> {
+  return readInvitations(await call(url, { op: 'revokeInvitation', token, invitationId }, fetchImpl));
+}
