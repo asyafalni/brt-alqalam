@@ -16,7 +16,7 @@ import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, PageHeader } from '../../components/ui';
 import { LazyList, useLazyCount } from '../../components/LazyList';
-import { rupiah } from '../requests/RequestBoard';
+import { rupiah } from '../../components/format';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { StockAlerts } from '../alerts/StockAlerts';

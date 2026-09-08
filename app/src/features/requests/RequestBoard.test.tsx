@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach , vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { App } from '../../App';
+// The screen is lazily loaded so the kiosk bundle does not carry it (§64.2's reasoning applied
+// to screens, not just to Clerk). Resolving the module here keeps these tests synchronous.
+await import('./RequestBoard');
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
@@ -44,9 +47,12 @@ beforeEach(() => { localStorage.clear(); at('#/pengajuan'); });
 afterEach(() => { cleanup(); at('#/'); });
 
 describe('Pengajuan', () => {
-  it('says what to do when nothing has been asked for yet', () => {
+  it('says what to do when nothing has been asked for yet', async () => {
     seed(catalog(input()));
-    expect(render(App).getByText(/Belum ada pengajuan/)).toBeTruthy();
+    const r = render(App);
+    // The FIRST render in a file still waits one tick for the lazy chunk; later ones
+    // find it already resolved. Awaiting here rather than un-splitting the screen.
+    await vi.waitFor(() => expect(r.getByText(/Belum ada pengajuan/)).toBeTruthy());
   });
 
   it('shows the reason, the price and the link — the four things the boss asked for', () => {

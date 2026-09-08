@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { App } from '../../App';
+// The screen is lazily loaded so the kiosk bundle does not carry it. Resolving the module
+// before rendering is what keeps these tests synchronous.
+await import('./History');
 import { historyRows } from './History';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation } from '../stocktake/draft';
@@ -83,9 +86,12 @@ describe('the two balances', () => {
 });
 
 describe('the Histori Data screen', () => {
-  it('says what to do rather than showing an empty table', () => {
+  it('says what to do rather than showing an empty table', async () => {
     seed(catalog(input()), []);
-    expect(render(App).getByText('Belum ada catatan.')).toBeTruthy();
+    // The FIRST render in a file still waits one tick for the lazy chunk; later ones find it
+    // already resolved. Awaiting here rather than un-splitting the screen.
+    const r = render(App);
+    await vi.waitFor(() => expect(r.getByText('Belum ada catatan.')).toBeTruthy());
   });
 
   it('shows the derived keterangan, never a stored one', () => {

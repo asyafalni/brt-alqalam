@@ -12,8 +12,6 @@ import { openRequests } from '../../domain/requests';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
-import { Report } from './features/report/Report';
-import { RequestBoard } from './features/requests/RequestBoard';
 import { AssetBoard } from './features/assets/AssetBoard';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
@@ -22,6 +20,18 @@ import { AssetBoard } from './features/assets/AssetBoard';
 // bundle a marbot downloads just to write down how much sabun is on a shelf.
 const LabelSheet = lazy(() => import('./features/labels/LabelSheet').then((m) => ({ default: m.LabelSheet })));
 const ScannerView = lazy(() => import('./features/scan/ScannerView').then((m) => ({ default: m.ScannerView })));
+
+/*
+ * ADMIN-ONLY SCREENS, SPLIT OUT. Pengajuan, Histori Data and the management page are all gated
+ * on a Clerk session (§39, and the roster is a gateway credential), so the marbot's tablet was
+ * downloading three screens it can never open. Same reasoning as keeping Clerk itself off the
+ * kiosk path (§64.2): the hot path is the one that must stay small, and it is the one nobody
+ * signs in on.
+ */
+const RequestBoard = lazy(() => import('./features/requests/RequestBoard').then((m) => ({ default: m.RequestBoard })));
+const History = lazy(() => import('./features/history/History').then((m) => ({ default: m.History })));
+const Manage = lazy(() => import('./features/admin/Manage').then((m) => ({ default: m.Manage })));
+const Report = lazy(() => import('./features/report/Report').then((m) => ({ default: m.Report })));
 
 /** One wording for a refused sign-in, whether it failed opening the session or appending. */
 function explainPin(code: string): string {
@@ -47,7 +57,6 @@ import type { Route } from './state/route';
 import { StockTake } from './features/stocktake/StockTake';
 
 import { Board } from './features/board/Board';
-import { History } from './features/history/History';
 import { ScanResult } from './features/scan/ScanResult';
 import { MovementSheet } from './features/movement/MovementSheet';
 import { ConnectPanel } from './features/gateway/ConnectPanel';
@@ -61,7 +70,6 @@ import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
 import { useCatalogWriter } from './state/useCatalogWriter';
 import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
-import { Manage } from './features/admin/Manage';
 import type { AdminSession } from './features/admin/AdminPanel';
 import { append, closeSession, finishRequest, GatewayError } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
@@ -440,6 +448,7 @@ export function App() {
             />
           )}
           {route.name === 'pengajuan' && (
+            <Suspense fallback={<Loading label="Memuat pengajuan…" />}>
             <RequestBoard
               draft={draft}
               inventory={inventory}
@@ -455,21 +464,28 @@ export function App() {
                 : undefined}
               onPrefillUsed={() => { if (route.assetId) navigate({ name: 'pengajuan' }); }}
             />
+            </Suspense>
           )}
           {route.name === 'histori' && (
-            <History
-              txns={inventory.txns}
-              items={draft.items}
-              locations={draft.locations}
-              stock={draft.stock}
-              search={search}
-            />
+            <Suspense fallback={<Loading label="Memuat riwayat…" />}>
+              <History
+                txns={inventory.txns}
+                items={draft.items}
+                locations={draft.locations}
+                stock={draft.stock}
+                search={search}
+              />
+            </Suspense>
           )}
           {route.name === 'kelola' && admin && (
-            <Manage connection={connection} admin={admin} />
+            <Suspense fallback={<Loading label="Memuat pengaturan…" />}>
+              <Manage connection={connection} admin={admin} />
+            </Suspense>
           )}
           {route.name === 'laporan' && (
-            <Report draft={draft} inventory={inventory} now={now} />
+            <Suspense fallback={<Loading label="Menyiapkan laporan…" />}>
+              <Report draft={draft} inventory={inventory} now={now} />
+            </Suspense>
           )}
           {route.name === 'label' && (
             <Suspense fallback={<Loading label="Menyiapkan label…" />}>

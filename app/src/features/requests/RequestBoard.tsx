@@ -25,6 +25,7 @@ import type { Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, ERROR_TEXT, FIELD, LABEL, PageHeader, Select, Stat } from '../../components/ui';
+import { rupiah } from '../../components/format';
 import { Sheet } from '../../components/Sheet';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
@@ -33,7 +34,7 @@ import { artFor, ItemArt } from '../items/ItemArt';
 import { discardPhotos, RequestThumb } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
-export const rupiah = (n: number): string => `Rp${n.toLocaleString('id-ID')}`;
+
 
 const STATUS: Record<RequestStatus, { label: string; chip: string; rail: string }> = {
   diajukan: {
