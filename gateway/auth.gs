@@ -52,17 +52,36 @@ function safeEqual(a, b) {
  * PIN → person. Model C: the PIN alone identifies AND verifies, so PINs must be globally
  * unique — enforced at creation in setUserPin().
  */
-function resolvePin(pin) {
-  if (!pin || !/^\d{4,8}$/.test(String(pin))) return null;
+/**
+ * Everybody whose PIN this is — usually exactly one, occasionally two.
+ *
+ * PINs are no longer forced to be unique. Refusing a PIN because somebody else already has it
+ * is work for the admin issuing it, and at 10–15 people the chance any two collide at all is
+ * about one percent (birthday, 10^4 space). So the fast path stays one step — type the PIN, you
+ * are in — and the rare ambiguity is resolved by asking WHICH of the two, only when it happens.
+ *
+ * ⚠️ The trade, recorded because it was chosen rather than overlooked: two people sharing a PIN
+ * can each pick the other's name, so attribution between exactly those two is no longer proof.
+ * Unique PINs made that impossible. The owner took this deliberately for the speed.
+ */
+function resolvePins(pin) {
+  var out = [];
+  if (!pin || !/^\d{4,8}$/.test(String(pin))) return out;
   var users = JSON.parse(PROP.getProperty('USERS') || '[]');
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
     if (u.disabled) continue;
     if (safeEqual(u.pinHash, hashPin(pin, u.salt))) {
-      return { userId: u.userId, name: u.name, role: u.role };
+      out.push({ userId: u.userId, name: u.name, role: u.role });
     }
   }
-  return null;
+  return out;
+}
+
+/** The single match, or null when there is none or more than one. */
+function resolvePin(pin) {
+  var found = resolvePins(pin);
+  return found.length === 1 ? found[0] : null;
 }
 
 // ---------------------------------------------------------------------------

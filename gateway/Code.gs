@@ -33,7 +33,14 @@ function fail(error, extra) {
 function doGet(e) {
   try {
     var op = (e && e.parameter && e.parameter.op) || 'state';
-    if (op === 'state') return respond({ ok: true, state: readPublicState() });
+    if (op === 'state') {
+      /* Assembled once and handed out for 25s. `respond` would re-serialise the object, so the
+         cached STRING is spliced in directly — re-parsing it only to stringify it again is the
+         kind of work that makes a cache look like it did not help. */
+      return ContentService
+        .createTextOutput('{"ok":true,"state":' + cachedPublicState() + '}')
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
     if (op === 'stateDetailed') {
       var session = requireSession(e.parameter.session);
       if (!session.ok) return fail(session.error, { retryAfterMs: session.retryAfterMs });
@@ -73,7 +80,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.6.0-submit-request';
+var GATEWAY_VERSION = '0.8.0-cached-read';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -92,7 +99,32 @@ function handleOpenSession(body) {
   var throttle = checkThrottle(device.deviceId);
   if (!throttle.ok) return fail('locked', { retryAfterMs: throttle.retryAfterMs });
 
-  var actor = resolvePin(body.pin);
+  var found = resolvePins(body.pin);
+
+  /* A second step ONLY when the PIN is ambiguous, which at 10–15 people happens about one time
+     in a hundred rosters. The fast path is unchanged: type the PIN, you are in. Asking everybody
+     to pick their name first to cover that one case would put a tap on every visit to save one
+     — which is the trade §0.0 exists to refuse.
+
+     The failure counter is NOT touched here: the PIN was right. */
+  if (found.length > 1 && !body.userId) {
+    clearFailures(device.deviceId);
+    return respond({
+      ok: true,
+      choose: found.map(function (u) { return { userId: u.userId, name: u.name }; }),
+    });
+  }
+
+  var actor = found.length === 1 ? found[0] : null;
+  if (body.userId) {
+    /* Naming somebody does not let you BE them: the PIN still has to be theirs, so this only
+       picks between people who already hold the PIN that was typed. */
+    actor = null;
+    for (var f = 0; f < found.length; f++) {
+      if (found[f].userId === body.userId) actor = found[f];
+    }
+  }
+
   if (!actor) {
     recordFailure(device.deviceId);
     // Deliberately identical to an unknown PIN: saying "no such PIN" would let someone
@@ -199,6 +231,7 @@ function handleAppend(body) {
 
     if (rows.length) {
       sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, TXN_COLUMNS.length).setValues(rows);
+      dropStateCache();
       SpreadsheetApp.flush();
     }
 
@@ -289,6 +322,7 @@ function handlePutCatalog(body) {
     }
 
     for (var t = 0; t < names.length; t++) writeTab(names[t], tabs[names[t]]);
+    dropStateCache();
 
     /* The audit trail §29 asks for. One row per save, not per changed field: HISTORI DATA has
        eight stock-shaped columns with nowhere to put a renamed category (§71.3), so what goes
@@ -308,6 +342,7 @@ function handlePutCatalog(body) {
     if (!built.ok) return fail('column_not_built', { column: built.column });
     var sheet = txnSheet();
     sheet.getRange(sheet.getLastRow() + 1, 1, 1, TXN_COLUMNS.length).setValues([built.row]);
+      dropStateCache();
 
     var rev = bumpCatalogRev();
     SpreadsheetApp.flush();
@@ -348,7 +383,11 @@ function handleSetUserPin(body) {
        are (Part VII) — so the loser's withdrawals would be recorded as the winner's. */
     var result = rosterSetPin(body.name, body.role, body.pin, body.userId);
     if (!result.ok) return fail(result.error);
-    return respond({ ok: true, userId: result.userId, users: rosterList() });
+    /* `sharedWith` so the screen can say "Budi has this one too" — informational, not a
+       refusal: the admin may well want them to share it, and if not they can pick another. */
+    return respond({
+      ok: true, userId: result.userId, sharedWith: result.sharedWith || [], users: rosterList(),
+    });
   } finally {
     lock.releaseLock();
   }
@@ -433,6 +472,7 @@ function handleSubmitRequest(body) {
       note: '',
     };
     appendRow('Requests', request);
+    dropStateCache();
     SpreadsheetApp.flush();
     /* The row is NOT echoed back. The submitter cannot read this tab, and handing them their own
        row would be the one hole in that — it is the reply that teaches a client the shape of

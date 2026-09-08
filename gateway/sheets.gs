@@ -28,16 +28,37 @@ var TXN_COLUMNS = [
 /** Columns that name a person. Stripped from the public tier — see §12.4 and §39. */
 var PII_COLUMNS = ['recipient', 'actorUserId'];
 
+/*
+ * The open spreadsheet, opened ONCE per execution.
+ *
+ * `sheetNamed()` called this for every tab, so one `state` read did six `getProperty` lookups
+ * and six `openById` calls — and both are round trips to Google, not local work. Measured
+ * against the live deployment: `op=ping`, which touches no spreadsheet at all, costs 1.43s of
+ * fixed Apps Script overhead, while `op=state` cost 4.40s. Most of that gap was re-opening a
+ * file that was already open.
+ *
+ * Execution-scoped, which is the only scope there is: Apps Script tears the environment down
+ * between requests, so this can never go stale across a write.
+ */
+var BOOK_ = null;
+
 function book() {
   // A bound script reaches its own spreadsheet without any extra authorisation. If this
   // script is ever detached, set SPREADSHEET_ID in Script Properties instead.
+  if (BOOK_) return BOOK_;
   var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  BOOK_ = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  return BOOK_;
 }
 
+/** Tabs too — `getSheetByName` is another round trip, not a map lookup. */
+var SHEETS_ = {};
+
 function sheetNamed(name) {
+  if (SHEETS_[name]) return SHEETS_[name];
   var sheet = book().getSheetByName(name);
   if (!sheet) throw new Error('Sheet tab "' + name + '" not found. Import it from sheets/.');
+  SHEETS_[name] = sheet;
   return sheet;
 }
 
@@ -290,4 +311,46 @@ function appendRow(name, row) {
     return (v === null || v === undefined) ? '' : String(v);
   });
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, header.length).setValues([values]);
+}
+
+
+// ---------------------------------------------------------------------------
+// Caching the public read.
+// ---------------------------------------------------------------------------
+
+/*
+ * WHY. Measured on the live deployment: `op=ping`, which touches no spreadsheet, costs 1.43s of
+ * fixed Apps Script overhead; `op=state` cost 4.40s, and 3.44s after the spreadsheet handle was
+ * memoised. The remaining ~2s is six `getDataRange().getValues()` round trips for a register of
+ * fifty items — it is per-CALL cost, not per-row, so it will not improve as the data shrinks and
+ * will barely worsen as it grows.
+ *
+ * A kiosk polls every 60s and several devices poll independently, so the same six reads are
+ * repeated constantly for a register that changes a few times a day. Caching the assembled
+ * payload turns most of those into the 1.43s floor.
+ *
+ * SHORT, AND INVALIDATED ON EVERY WRITE. 25 seconds is well inside the 60s poll, so a device
+ * still sees a change on its next poll rather than a cache expiry later — and any append,
+ * catalog write or request drops the entry outright, so a movement recorded on one tablet is
+ * visible to the next reader immediately rather than up to 25s later.
+ */
+var STATE_CACHE_KEY = 'state:public';
+var STATE_CACHE_SECONDS = 25;
+
+/** CacheService refuses items over 100kB. Bigger registers simply go uncached, never truncated. */
+var STATE_CACHE_MAX = 90 * 1024;
+
+function cachedPublicState() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(STATE_CACHE_KEY);
+  if (hit) return hit;
+
+  var body = JSON.stringify(readPublicState());
+  if (body.length <= STATE_CACHE_MAX) cache.put(STATE_CACHE_KEY, body, STATE_CACHE_SECONDS);
+  return body;
+}
+
+/** Called by every write. Cheap, and the alternative is showing somebody a stale shelf. */
+function dropStateCache() {
+  CacheService.getScriptCache().remove(STATE_CACHE_KEY);
 }

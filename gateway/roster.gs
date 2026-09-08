@@ -51,15 +51,16 @@ function rosterSetPin(name, role, pin, userId) {
     if (userId ? users[i].userId === userId : users[i].name === name) existing = users[i];
   }
 
-  /* Globally unique, checked against everyone else. Disabled users are INCLUDED: re-issuing a
-     retired marbot's PIN to somebody new would make the old rows in the log read as the new
-     person's, and the log is not rewritable. */
+  /* NOT refused when somebody else has it. Uniqueness used to be required because the PIN alone
+     resolved who you are; a PIN shared by two people now asks which of them at sign-in, so the
+     refusal bought nothing and cost the admin a retry. The count is REPORTED, though, so the
+     screen can say "Budi has this one too" and let them choose a different one anyway. */
+  var sharedWith = [];
   for (var j = 0; j < users.length; j++) {
     var other = users[j];
     if (existing && other.userId === existing.userId) continue;
-    if (safeEqual(other.pinHash, hashPin(pin, other.salt))) {
-      return { ok: false, error: 'pin_taken' };
-    }
+    if (other.disabled) continue;
+    if (safeEqual(other.pinHash, hashPin(pin, other.salt))) sharedWith.push(other.name);
   }
 
   var salt = Utilities.getUuid();
@@ -81,7 +82,7 @@ function rosterSetPin(name, role, pin, userId) {
     users.push(existing);
   }
   rosterSave(users);
-  return { ok: true, userId: existing.userId };
+  return { ok: true, userId: existing.userId, sharedWith: sharedWith };
 }
 
 /**

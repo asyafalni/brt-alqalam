@@ -83,7 +83,7 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   return new Function(
     ...Object.keys(sandbox),
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
-       handleSetUserPin, handleSetUserActive, handleSubmitRequest, writeTab, txnRow, catalogRev,
+       handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, writeTab, txnRow, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
@@ -269,11 +269,14 @@ describe('the roster', () => {
       .toMatchObject({ ok: false, error: 'bad_pin' });
   });
 
-  it('refuses a PIN somebody else already has — the PIN IS the identity', () => {
+  it('ALLOWS a PIN somebody else has, and names who shares it', () => {
     const g = load2();
     expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' }).ok).toBe(true);
-    expect(g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' }))
-      .toMatchObject({ ok: false, error: 'pin_taken' });
+    const second = g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' });
+    // Refusing cost the admin a retry and bought nothing: a shared PIN now asks which of the
+    // two at sign-in. The count is reported so the screen can offer to pick another anyway.
+    expect(second.ok).toBe(true);
+    expect(second.sharedWith).toEqual(['Budi']);
   });
 
   it('lets one person keep their own PIN while changing their name', () => {
@@ -297,12 +300,18 @@ describe('the roster', () => {
     expect(Object.keys(r.users[0]).sort()).toEqual(['disabled', 'name', 'role', 'userId']);
   });
 
-  it('keeps a retired person’s PIN reserved, so old log rows stay theirs', () => {
+  it("reissues a retired person's PIN, and their old rows stay theirs anyway", () => {
+    /* The old rule reserved it, on the reasoning that reissuing would make historical rows read
+       as the new person's. That reasoning was WRONG: the log stores `actorUserId`, not the PIN,
+       and a new person gets a new id. Nothing in the past changes. */
     const g = load2();
-    const made = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
-    g.handleSetUserActive({ token: admin, userId: made.userId, disabled: true });
-    expect(g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' }))
-      .toMatchObject({ ok: false, error: 'pin_taken' });
+    const budi = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    g.handleSetUserActive({ token: admin, userId: budi.userId, disabled: true });
+    const sari = g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', pin: '4321' });
+    expect(sari.ok).toBe(true);
+    expect(sari.userId).not.toBe(budi.userId);
+    // And a retired PIN opens nothing, so the two never collide at sign-in either.
+    expect(sari.sharedWith).toEqual([]);
   });
 
   it('will not disable admin_utama, which the spec draws as Tetap', () => {
@@ -418,5 +427,58 @@ describe('the request id, so photos are not orphaned', () => {
     const second = g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
     expect(second.requestId).not.toBe('REQ-abc12345');
     expect(tabs.Requests).toHaveLength(3);
+  });
+});
+
+describe('signing in when a PIN belongs to two people', () => {
+  const device = { deviceSecret: 'rahasia-uji' };
+
+  function withUsers(names: [string, string][]) {
+    const tabs = freshTabs();
+    const g = load(tabs, {
+      DEVICES: JSON.stringify([{ deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia-uji', revoked: false }]),
+    });
+    names.forEach(([name, pin]) =>
+      g.handleSetUserPin({ token: admin, name, role: 'anggota', pin }));
+    return g;
+  }
+
+  it('lets a unique PIN straight through — the fast path is unchanged', () => {
+    const g = withUsers([['Budi', '4321'], ['Sari', '8888']]);
+    const r = g.handleOpenSession({ ...device, pin: '4321' });
+    expect(r.ok).toBe(true);
+    expect(r.session.actorName).toBe('Budi');
+    expect(r.choose).toBeUndefined();
+  });
+
+  it('asks which of the two when the PIN is shared', () => {
+    const g = withUsers([['Budi', '4321'], ['Sari', '4321']]);
+    const r = g.handleOpenSession({ ...device, pin: '4321' });
+    expect(r.ok).toBe(true);
+    expect(r.session).toBeUndefined();
+    expect(r.choose.map((c: { name: string }) => c.name).sort()).toEqual(['Budi', 'Sari']);
+  });
+
+  it('opens the session once a name is picked', () => {
+    const g = withUsers([['Budi', '4321'], ['Sari', '4321']]);
+    const who = g.handleOpenSession({ ...device, pin: '4321' }).choose
+      .find((c: { name: string }) => c.name === 'Sari');
+    const r = g.handleOpenSession({ ...device, pin: '4321', userId: who.userId });
+    expect(r.session.actorName).toBe('Sari');
+  });
+
+  it('naming somebody does NOT let you be them without their PIN', () => {
+    const g = withUsers([['Budi', '4321'], ['Sari', '9999']]);
+    const sari = g.handleListUsers({ token: admin }).users
+      .find((u: { name: string }) => u.name === 'Sari');
+    // Budi's PIN, Sari's name.
+    expect(g.handleOpenSession({ ...device, pin: '4321', userId: sari.userId }))
+      .toMatchObject({ ok: false, error: 'invalid_pin' });
+  });
+
+  it('still refuses a PIN nobody has', () => {
+    const g = withUsers([['Budi', '4321']]);
+    expect(g.handleOpenSession({ ...device, pin: '0000' }))
+      .toMatchObject({ ok: false, error: 'invalid_pin' });
   });
 });
