@@ -60,7 +60,13 @@ function doPost(e) {
   }
 }
 
-var GATEWAY_VERSION = '0.1.0';
+/*
+ * Bump this with every change you paste in. `?op=ping` returns it, which is the only way to
+ * tell from outside WHICH code a deployment is actually serving — and that mattered: saving a
+ * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
+ * fix that was never live. A version nobody can read is a version nobody can check.
+ */
+var GATEWAY_VERSION = '0.2.0-locationId';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
