@@ -15,7 +15,9 @@ import { useEffect, useRef, useState } from 'octane';
 import { CircleCheck, LogOut, ShieldCheck, TriangleAlert } from '@octanejs/lucide';
 import { whoami } from '../../../../data/gateway';
 import type { Whoami } from '../../../../data/gateway';
-import { ClerkUnavailable, clerkMessage, gatewayToken, loadClerk } from '../../data/clerkLoader';
+import {
+  ClerkUnavailable, NEEDS_SECOND_FACTOR, clerkMessage, gatewayToken, loadClerk,
+} from '../../data/clerkLoader';
 import type { ClerkClient } from '../../data/clerkLoader';
 import type { Connection } from '../../state/connection';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
@@ -104,6 +106,10 @@ export function AdminPanel(
   const [password, setPassword] = useState('');
   const [signingIn, setSigningIn] = useState(false);
   const [formError, setFormError] = useState('');
+  /* Clerk asks for an emailed code when it does not recognise the device. Shown only when it
+     asks, so the ordinary sign-in stays two fields. */
+  const [code, setCode] = useState('');
+  const [needsCode, setNeedsCode] = useState(false);
 
   /* Confirms with the gateway, not with the browser's copy of the user. Called on load and
      again after Clerk reports a session change, because signing in does not remount this. */
@@ -163,6 +169,14 @@ export function AdminPanel(
    * submit. What we gain over Clerk's mounted widget is that this form is in Bahasa, matches
    * every other screen, and cannot half-load (see `CLERK_JS_FILE`).
    */
+  async function finish(clerk: ClerkClient, sessionId: string) {
+    await clerk.setActive({ session: sessionId });
+    setPassword('');
+    setCode('');
+    setNeedsCode(false);
+    await confirm(clerk);
+  }
+
   async function signIn(e: Event) {
     e.preventDefault();
     const clerk = clerkRef.current;
@@ -174,18 +188,46 @@ export function AdminPanel(
       const result = await clerk.client.signIn.create({
         strategy: 'password', identifier: identifier.trim(), password,
       });
-      if (result.status !== 'complete' || !result.createdSessionId) {
-        // Two-factor and the like. Not supported here, and saying so beats a silent no-op.
-        setFormError(`Clerk meminta langkah tambahan (${result.status}), yang belum didukung `
-          + 'layar ini. Selesaikan lewat dashboard Clerk.');
+
+      if (result.status === 'complete' && result.createdSessionId) {
+        await finish(clerk, result.createdSessionId);
         return;
       }
-      await clerk.setActive({ session: result.createdSessionId });
-      setPassword('');
-      await confirm(clerk);
+
+      /* NOT a failure — the password was accepted and Clerk wants the device proved. Reporting
+         this as a rejection would tell an admin their password is wrong when it is not, which
+         is the most expensive wrong message a login screen can show. */
+      if (NEEDS_SECOND_FACTOR.includes(result.status)) {
+        await clerk.client.signIn.prepareSecondFactor({ strategy: 'email_code' });
+        setNeedsCode(true);
+        return;
+      }
+
+      setFormError(`Clerk meminta langkah "${result.status}", yang belum didukung layar ini. `
+        + 'Selesaikan lewat dashboard Clerk.');
     } catch (err) {
-      // Clerk's own wording, which is more accurate than a guess — it is the side that knows
-      // whether this was a wrong password, a breached one, or a locked account.
+      setFormError(clerkMessage(err));
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  async function submitCode(e: Event) {
+    e.preventDefault();
+    const clerk = clerkRef.current;
+    if (!clerk?.client) return;
+    setSigningIn(true);
+    setFormError('');
+    try {
+      const result = await clerk.client.signIn.attemptSecondFactor({
+        strategy: 'email_code', code: code.trim(),
+      });
+      if (result.status === 'complete' && result.createdSessionId) {
+        await finish(clerk, result.createdSessionId);
+      } else {
+        setFormError(`Clerk menjawab "${result.status}". Minta kode baru dan coba lagi.`);
+      }
+    } catch (err) {
       setFormError(clerkMessage(err));
     } finally {
       setSigningIn(false);
@@ -225,7 +267,48 @@ export function AdminPanel(
         </Card>
       )}
 
-      {phase === 'signed-out' && (
+      {phase === 'signed-out' && needsCode && (
+        <Card class="border-t-4 border-t-[#c9a86a] shadow-xl">
+          <h2 class="text-base font-bold text-slate-900">Masukkan kode dari email</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Password-mu sudah benar. Clerk belum mengenali perangkat ini, jadi kode enam angka
+            dikirim ke emailmu.
+          </p>
+
+          <form class="mt-4 space-y-4" onSubmit={submitCode}>
+            <div>
+              <label class={LABEL} for="admin-code">Kode</label>
+              <input
+                id="admin-code"
+                class={`${FIELD} tracking-[0.4em]`}
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength={8}
+                value={code}
+                onInput={(e: Event) => setCode((e.target as HTMLInputElement).value)}
+              />
+            </div>
+
+            {formError && <p class={ERROR_TEXT} role="alert">{formError}</p>}
+
+            <div class="flex items-center gap-3">
+              <Button type="submit" disabled={signingIn || code.trim().length < 4}>
+                {signingIn ? 'Memeriksa…' : 'Lanjut'}
+              </Button>
+              <button
+                type="button"
+                class="text-sm font-semibold text-slate-500 underline-offset-4 hover:text-slate-900 hover:underline"
+                onClick={() => { setNeedsCode(false); setCode(''); setFormError(''); }}
+              >
+                Kembali
+              </button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {phase === 'signed-out' && !needsCode && (
         <Card class="border-t-4 border-t-[#c9a86a] shadow-xl">
           <h2 class="text-base font-bold text-slate-900">Masuk sebagai admin</h2>
           <p class="mt-1 text-sm text-slate-600">

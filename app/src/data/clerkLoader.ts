@@ -27,11 +27,30 @@ export interface ClerkApiError {
   message?: string;
 }
 
+export interface ClerkSignInResult {
+  status: string;
+  createdSessionId?: string;
+  /** What Clerk will accept as a second step, when it asks for one. */
+  supportedSecondFactors?: { strategy: string }[];
+}
+
 export interface ClerkSignIn {
   create(params: {
     strategy: 'password'; identifier: string; password: string;
-  }): Promise<{ status: string; createdSessionId?: string }>;
+  }): Promise<ClerkSignInResult>;
+  prepareSecondFactor(params: { strategy: 'email_code' }): Promise<ClerkSignInResult>;
+  attemptSecondFactor(params: { strategy: 'email_code'; code: string }): Promise<ClerkSignInResult>;
 }
+
+/**
+ * The statuses that mean "the password was right, now prove the device".
+ *
+ * `needs_client_trust` is Clerk's device-attestation step and is not in the older documented
+ * set; it arrives with `firstFactorVerification: "verified"`, so treating it as a failure would
+ * tell an admin their password was wrong when it was not. Both are answered the same way — an
+ * emailed code — so they are one branch here.
+ */
+export const NEEDS_SECOND_FACTOR = ['needs_second_factor', 'needs_client_trust'];
 
 export interface ClerkClient {
   load(opts?: Record<string, unknown>): Promise<void>;
