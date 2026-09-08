@@ -20,6 +20,7 @@ import {
 } from '../../data/clerkLoader';
 import type { ClerkClient } from '../../data/clerkLoader';
 import type { Connection } from '../../state/connection';
+import { adminSession, forgetSignedIn, rememberSignedIn } from './restore';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 import { Logo } from '../../components/Logo';
 import { MasjidArt } from '../../components/MasjidArt';
@@ -131,12 +132,12 @@ export function AdminPanel(
       const result = await whoami(connection.url, token);
       setWho(result);
       setPhase('ready');
+      /* Remembered on the DEVICE, so the next page load knows to ask Clerk at all. Without it
+         the app said "Belum masuk" on every start until somebody opened this very screen. */
+      if (result.isAdmin) rememberSignedIn(result); else forgetSignedIn();
+
       onAdmin(result.isAdmin
-        ? {
-          who: result,
-          getToken: () => gatewayToken(clerk),
-          signOut: async () => { await clerk.signOut(); onAdmin(null); setWho(null); setPhase('signed-out'); },
-        }
+        ? adminSession(clerk, result, () => { onAdmin(null); setWho(null); setPhase('signed-out'); })
         : null);
     } catch (err) {
       setWho(null);

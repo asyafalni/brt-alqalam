@@ -36,8 +36,12 @@ const explain = (e: unknown) => {
   if (!(e instanceof GatewayError)) return REASON.offline;
   if (REASON[e.code]) return REASON[e.code];
   if (needsAuthorisation(e.hint)) {
-    return 'Gateway belum diizinkan menghubungi Clerk. Buka Apps Script, jalankan '
-      + 'checkSpreadsheet() sekali, dan setujui izin baru yang muncul — lalu coba lagi.';
+    /* `authorizeClerk()`, NOT `checkSpreadsheet()`. The editor only prompts for a permission
+       when the function it is about to run actually needs one, and `checkSpreadsheet` never
+       calls out — so it finishes quietly and grants nothing. Naming the wrong function here
+       sent somebody round that loop once already. */
+    return 'Gateway belum diizinkan menghubungi Clerk. Buka Apps Script, muat ulang halaman, '
+      + 'pilih fungsi authorizeClerk lalu Run, dan setujui izin yang muncul — baru coba lagi.';
   }
   // Clerk's own wording otherwise: it says things like "duplicate invitation" better than a
   // paraphrase would.

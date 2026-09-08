@@ -63,6 +63,7 @@ import { ConnectPanel } from './features/gateway/ConnectPanel';
 import { Enrol } from './features/gateway/Enrol';
 import { SubmitRequest } from './features/requests/SubmitRequest';
 import { newRequestId } from './features/requests/newRequestId';
+import { restoreAdmin } from './features/admin/restore';
 import { PinFlow } from './features/gateway/PinFlow';
 import { canRecord, loadConnection } from './state/connection';
 import type { Connection } from './state/connection';
@@ -90,6 +91,18 @@ export function App() {
      what turns every catalog setter in the app from a noop into a write — the sign-in is on one
      screen, the editing is on all of them. */
   const [admin, setAdmin] = useState<AdminSession | null>(null);
+  /* Clerk is lazy (§64.2), so on an ordinary load nothing has asked it whether a session
+     exists — which is why the rail said "Belum masuk" until somebody opened the admin screen.
+     A device that has been signed into before looks; one that never has does not, and so never
+     fetches Clerk at all. */
+  useEffect(() => {
+    if (!connection || admin) return;
+    let alive = true;
+    void restoreAdmin(connection.url, () => setAdmin(null), (corrected) => setAdmin(corrected))
+      .then((session) => { if (alive && session) setAdmin(session); });
+    return () => { alive = false; };
+  }, [connection?.url]);
+
   /* Declared BEFORE the register, because an admin changes which tier it reads. */
   const register = useRegister(connection, admin?.getToken);
   /* Rows appended in this visit, shown ahead of the next poll: somebody who records a
