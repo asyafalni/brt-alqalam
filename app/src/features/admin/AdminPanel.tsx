@@ -422,24 +422,33 @@ export function AdminPanel(
       {/* On a phone the hall is the BACKGROUND, not a band across the top. The band version put
           white text on a 200px strip and the tagline immediately overflowed it onto a grey gap —
           a full bleed with the card floating over it has neither problem and looks better. */}
-      <div class="absolute inset-0 lg:relative lg:inset-auto lg:h-auto">
+      <div class="absolute inset-0 overflow-hidden lg:relative lg:inset-auto lg:h-auto">
         <HallPanel />
       </div>
 
       <div class="relative flex min-h-screen items-center justify-center px-5 py-12 sm:px-10 lg:min-h-0 lg:bg-[#faf7f2]">
         {/* The building's one motif, at a whisper, CENTRED so the form sits inside the arch
-            rather than beside it. Hung off the edge it read as two stray vertical rules; framing
-            the card is the only placement where a half-visible arch is not simply a stray line.
+            rather than beside it. Hung off the edge it read as two stray vertical rules.
+
+            CLIPPED BY ITS OWN WRAPPER, and that is not cosmetic: at 115% height and centred, the
+            arch hangs 68px below the fold and 18px past the right edge, and a decorative element
+            that overflows the viewport is a decorative element that gives the whole page a
+            scrollbar. It did — an empty band under a full-height login, which reads as a broken
+            layout rather than as an ornament. The wrapper is `inset-0`, so the arch can be as
+            large as it likes and nothing it does can ever add a pixel of scroll.
+
             Desktop only — on a phone this half IS the photograph. */}
-        <svg
-          class="pointer-events-none absolute left-1/2 top-1/2 hidden h-[115%] w-auto -translate-x-1/2 -translate-y-1/2 lg:block"
-          viewBox="0 0 100 140"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path d="M8 140 V52 Q50 4 92 52 V140" stroke="#c9a86a" stroke-opacity="0.16" stroke-width="1.2" />
-          <path d="M22 140 V60 Q50 24 78 60 V140" stroke="#c9a86a" stroke-opacity="0.11" stroke-width="1.2" />
-        </svg>
+        <div class="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block">
+          <svg
+            class="absolute left-1/2 top-1/2 h-[115%] w-auto -translate-x-1/2 -translate-y-1/2"
+            viewBox="0 0 100 140"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="M8 140 V52 Q50 4 92 52 V140" stroke="#c9a86a" stroke-opacity="0.16" stroke-width="1.2" />
+            <path d="M22 140 V60 Q50 24 78 60 V140" stroke="#c9a86a" stroke-opacity="0.11" stroke-width="1.2" />
+          </svg>
+        </div>
 
         <div class="relative w-full max-w-md">
           {/* The phone's brand lockup, over the photograph. The desktop's lives in the hall
