@@ -31,7 +31,14 @@ export const BOARD_KINDS: BoardKind[] = ['semua', 'bisa-habis', 'barang-tetap'];
 
 export type Route =
   | { name: 'beranda' }
-  | { name: 'opname' }
+  /**
+   * `edit` opens the item panel already filled in for one row.
+   *
+   * In the URL rather than in memory, like Pengajuan's prefill: the trip from a barang's page
+   * survives a reload, and "ubah barang ini" becomes a link somebody can send. Consumed and
+   * dropped from the address the moment the panel opens.
+   */
+  | { name: 'opname'; edit?: string }
   | { name: 'label' }
   | { name: 'board'; filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort }
   /** `id` opens straight onto one rack's panel — the stock list links to it by rack. */
@@ -83,7 +90,10 @@ export function parseRoute(hash: string): Route {
     if (item) return { name: 'scan', target: 'item', id: item };
     return { name: 'scan-empty' };
   }
-  if (path === '/opname') return { name: 'opname' };
+  if (path === '/opname') {
+    const edit = params.get('e');
+    return edit ? { name: 'opname', edit } : { name: 'opname' };
+  }
   if (path === '/barang') {
     const id = params.get('i');
     if (id) return { name: 'item', id };
@@ -156,7 +166,8 @@ export function routeToHash(route: Route): string {
     case 'kelola': return '#/kelola';
     case 'daftar':
       return `#/daftar?g=${encodeURIComponent(route.gateway)}&s=${encodeURIComponent(route.secret)}`;
-    case 'opname': return '#/opname';
+    case 'opname':
+      return route.edit ? `#/opname?e=${encodeURIComponent(route.edit)}` : '#/opname';
     case 'item': return `#/barang?i=${encodeURIComponent(route.id)}`;
     case 'scan': {
       const key = route.target === 'asset' ? 'a' : route.target === 'location' ? 'l' : 'i';

@@ -201,7 +201,13 @@ export function ItemDetail(
                 </Button>
               </>
             )}
-            <Button variant="secondary" onClick={() => onNavigate({ name: 'opname' })}>
+            {/* Carries WHICH item. It used to navigate to a bare `#/opname`, so "Ubah" on
+                Sabun cuci tangan landed you on a list of fifty rows with nothing selected and
+                the thing you had just been looking at to find again. */}
+            <Button
+              variant="secondary"
+              onClick={() => onNavigate({ name: 'opname', edit: item.itemId })}
+            >
               <Pencil class="h-4 w-4" /> Ubah
             </Button>
             <Button variant="secondary" onClick={() => onNavigate({ name: 'label' })}>

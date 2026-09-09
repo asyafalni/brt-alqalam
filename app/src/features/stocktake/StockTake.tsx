@@ -6,7 +6,7 @@
 // edge, so Ubah and Hapus existed only for whoever thought to scroll sideways. DataTable keeps
 // a real table on a desk and stacks the same rows as cards below `sm`, actions included.
 
-import { useMemo, useState } from 'octane';
+import { useMemo, useRef, useState } from 'octane';
 import { CircleCheck, Download, Package, Pencil, Plus, Trash2 } from '@octanejs/lucide';
 import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import type { PurchaseRequest } from '../../../../domain/requests';
@@ -34,9 +34,12 @@ const emptyInput = (categories: Category[]): DraftInput => ({
 });
 
 export function StockTake(
-  { draft, canManage = true }:
+  { draft, canManage = true, edit, onEditOpened }:
   {
     draft: Draft;
+    /** An item to open the panel on, arriving from a barang's page. Consumed once. */
+    edit?: string;
+    onEditOpened?: () => void;
     /**
      * Whether this person may EXPORT the whole catalog or EMPTY it.
      *
@@ -63,6 +66,9 @@ export function StockTake(
   /* The opname list's own filter. It used to be the navbar box, which meant the query stayed
      with you when you left — narrowing Stok and Histori from a field up in the chrome. */
   const [search, setSearch] = useState('');
+  /* Which arriving id has already been acted on, so a re-render does not reopen a panel the
+     person has just closed. */
+  const openedFor = useRef('');
   /*
    * The form is a PANEL now, not a slab under the list.
    *
@@ -203,6 +209,25 @@ export function StockTake(
     cancelEdit();
     setConfirmReset(false);
     setSearch('');
+  }
+
+  /*
+   * Arriving with an item to edit opens the panel on it, and drops the parameter.
+   *
+   * During render, not in an effect, and keyed on the id: an effect would paint the list once
+   * with no panel and then open it, which reads as a flicker on the way in. Same shape as
+   * Pengajuan's prefill.
+   */
+  if (edit && edit !== openedFor.current) {
+    openedFor.current = edit;
+    const item = items.find((i) => i.itemId === edit);
+    if (item) {
+      /* Its first shelf: an item on two racks has to be edited on one of them, and the panel
+         says which. Somebody who meant the other one changes it in the picker. */
+      const line = stock.find((l) => l.itemId === edit);
+      startEdit(item, line?.locationId ?? '');
+    }
+    onEditOpened?.();
   }
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;

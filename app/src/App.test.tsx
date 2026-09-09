@@ -324,3 +324,31 @@ describe('what happened to the record', () => {
     expect(flash.getByText(/HP ini saja/)).toBeTruthy();
   });
 });
+
+describe('editing a barang from where you were looking at it', () => {
+  /*
+   * "Ubah" on a barang's page used to navigate to a bare `#/opname` — so it dropped you on a
+   * list of every item with nothing selected, and the thing you had just been reading to find
+   * again. That broken bridge is most of why the two screens read as duplicates of each other:
+   * Stok can edit nothing, and the one link out of it lost its subject.
+   */
+  it('opens the form on THAT item, not on the list', () => {
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/barang?i=ITM-0002');
+    const r = render(App);
+
+    fireEvent.click(r.getByText('Ubah'));
+
+    expect(r.getByText('Ubah barang')).toBeTruthy();
+    expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('Pisau dapur');
+  });
+
+  it('drops the parameter, so a reload does not reopen it', () => {
+    seed(input({ name: 'Sabun cuci' }));
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+
+    fireEvent.click(r.getByText('Ubah'));
+    expect(location.hash).toBe('#/opname');
+  });
+});

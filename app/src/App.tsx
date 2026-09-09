@@ -559,7 +559,14 @@ export function App() {
             />
           )}
           {route.name === 'opname' && (
-            <StockTake draft={draft} canManage={privileged} />
+            <StockTake
+              draft={draft}
+              canManage={privileged}
+              edit={route.edit}
+              /* Dropped from the address as soon as it is used, so a reload or a Back does not
+                 reopen the panel over whatever the person moved on to. */
+              onEditOpened={() => { if (route.edit) navigate({ name: 'opname' }); }}
+            />
           )}
           {route.name === 'board' && (
             <Board
