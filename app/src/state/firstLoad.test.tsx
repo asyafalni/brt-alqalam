@@ -63,3 +63,52 @@ describe('a device that was never connected', () => {
     expect(r.getByText(/Belum ada data/)).toBeTruthy();
   });
 });
+
+describe('opening the app a second time', () => {
+  /*
+   * Apps Script's floor is its own start-up — 1.3–2.5s measured live for a call that touches no
+   * sheet — so the read cannot be made faster. What changed is whether anybody has to watch it:
+   * the last register is painted at once, the fresh copy is already in flight, and the progress
+   * bar says so the whole time.
+   */
+  const emptyState = () => ({
+    categories: [], locations: [], items: [], stock: [], instances: [], requests: [], txns: [],
+    serverTs: 0, tier: 'public', rev: 1, quarantined: [],
+  });
+
+  it('shows the last register instead of a loading screen', () => {
+    vi.stubGlobal('fetch', vi.fn(hang));
+    localStorage.setItem('brt.register.cache', JSON.stringify({
+      url: GW,
+      fetchedTs: Date.now(),
+      state: {
+        ...emptyState(),
+        items: [{
+          itemId: 'ITM-0001', barcode: 'ALQ-ITM-0001', name: 'Sabun cuci',
+          categoryId: 'CAT-KEBERSIHAN', kind: 'consumable', unit: 'botol',
+          trackBy: 'quantity', minStock: null, active: true,
+        }],
+        stock: [{ itemId: 'ITM-0001', locationId: '', initialStock: 4 }],
+      },
+    }));
+
+    const r = render(App);
+    expect(r.queryByText(/Memuat register/)).toBeNull();
+    /* And the dashboard rendered from the CACHE, not from the empty local draft — which would
+       show the very "belum ada data" screen this whole file exists to prevent. */
+    expect(r.queryByText(/Belum ada barang/)).toBeNull();
+    expect(r.getByText(/Jenis barang/)).toBeTruthy();
+  });
+
+  it('still waits when the cache belongs to another gateway', () => {
+    // A reconnect to a different sheet must not paint the old masjid's register.
+    vi.stubGlobal('fetch', vi.fn(hang));
+    localStorage.setItem('brt.register.cache', JSON.stringify({
+      url: 'https://script.google.com/macros/s/OTHER/exec',
+      fetchedTs: Date.now(),
+      state: emptyState(),
+    }));
+
+    expect(render(App).getByText(/Memuat register/)).toBeTruthy();
+  });
+});

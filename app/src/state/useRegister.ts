@@ -18,6 +18,7 @@ import { useEffect, useState } from 'octane';
 import { fetchState, fetchStateAsAdmin, GatewayError } from '../../../data/gateway';
 import type { GatewayState } from '../../../data/gateway';
 import type { Connection } from './connection';
+import { cacheRegister, cachedRegister, forgetRegister } from './registerCache';
 
 export interface Register {
   state: GatewayState | null;
@@ -44,14 +45,30 @@ export function useRegister(
    */
   getAdminToken?: () => Promise<string>,
 ): Register {
-  const [state, setState] = useState<GatewayState | null>(null);
+  /*
+   * Seeded from the LAST READ, so opening the app is not two seconds of blank screen.
+   *
+   * Apps Script's floor is its own start-up — `?op=ping`, which touches no sheet, measures
+   * 1.3–2.5s on the live deployment — so the read cannot be made faster. What can change is
+   * whether anybody has to watch it. The fresh copy is already in flight, the progress bar says
+   * so, and it lands about a second and a half later.
+   */
+  const seed = connection ? cachedRegister(connection.url) : null;
+  const [state, setState] = useState<GatewayState | null>(seed?.state ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fetchedTs, setFetchedTs] = useState(0);
+  const [fetchedTs, setFetchedTs] = useState(seed?.fetchedTs ?? 0);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (!connection) { setState(null); setError(''); return; }
+    if (!connection) {
+      setState(null);
+      setError('');
+      /* Disconnecting must forget it too, or reconnecting to a DIFFERENT sheet would paint the
+         old masjid's register for a second and a half. */
+      forgetRegister();
+      return;
+    }
 
     let alive = true;
     setLoading(true);
@@ -64,6 +81,9 @@ export function useRegister(
         setState(next);
         setError('');
         setFetchedTs(Date.now());
+        /* Kept for the NEXT visit, not for this one. Written after a successful read only, so
+           a cache can never contain something the gateway refused. */
+        cacheRegister(connection.url, next);
       })
       .catch((err: unknown) => {
         if (!alive) return;
