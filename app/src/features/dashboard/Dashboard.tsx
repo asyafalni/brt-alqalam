@@ -76,18 +76,25 @@ export function Dashboard(
   const walk = useMemo(() => coverage(locations), [locations]);
 
   /*
-   * How much of the catalog is at a safe level.
+   * HOW FAR THROUGH THE SHOPPING WE ARE — not how healthy the stock is.
    *
-   * The denominator is the SAME predicate `deriveNotifications` uses — quantity-tracked, with a
-   * minimum set — and not "all items". An item with Setting Minimum "(-)" can never be low
-   * (§46), so counting it as safe would inflate the bar permanently with rows that were never
-   * at risk. Built off `notifications.length` rather than re-deriving the low set, so the bar
-   * and the list underneath it cannot disagree.
+   * This bar first measured "items at a safe level", which read as reassurance while three
+   * things were HABIS in the list directly beneath it. A bar over a task list has to measure
+   * the TASK, and the task on this card is buying: a low item is dealt with when somebody has
+   * filed a request for it, and stops being on the list at all once that purchase lands.
+   *
+   * So the denominator is the list itself and the numerator is how many of those already have
+   * an open pengajuan. The remainder is the actual work left, and the bar cannot ever look
+   * calm while nothing has been done about an empty shelf.
    */
-  const stock = useMemo(() => {
-    const tracked = items.filter((i) => i.trackBy === 'quantity' && i.minStock != null).length;
-    return { tracked, safe: Math.max(0, tracked - inventory.notifications.length) };
-  }, [items, inventory.notifications]);
+  const shopping = useMemo(() => {
+    const asked = new Set(
+      openRequests(draft.requests).map((r) => r.itemId).filter(Boolean) as string[],
+    );
+    const total = inventory.notifications.length;
+    const done = inventory.notifications.filter((n) => asked.has(n.itemId)).length;
+    return { total, done, left: total - done };
+  }, [draft.requests, inventory.notifications]);
   const dueCount = due.length;
   // A request nobody looks at is a request nobody answers, so it joins the row of things
   // waiting on a person.
@@ -290,13 +297,17 @@ export function Dashboard(
                 Stok yang sudah menyentuh atau melewati batas minimumnya.
               </p>
 
-              {/* The same shape as the rack bar, measuring a different KIND of thing: that one
-                  is a walk that finishes, this is a level that moves up and down for ever. So
-                  it is labelled by the state it reports — how much of the catalog is stocked —
-                  rather than as progress toward an end it does not have. The list shrinking as
-                  things are restocked is what fills it. */}
-              {stock.tracked > 0 && (
-                <Meter label="Stok aman" done={stock.safe} total={stock.tracked} unit="barang" />
+              {/* Hidden entirely when this device cannot READ requests — the public tier omits
+                  them (§39), so the numerator would be zero and the bar would report that
+                  nobody has done anything, which is a different claim from not knowing. */}
+              {canReview && shopping.total > 0 && (
+                <Meter
+                  label="Sudah diajukan"
+                  done={shopping.done}
+                  total={shopping.total}
+                  unit="barang"
+                  note={shopping.left > 0 ? `${shopping.left} belum diajukan` : 'Semuanya sudah diajukan.'}
+                />
               )}
 
               <LazyList sentinel={alerts.sentinel} done={alerts.done}>
@@ -460,11 +471,13 @@ const CHIP_TONE = {
 /**
  * A bar and its fraction, shared by the two cards on this row so they cannot drift apart.
  *
- * Both answer "how much of a finite set is in the good state", which is the only question a
- * bar can answer honestly — a bar without a denominator is decoration.
+ * Both measure WORK — racks walked, items asked for — never a state. A bar over a task list
+ * that reports how healthy things are will read as reassurance at exactly the moment the list
+ * beneath it is full of emergencies, which is how the first version of this went wrong.
  */
 function Meter(
-  { label, done, total, unit }: { label: string; done: number; total: number; unit: string },
+  { label, done, total, unit, note }:
+  { label: string; done: number; total: number; unit: string; note?: string },
 ) {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
@@ -485,6 +498,9 @@ function Meter(
           style={`width:${pct}%;print-color-adjust:exact`}
         />
       </div>
+      {/* What is LEFT, spelled out. A fraction says it, but only after being subtracted, and
+          the remainder is the thing somebody is actually going to go and do. */}
+      {note && <p class="mt-1.5 text-xs text-slate-600">{note}</p>}
     </div>
   );
 }

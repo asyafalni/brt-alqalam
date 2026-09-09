@@ -5,6 +5,9 @@ import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createItem } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
 import type { Item, Location, StockLine, Txn } from '../../../../domain/types';
+import { Dashboard } from './Dashboard';
+import { useInventory } from '../../state/useInventory';
+import type { Draft } from '../../state/useDraft';
 
 const input = (p: Partial<DraftInput> = {}): DraftInput => ({
   name: 'Sabun', categoryId: 'CAT-KEBERSIHAN', unit: 'galon',
@@ -216,32 +219,75 @@ describe('the stock-take has a finish line', () => {
   });
 });
 
-describe('the low-stock card carries a level, not a finish line', () => {
+/** A connected VIEWER: the register is readable, Requests are not sent at all (§39). */
+const viewerDraft = (items: Item[]): Draft => ({
+  items, categories: SEED_CATEGORIES, locations: [RAK], stock: lines, txns: [], requests: [],
+  readOnly: true, canRecord: false,
+  setItems: () => {}, setCategories: () => {}, setLocations: () => {}, setStock: () => {},
+  setRequests: () => {}, setTxns: () => {}, setRepair: () => {}, setPurchase: () => {},
+  setCatalog: () => {}, reset: () => {}, loadDemo: () => {}, loadFrom: () => {},
+});
+
+describe('the low-stock card measures the shopping, not the shelf', () => {
   /*
-   * A bar needs a denominator that means something. This one counts only what
-   * `deriveNotifications` counts — quantity-tracked items with a minimum set — because an item
-   * with Setting Minimum "(-)" can never be low (§46), and counting it as safe would inflate
-   * the bar permanently with rows that were never at risk.
+   * It first reported "Stok aman 84%", which read as reassurance while three items were HABIS
+   * in the list directly beneath it. A bar over a task list has to measure the TASK. The task
+   * on this card is buying: a low item is dealt with once somebody has filed a request for it,
+   * and leaves the list entirely once that purchase lands.
    */
-  it('measures the safe items against the ones that CAN be low', () => {
-    seed(catalog(
-      input({ name: 'Sabun', initialStock: 12, minStock: 5 }),   // safe
-      input({ name: 'Karbol', initialStock: 1, minStock: 4 }),   // low
-      input({ name: 'Terpal', initialStock: 0, minStock: null }), // no minimum — not counted
-    ));
+  const lowTwo = () => catalog(
+    input({ name: 'Sabun', initialStock: 1, minStock: 5 }),
+    input({ name: 'Karbol', initialStock: 0, minStock: 4 }),
+  );
+
+  const asking = (itemId: string) => ({
+    requestId: 'REQ-1', type: 'beli' as const, name: 'Sabun', itemId, qty: 1, unit: 'botol',
+    reason: 'habis', status: 'diajukan' as const, requestedBy: 'USR-1', requestedTs: 1,
+  });
+
+  function seedWith(items: Item[], requests: unknown[]) {
+    localStorage.setItem('brt.stocktake.draft.v6', JSON.stringify({
+      items, categories: SEED_CATEGORIES, locations: [RAK], stock: lines, txns: [], requests,
+    }));
+  }
+
+  it('counts the low items that already have a request', () => {
+    seedWith(lowTwo(), [asking('ITM-0001')]);
     const r = render(App);
-    expect(r.getByLabelText('Stok aman: 50 persen')).toBeTruthy();
+    expect(r.getByLabelText('Sudah diajukan: 50 persen')).toBeTruthy();
     expect(r.getByText(/dari 2 barang/)).toBeTruthy();
   });
 
-  it('never disagrees with the list underneath it', () => {
-    // Built off `notifications.length` rather than re-deriving the low set: two derivations of
-    // one fact is how a bar ends up contradicting the rows it sits above.
-    seed(catalog(
-      input({ name: 'Sabun', initialStock: 1, minStock: 5 }),
-      input({ name: 'Karbol', initialStock: 1, minStock: 4 }),
-    ));
+  it('spells out what is LEFT, which is the thing somebody goes and does', () => {
+    seedWith(lowTwo(), [asking('ITM-0001')]);
+    expect(render(App).getByText('1 belum diajukan')).toBeTruthy();
+  });
+
+  it('never looks calm while nothing has been done about an empty shelf', () => {
+    // The whole failure of the previous version: 84% "aman" above three HABIS rows.
+    seedWith(lowTwo(), []);
     const r = render(App);
-    expect(r.getByLabelText('Stok aman: 0 persen')).toBeTruthy();
+    expect(r.getByLabelText('Sudah diajukan: 0 persen')).toBeTruthy();
+    expect(r.getByText('2 belum diajukan')).toBeTruthy();
+  });
+
+  it('says nothing at all when this device may not read requests', () => {
+    /* The public tier omits Requests entirely (§39), so the numerator would be zero — and
+       "nobody has done anything about the empty shelves" is a very different claim from "we
+       cannot see". Rendered directly, because only App decides `canReview` and this is a fact
+       about the card. */
+    const items = lowTwo();
+    const draft = viewerDraft(items);
+    const r = render(() => (
+      <Dashboard
+        draft={draft}
+        inventory={useInventory(draft, Date.now())}
+        now={Date.now()}
+        canReview={false}
+        onNavigate={() => {}}
+      />
+    ));
+    expect(r.getByText(/Perlu dibeli lagi/)).toBeTruthy();
+    expect(r.queryByText(/belum diajukan/)).toBeNull();
   });
 });
