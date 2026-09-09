@@ -8,8 +8,12 @@
 //     store rather than copied: an original would be rejected by Apps Script's POST ceiling.
 //   * THE SESSION TRAVELS IN THE BODY, so every call here is a POST. A photo fetched with a
 //     token in an `<img src>` would write that credential into browser history.
-//   * THE FOLDER IS NEVER LINK-PUBLIC (§12.4). Bytes come back through the gateway under a
-//     session, which is the whole reason there is no Drive URL anywhere in this file.
+//   * LOOKING IS OPEN, WRITING IS NOT. Owner's call: a photo of a jerrycan is not a secret, so
+//     `list` and `url` carry no session and work on a device that has never typed a PIN.
+//   * THE FOLDER IS STILL NEVER LINK-PUBLIC, which is a different question. Bytes come back
+//     through the gateway, so the exposure is bounded by the `/exec` URL and revocable by
+//     rotating the deployment; a public Drive URL would be permanent and outlive any later
+//     decision to close things again. That is why there is no Drive URL anywhere in this file.
 //
 // `indexedDbPhotos.ts` is NOT obsolete. It is the store on a device with no gateway — the
 // stock-take walk, where the wifi is worst and a photo that needs the network is a photo that
@@ -32,10 +36,10 @@ function asStoreError(code: string, detail?: string): PhotoStoreError {
   if (code === 'not_found' || code === 'file_missing') {
     return new PhotoStoreError('not_found', 'Foto ini sudah tidak ada.');
   }
-  /* A missing or expired PIN session lands here, and the wording has to say what to DO — "no
-     store here at all" is true but useless to somebody looking at an empty gallery. */
+  /* Only reachable from `put` and `remove` now, since looking needs no session — so the
+     wording can name the action rather than the gallery. */
   if (code === 'no_session' || code === 'session_expired' || code === 'session_revoked') {
-    return new PhotoStoreError('unavailable', 'Masukkan PIN dulu untuk membuka foto.');
+    return new PhotoStoreError('unavailable', 'Masukkan PIN dulu untuk menyimpan atau menghapus foto.');
   }
   return new PhotoStoreError('unavailable', detail || 'Foto tidak bisa diambil dari gateway.');
 }
@@ -98,6 +102,7 @@ export function createDrivePhotoStore(
   const blobs = new Map<string, Blob>();
   const urls = new Map<string, string>();
 
+  /** Required for WRITES only. Looking at a photo needs nothing. */
   const token = () => {
     const s = session();
     if (!s) throw asStoreError('no_session');
@@ -106,17 +111,21 @@ export function createDrivePhotoStore(
 
   return {
     async list(itemId) {
-      const json = await call(url, { op: 'photos', session: token(), itemId }, fetchImpl);
+      const json = await call(url, { op: 'photos', itemId }, fetchImpl);
       const rows = Array.isArray(json.photos) ? (json.photos as ItemPhoto[]) : [];
       return orderPhotos(rows);
     },
 
     async put(itemId, file, caption) {
-      // Downscaled BEFORE encoding, or the base64 alone would breach the POST ceiling.
+      /* The session FIRST. Downscaling a phone photo is real work on a cheap tablet, and doing
+         it before finding out there is nobody to attribute the upload to spends it for nothing
+         — then reports a PIN error the person will read as being about the picture. */
+      const session = token();
+      // Downscaled before encoding, or the base64 alone would breach the POST ceiling.
       const small = await downscale(file);
       const json = await call(url, {
         op: 'putPhoto',
-        session: token(),
+        session,
         itemId,
         caption: caption ?? '',
         mimeType: small.blob.type || 'image/jpeg',
@@ -139,7 +148,7 @@ export function createDrivePhotoStore(
 
       let blob = blobs.get(photoId);
       if (!blob) {
-        const json = await call(url, { op: 'photo', session: token(), photoId }, fetchImpl);
+        const json = await call(url, { op: 'photo', photoId }, fetchImpl);
         blob = fromBase64(String(json.dataBase64 ?? ''), String(json.mimeType ?? 'image/jpeg'));
         blobs.set(photoId, blob);
       }

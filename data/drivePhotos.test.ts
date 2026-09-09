@@ -31,39 +31,46 @@ describe('talking to the gateway at all', () => {
 
   it('puts the session in the BODY, never in the URL', async () => {
     // A token in a query string is written into browser history and every log in between.
-    const f = reply({ ok: true, photos: [] });
-    await createDrivePhotoStore(URL_, () => 'sess-1', f).list('ITM-1');
+    const f = reply({ ok: true });
+    await createDrivePhotoStore(URL_, () => 'sess-1', f).remove('PH-1');
     expect(String(f.mock.calls[0][0])).not.toContain('sess-1');
     expect(bodyOf(f).session).toBe('sess-1');
   });
 
   it('reads the session at CALL time, not once at construction', async () => {
     // A session slides and expires. A token captured when the store was made is an hour-old
-    // token by the time somebody scrolls to a photo.
+    // token by the time somebody gets round to deleting a photo.
     let live = 'first';
-    const f = reply({ ok: true, photos: [] });
+    const f = reply({ ok: true });
     const store = createDrivePhotoStore(URL_, () => live, f);
-    await store.list('ITM-1');
+    await store.remove('PH-1');
     live = 'second';
-    await store.list('ITM-1');
+    await store.remove('PH-2');
     expect(bodyOf(f, 1).session).toBe('second');
   });
 });
 
-describe('when there is no session', () => {
-  it('says what to DO, rather than that the store is unavailable', async () => {
-    // "No store here at all" is true and useless to somebody looking at an empty gallery.
+describe('looking needs no PIN; writing does', () => {
+  it('lists and fetches on a device that has never typed one', async () => {
+    // Owner's call: a photo of a jerrycan is not a secret. A takmir phone that only reads the
+    // register can see the pictures too.
     const f = reply({ ok: true, photos: [] });
+    await expect(createDrivePhotoStore(URL_, () => null, f).list('ITM-1')).resolves.toEqual([]);
+    expect(bodyOf(f).session).toBeUndefined();
+  });
+
+  it('refuses to STORE without one, and says which action needs it', async () => {
+    const f = reply({ ok: true });
     const store = createDrivePhotoStore(URL_, () => null, f);
-    await expect(store.list('ITM-1')).rejects.toMatchObject({ code: 'unavailable' });
-    await expect(store.list('ITM-1')).rejects.toThrow(/PIN/);
+    await expect(store.put('ITM-1', new Blob(['x']))).rejects.toThrow(/PIN/);
     expect(f).not.toHaveBeenCalled();
   });
 
-  it('translates an expired one the same way', async () => {
-    const f = reply({ ok: false, error: 'session_expired' });
-    const store = createDrivePhotoStore(URL_, () => 'stale', f);
-    await expect(store.list('ITM-1')).rejects.toThrow(/PIN/);
+  it('refuses to DELETE without one', async () => {
+    const f = reply({ ok: true });
+    const store = createDrivePhotoStore(URL_, () => null, f);
+    await expect(store.remove('PH-1')).rejects.toMatchObject({ code: 'unavailable' });
+    expect(f).not.toHaveBeenCalled();
   });
 });
 

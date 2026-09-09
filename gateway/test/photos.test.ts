@@ -164,23 +164,37 @@ function withSession(tabs: Record<string, Tab>) {
 
 const ONE_PIXEL = Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64');
 
-describe('a photo is not public', () => {
-  it('refuses to store one without a session', () => {
-    const api = load(freshTabs());
-    const r = api.handlePutPhoto({ itemId: 'ITM-1', dataBase64: ONE_PIXEL });
-    expect(r.ok).toBe(false);
+/*
+ * LOOKING is open; WRITING is not. Owner's call — a photo of a jerrycan is not a secret. The
+ * two halves are tested apart because it is precisely the sort of split that erodes: somebody
+ * refactors the guard into a shared helper and either everything opens or everything closes.
+ */
+describe('who may do what', () => {
+  it('lets anybody LOOK, like ?op=state does', () => {
+    const tabs = freshTabs();
+    const api = withSession(tabs);
+    const put = api.handlePutPhoto({ session: SESSION, itemId: 'ITM-1', dataBase64: ONE_PIXEL });
+
+    expect(api.handleListPhotos({ itemId: 'ITM-1' }).ok).toBe(true);
+    expect(api.handleGetPhoto({ photoId: put.photo.photoId }).ok).toBe(true);
   });
 
-  it('refuses to serve one without a session', () => {
-    // The whole reason bytes come back through this script rather than as a Drive link: a
-    // link-public folder would put every photo behind a world-readable URL (§12.4).
+  it('refuses to STORE one without a session', () => {
     const api = load(freshTabs());
-    expect(api.handleGetPhoto({ photoId: 'PH-1' }).ok).toBe(false);
+    expect(api.handlePutPhoto({ itemId: 'ITM-1', dataBase64: ONE_PIXEL }).ok).toBe(false);
+  });
+
+  it('refuses to DELETE one without a session', () => {
+    const api = load(freshTabs());
+    expect(api.handleDeletePhoto({ photoId: 'PH-1' }).ok).toBe(false);
   });
 
   it('never makes the Drive folder shareable, and never asks for the whole Drive', () => {
-    // `DriveApp` is absent from this sandbox entirely: reaching for it — which would demand
-    // the full `drive` scope on a publicly-callable script — throws rather than passing.
+    /* Open to read does NOT mean public on Drive. Serving bytes through this script keeps the
+       exposure bounded by the /exec URL and revocable by rotating the deployment; a link-public
+       folder would give every photo a permanent URL that outlives any later decision.
+       `DriveApp` is absent from this sandbox entirely, so reaching for it — which would demand
+       the full `drive` scope on a publicly-callable script — throws rather than passing. */
     const api = load(freshTabs());
     api.photoFolderId();
     expect(folders).toEqual(['BRT Inventaris — Foto']);
@@ -234,21 +248,21 @@ describe('reading them back', () => {
 
   it('lists metadata only — a list screen must not pull megabytes', () => {
     api.handlePutPhoto({ session: SESSION, itemId: 'ITM-1', dataBase64: ONE_PIXEL, bytes: 4 });
-    const r = api.handleListPhotos({ session: SESSION, itemId: 'ITM-1' });
+    const r = api.handleListPhotos({ itemId: 'ITM-1' });
     expect(r.photos).toHaveLength(1);
     expect(JSON.stringify(r)).not.toContain(ONE_PIXEL);
   });
 
   it('returns the bytes for one', () => {
     const put = api.handlePutPhoto({ session: SESSION, itemId: 'ITM-1', dataBase64: ONE_PIXEL });
-    const got = api.handleGetPhoto({ session: SESSION, photoId: put.photo.photoId });
+    const got = api.handleGetPhoto({ photoId: put.photo.photoId });
     expect(got.dataBase64).toBe(ONE_PIXEL);
   });
 
   it('says which thing is missing when the file was deleted in Drive by hand', () => {
     const put = api.handlePutPhoto({ session: SESSION, itemId: 'ITM-1', dataBase64: ONE_PIXEL });
     drive.clear();
-    expect(api.handleGetPhoto({ session: SESSION, photoId: put.photo.photoId }))
+    expect(api.handleGetPhoto({ photoId: put.photo.photoId }))
       .toMatchObject({ ok: false, error: 'file_missing' });
   });
 });

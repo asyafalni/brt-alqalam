@@ -7,10 +7,16 @@
  *   a. NO BINARY BODY. A CORS simple request means `text/plain`, so the upload arrives as
  *      base64 inside the JSON. The client downscales first for exactly this reason.
  *   b. SESSION IN THE BODY. Same reason every other op takes it there.
- *   c. THE FOLDER IS NEVER LINK-PUBLIC. Bytes are served back through this script, under a
- *      session, so a photo of a rack with a name on a whiteboard cannot become a world-readable
- *      URL (§12.4). This is the whole reason there is no `?op=photo` shortcut that returns a
- *      Drive link.
+ *   c. THE FOLDER IS NEVER LINK-PUBLIC, even though READING is now open.
+ *
+ *      Owner's call: a photo of a jerrycan is not a secret, so looking needs no PIN — writing
+ *      still does. Those are two different things and only one of them was ever the risk.
+ *
+ *      What that does NOT mean is flipping the Drive folder to "anyone with the link". Serving
+ *      bytes through this script puts photos in the same tier as item names and rack codes: an
+ *      exposure bounded by the `/exec` URL, and revocable by rotating the deployment. A public
+ *      Drive URL is permanent, lives independently of this gateway, and would survive any later
+ *      decision to lock things down again. The cheaper path is the one that cannot be undone.
  *   d. ONE PHOTO PER CALL. The 6-minute execution ceiling is generous for one and fatal for a
  *      backfill; there is deliberately no bulk endpoint.
  *
@@ -123,10 +129,8 @@ function photoRows() {
   return readTab('Photos');
 }
 
+/** OPEN, like `?op=state`: a photo of a jerrycan sits in the same tier as its name. */
 function handleListPhotos(body) {
-  var session = requireSession(body.session);
-  if (!session.ok) return fail(session.error);
-
   var itemId = String(body.itemId || '');
   if (!itemId) return fail('no_item');
 
@@ -194,8 +198,7 @@ function handlePutPhoto(body) {
       String(body.caption || ''),
     ]]);
 
-    adminLog(session.who || { name: session.actorName, uid: session.actorUserId },
-      'photo_add', itemId + ' ' + photoId);
+    adminLog({ name: session.name, uid: session.userId }, 'photo_add', itemId + ' ' + photoId);
 
     return respond({
       ok: true,
@@ -215,16 +218,13 @@ function handlePutPhoto(body) {
 }
 
 /**
- * The bytes, base64, under a session.
+ * The bytes, base64. No session — see constraint (c).
  *
- * Not a Drive link, and not a public file — see constraint (c). The client caches what comes
- * back so a photo crosses the wire once per device, which is what makes serving bytes through
- * a 1.5-second gateway acceptable at all.
+ * Still not a Drive link and still not a public file: the exposure stays bounded by the `/exec`
+ * URL and revocable with it. The client caches what comes back so a photo crosses the wire once
+ * per device, which is what makes serving bytes through a 1.5-second gateway acceptable at all.
  */
 function handleGetPhoto(body) {
-  var session = requireSession(body.session);
-  if (!session.ok) return fail(session.error);
-
   var photoId = String(body.photoId || '');
   if (!photoId) return fail('no_photo');
 
