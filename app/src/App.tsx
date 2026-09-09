@@ -19,6 +19,8 @@ import { ItemDetail } from './features/items/ItemDetail';
 import { AssetBoard } from './features/assets/AssetBoard';
 import { LoanSheet } from './features/movement/LoanSheet';
 import type { LoanTarget } from './features/movement/LoanSheet';
+import { InspectSheet } from './features/movement/InspectSheet';
+import type { InspectTarget } from './features/movement/InspectSheet';
 import { Finder } from './features/search/Finder';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
@@ -351,6 +353,9 @@ export function App() {
   /* Lending a labelled unit out, and closing that loan. Until this existed the whole equipment
      lifecycle was reachable only from demo data (§60, §73). */
   const [loan, setLoan] = useState<LoanTarget | null>(null);
+  /* Confirming a unit is still good — the claim `available` has always made and nothing has
+     ever verified (Q5b). */
+  const [inspecting, setInspecting] = useState<InspectTarget | null>(null);
 
   const now = useNow();
   const inventory = useInventory(draft, now);
@@ -652,6 +657,7 @@ export function App() {
               onNavigate={navigate}
               onMove={setMoving}
               onLoan={setLoan}
+              onInspect={setInspecting}
             />
           )}
           {route.name === 'aset' && (
@@ -671,6 +677,7 @@ export function App() {
               }}
               onOpenCounted={() => navigate({ name: 'board', kind: 'barang-tetap' })}
               onLoan={setLoan}
+              onInspect={setInspecting}
             />
           )}
           {route.name === 'pengajuan' && (
@@ -922,6 +929,15 @@ export function App() {
           setLoan(null);
         }}
         onClose={() => setLoan(null)}
+      />
+
+      <InspectSheet
+        target={inspecting}
+        onCommit={(txn) => {
+          commitTxn(txn, inspecting ? inspecting.label : 'unit');
+          setInspecting(null);
+        }}
+        onClose={() => setInspecting(null)}
       />
 
       {/* At the FRAME, above the bottom bar. A movement is recorded from Beranda, from a rack,

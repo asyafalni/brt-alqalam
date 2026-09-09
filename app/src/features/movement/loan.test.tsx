@@ -115,3 +115,50 @@ describe('closing the loan', () => {
     expect(stored()[1]).toMatchObject({ type: 'pengembalian', condition: 'normal' });
   });
 });
+
+/*
+ * Q5(b). `available` on a durable is a claim about its CONDITION, and nothing was ever
+ * checking it. A rack has `lastCountedTs` and a rotation — the report even says "rak yang belum
+ * pernah dicek bukan berarti aman" — while a unit had no equivalent at all. So a katrol bought
+ * for one Qurban reads as ready for the eleven months nobody touches it.
+ */
+describe('confirming a unit is still good', () => {
+  const openInspect = () => {
+    seed(knives());
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Periksa')[0]);
+    return { r, sheet: within(r.container.querySelector('[role="dialog"]')!) };
+  };
+
+  it('says so on the unit until somebody has looked', () => {
+    seed(knives());
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+    expect(r.getAllByText('belum pernah diperiksa').length).toBe(2);
+  });
+
+  it('records a dated check that changes nothing else', () => {
+    const { sheet } = openInspect();
+    fireEvent.click(sheet.getByText('Simpan hasil periksa'));
+
+    expect(stored()[0]).toMatchObject({ type: 'pemeriksaan', qtyDelta: 0 });
+    // Still available, still two units: the value of this record is its date, nothing more.
+    expect(stored()[0].toStatus).toBeUndefined();
+  });
+
+  it('can send it straight to the repair queue instead', () => {
+    // The other hole this closes: a thing that rusted on the shelf never went anywhere, so
+    // there was no return to record the damage on. It could only be marked broken by lending
+    // it out first.
+    const { r, sheet } = openInspect();
+    fireEvent.click(sheet.getByText('Rusak'));
+    fireEvent.input(sheet.getByLabelText('Rusaknya di mana?'), { target: { value: 'Gagangnya retak' } });
+    fireEvent.click(sheet.getByText('Simpan hasil periksa'));
+
+    expect(stored()[0]).toMatchObject({ type: 'status_change', toStatus: 'broken', note: 'Gagangnya retak' });
+    at('#/aset');
+    // The list renders twice on purpose — a desk table and phone cards (components/DataTable).
+    expect(r.getAllByText(/Pisau potong #1/).length).toBeGreaterThan(0);
+  });
+});

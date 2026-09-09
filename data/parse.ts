@@ -136,7 +136,7 @@ function oneOf<T extends string>(r: Record<string, string>, f: string, allowed: 
   return v as T;
 }
 
-const MOVEMENTS = ['pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'digunakan', 'adjust', 'status_change', 'reversal'] as const;
+const MOVEMENTS = ['pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'digunakan', 'pemeriksaan', 'adjust', 'status_change', 'reversal'] as const;
 const CONDITIONS = ['normal', 'rusak', 'hilang'] as const;
 const STATUSES = ['available', 'out', 'broken', 'lost', 'retired'] as const;
 

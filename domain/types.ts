@@ -17,6 +17,17 @@ export type TrackBy = 'quantity' | 'instance';
 // the item is out, and something is out *with someone*.
 export type MovementType =
   | 'pemakaian' | 'pengambilan' | 'peminjaman' | 'pengembalian' | 'digunakan'
+  /**
+   * Somebody looked at a labelled unit and found it still good.
+   *
+   * Its own type rather than a `status_change` to the status it already had, because the log
+   * has to be able to tell "I inspected this and it is fine" from "an admin forced it back to
+   * available" — those are different claims by different people for different reasons, and
+   * only the first one means the condition has actually been verified.
+   *
+   * Changes NOTHING. It is a dated assertion, and its whole value is the date.
+   */
+  | 'pemeriksaan'
   | 'adjust' | 'status_change' | 'reversal';
 
 /** Direction of travel, decided by the screen the operator is on, not by a choice they make. */

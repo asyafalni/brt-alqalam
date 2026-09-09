@@ -24,6 +24,8 @@ import { loanAge, loansByAge } from '../../../../domain/loans';
 import type { LoanLevel } from '../../../../domain/loans';
 import type { RequestType } from '../../../../domain/requests';
 import type { LoanTarget } from '../movement/LoanSheet';
+import type { InspectTarget } from '../movement/InspectSheet';
+import { inspection, lastInspected } from '../../../../domain/inspect';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -52,13 +54,15 @@ const TABLE_SHAPE_ACTION =
   `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, now, onOpenItem, onRequest, onOpenCounted, onLoan }:
+  { draft, inventory, now, onOpenItem, onRequest, onOpenCounted, onLoan, onInspect }:
   {
     draft: Draft; inventory: Inventory; now: number; onOpenItem: (id: string) => void;
     /** To the stock list, narrowed to barang tetap — where the counted ones actually live. */
     onOpenCounted: () => void;
     /** Closes a loan. Absent on a device that may only read. */
     onLoan?: (target: LoanTarget) => void;
+    /** Records that a unit was looked at. Absent on a device that may only read. */
+    onInspect?: (target: InspectTarget) => void;
     /**
      * The bridge from "this is broken" to somebody doing something about it.
      *
@@ -97,6 +101,22 @@ export function AssetBoard(
     () => draft.items.filter((i) => i.kind === 'equipment' && i.trackBy === 'quantity').length,
     [draft.items],
   );
+
+  /*
+   * Units sitting in the gudang whose condition nobody has confirmed for six months, or ever.
+   *
+   * Only AVAILABLE ones: a broken unit's condition is known and already in a queue, and a
+   * borrowed one is not here to look at. Oldest first, and never-checked ahead of everything —
+   * that unit's readiness is an assumption made on the day it was counted and never revisited.
+   */
+  const stale = useMemo(() => {
+    const checks = lastInspected(inventory.txns);
+    return all
+      .filter((d) => d.status === 'available' && matches(d))
+      .map((d) => ({ d, seen: inspection(checks.get(d.instance.assetId), now) }))
+      .filter((r) => r.seen.level !== 'baru')
+      .sort((a, b) => (b.seen.days ?? Infinity) - (a.seen.days ?? Infinity));
+  }, [all, q, inventory.txns, now]);
 
   const groups = useMemo(() => ({
     /* OLDEST FIRST. A unit borrowed three days ago and one borrowed since last Qurban looked
@@ -245,9 +265,66 @@ export function AssetBoard(
         showNote
         action={{ type: 'beli', label: 'Ajukan pembelian pengganti', short: 'Beli pengganti', icon: ShoppingCart }}
       />
+
+      {/* LAST, and quiet. The three lists above are exceptions somebody has reported; this one
+          is a rotation nobody has got to yet — background work, not an agenda. */}
+      {onInspect && draft.canRecord !== false && stale.length > 0 && (
+        <section class={CARD}>
+          <div class="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-bold text-slate-900">Perlu diperiksa</h2>
+            <span class="text-sm tabular-nums text-slate-600">{stale.length} unit</span>
+          </div>
+          <p class="mb-3 max-w-prose text-sm leading-relaxed text-slate-600">
+            “Siap pakai” itu pernyataan tentang kondisi, dan ini yang belum ada yang
+            memastikannya — sebagian sejak lama, sebagian belum pernah sama sekali. Barang yang
+            cuma dipakai setahun sekali paling sering ketahuan rusaknya pas hari H.
+          </p>
+          <ul class="space-y-1.5">
+            {stale.slice(0, SHOWN_STALE).map(({ d, seen }) => (
+              <li
+                key={d.instance.assetId}
+                class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 p-2.5"
+              >
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-semibold text-slate-900">
+                    {d.instance.label}
+                  </span>
+                  <span class="block truncate text-xs text-slate-600">
+                    {seen.level === 'belum-pernah'
+                      ? 'belum pernah diperiksa'
+                      : `terakhir diperiksa ${seen.days} hari lalu`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  class="min-h-11 shrink-0 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+                  onClick={() => onInspect({
+                    assetId: d.instance.assetId,
+                    label: d.instance.label,
+                    item: itemOf(d)!,
+                    lastTs: seen.ts,
+                  })}
+                >
+                  Periksa
+                </button>
+              </li>
+            ))}
+          </ul>
+          {stale.length > SHOWN_STALE && (
+            /* Capped rather than paged. On day one every unit is unchecked, and a list of forty
+               knives would bury the three lists above it that somebody actually reported. */
+            <p class="mt-2 text-xs italic text-slate-500">
+              dan {stale.length - SHOWN_STALE} unit lain
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }
+
+/** Enough to make a start on, never enough to bury the reported problems above it. */
+const SHOWN_STALE = 6;
 
 /*
  * A TIME ramp, kept off the status palette on purpose.

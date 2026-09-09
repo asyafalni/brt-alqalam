@@ -21,6 +21,8 @@ import { moveLine, setLine, totalFor, UNPLACED } from '../../../../domain/stock'
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
 import type { MovementTarget } from '../movement/MovementSheet';
 import type { LoanTarget } from '../movement/LoanSheet';
+import type { InspectTarget } from '../movement/InspectSheet';
+import { inspection, lastInspected } from '../../../../domain/inspect';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
 import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
@@ -79,7 +81,7 @@ const HISTORY: Column<Txn>[] = [
 ];
 
 export function ItemDetail(
-  { id, draft, inventory, now, onNavigate, onMove, onLoan }:
+  { id, draft, inventory, now, onNavigate, onMove, onLoan, onInspect }:
   {
     id: string; draft: Draft; inventory: Inventory; now: number;
     onNavigate: (r: Route) => void;
@@ -87,6 +89,8 @@ export function ItemDetail(
     onMove: (target: MovementTarget) => void;
     /** Lends a labelled unit out, or closes its loan. Absent on a device that may only read. */
     onLoan?: (target: LoanTarget) => void;
+    /** Records that a unit was looked at and found still good — or found broken. */
+    onInspect?: (target: InspectTarget) => void;
   },
 ) {
   const item = draft.items.find((i) => i.itemId === id || i.barcode === id);
@@ -147,6 +151,9 @@ export function ItemDetail(
         : setLine(prev, itemId, locationId, 0)));
     setPlacing(false);
   }
+
+  /* One pass over the log for every unit, rather than one pass per unit. */
+  const checks = useMemo(() => lastInspected(inventory.txns), [inventory.txns]);
 
   const instances = useMemo(
     () => (item.trackBy === 'instance'
@@ -361,6 +368,7 @@ export function ItemDetail(
               const d = inventory.derived.instances[a.assetId];
               const status = d?.status ?? 'available';
               const chip = instanceStatusBadge(status);
+              const seen = inspection(checks.get(a.assetId), now);
               /* Lending out and closing a loan are the two things this card is FOR, and until
                  now it was decoration: the borrowed / broken / lost states existed and nothing
                  could reach them (§60). Only these two states have a next step — a broken unit
@@ -375,6 +383,15 @@ export function ItemDetail(
                     <p class="truncate text-sm font-bold text-slate-900">{a.label}</p>
                     <p class={`${CODE} truncate`}>{a.assetId}</p>
                     <span class={`${PILL} ${chip.chip} mt-2 inline-block`}>{chip.label}</span>
+                    {/* WHEN it was last confirmed good, on every available unit. This is the
+                        claim `available` has always been making, finally dated. */}
+                    {status === 'available' && (
+                      <span class={`mt-1.5 block text-[11px] ${seen.level === 'baru' ? 'text-slate-500' : 'text-amber-700'}`}>
+                        {seen.level === 'belum-pernah'
+                          ? 'belum pernah diperiksa'
+                          : `diperiksa ${seen.days} hari lalu`}
+                      </span>
+                    )}
                     {actionable && (
                       <span class="mt-2 block text-xs font-semibold text-slate-700 underline underline-offset-2">
                         {status === 'available' ? 'Pinjamkan' : 'Selesaikan pinjaman'}
@@ -402,6 +419,20 @@ export function ItemDetail(
                     </button>
                   ) : (
                     <div class={shell}>{Row}</div>
+                  )}
+                  {/* Its OWN button, not a second meaning for the card. Lending a thing out and
+                      checking it are different acts, and a card that did both depending on
+                      where you tapped would be a card nobody taps confidently. */}
+                  {onInspect && draft.canRecord !== false && status === 'available' && (
+                    <button
+                      type="button"
+                      class="mt-1.5 w-full rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900"
+                      onClick={() => onInspect({
+                        assetId: a.assetId, label: a.label, item, lastTs: checks.get(a.assetId) ?? null,
+                      })}
+                    >
+                      Periksa
+                    </button>
                   )}
                 </li>
               );

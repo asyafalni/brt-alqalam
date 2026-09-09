@@ -73,6 +73,7 @@ export function keteranganLabel(type: MovementType, condition?: Condition): stri
     peminjaman: 'Peminjaman',
     digunakan: 'Digunakan',
     pengembalian: 'Pengembalian',
+    pemeriksaan: 'Pemeriksaan',
     adjust: 'Penyesuaian stok',
     status_change: 'Ubah status',
     reversal: 'Pembatalan',

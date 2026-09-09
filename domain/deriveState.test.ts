@@ -330,3 +330,27 @@ describe('a labelled item counts its units, not its opening quantity', () => {
     expect(s.items['ITM-E']).toMatchObject({ qty: 8, ownedQty: 8 });
   });
 });
+
+describe('an inspection', () => {
+  it('changes nothing at all — it is a dated assertion, and the date is the point', () => {
+    const item: Item = {
+      itemId: 'ITM-0001', barcode: 'ALQ-ITM-0001', name: 'Pisau', categoryId: 'CAT-PHBI',
+      kind: 'equipment', unit: 'buah', trackBy: 'instance', minStock: null, active: true,
+    };
+    const unit: AssetInstance = {
+      assetId: 'ALQ-ITM-0001-001', itemId: 'ITM-0001', label: 'Pisau #1',
+      acquiredTs: 0, active: true,
+    };
+    const check: Txn = {
+      txnId: 'T1', clientTxnId: 'c1', ts: 1000, type: 'pemeriksaan',
+      assetId: unit.assetId, qtyDelta: 0, actorUserId: 'USR-1',
+    };
+    const stock = [{ itemId: 'ITM-0001', locationId: '', initialStock: 1 }];
+
+    const before = deriveState([item], [unit], [], 2000, stock);
+    const after = deriveState([item], [unit], [check], 2000, stock);
+
+    expect(after.instances[unit.assetId].status).toBe(before.instances[unit.assetId].status);
+    expect(after.items['ITM-0001'].qty).toBe(before.items['ITM-0001'].qty);
+  });
+});
