@@ -78,7 +78,7 @@ import { newRequestId } from './features/requests/newRequestId';
 import { restoreAdmin } from './features/admin/restore';
 import { PinFlow } from './features/gateway/PinFlow';
 import { canRecord, connectionLost, loadConnection } from './state/connection';
-import { endSession, keepSession, liveSession, SESSION_TTL_MS, touchSession } from './state/session';
+import { endSession, keepSession, liveSession, sessionName, SESSION_TTL_MS, touchSession } from './state/session';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
@@ -129,6 +129,10 @@ export function App() {
      without it: in the sheet, waiting on this phone, refused. */
   const [flash, setFlash] = useState<FlashMessage | null>(null);
   const say = (m: Omit<FlashMessage, 'at'>) => setFlash({ ...m, at: Date.now() });
+  /* Whose visit is open, mirrored into state so ending it repaints. Read from storage rather
+     than held only here, because a reload must not forget who is standing at the tablet. */
+  const [actor, setActor] = useState(() => sessionName());
+  const readActor = () => setActor(sessionName());
   /** How many movements are recorded but not yet in the sheet. Shown, never hidden. */
   const [queued, setQueued] = useState(0);
 
@@ -169,12 +173,13 @@ export function App() {
         text: what && result.appended.length === 1 ? `Tercatat: ${what}` : 'Tercatat di spreadsheet.',
         hint: result.appended.length > 1
           ? `${result.appended.length} catatan terkirim.`
-          : undefined,
+          : sessionName() ? `Sebagai ${sessionName()}.` : undefined,
       });
       setPinFor(null);
       refreshQueue();
       // The gateway slid its own expiry by serving this; keep the local one in step.
       touchSession(SESSION_TTL_MS);
+      readActor();
       // Re-read rather than trusting the local fold: the sheet is the register, and anything
       // another device did belongs on this screen too.
       register.refresh();
@@ -203,6 +208,7 @@ export function App() {
            the fix is to type a PIN again. */
         if (code === 'session_expired' || code === 'session_revoked' || code === 'no_session') {
           endSession();
+          readActor();
           setPinFor(entries);
         }
         setPinError(explainPin(code));
@@ -813,6 +819,7 @@ export function App() {
                    session is a single visit by design (§58.5), so storing it would hand the
                    next person the last one's identity. */
                 keepSession(session, session.kind, session.expiresInMs);
+                readActor();
                 void record(session.token, pinFor);
               }}
             />
@@ -825,6 +832,10 @@ export function App() {
              draft and nowhere else — legitimate for a stock-take, indistinguishable from the
              real thing until it said so. */
           destination={connection ? 'gateway' : 'local'}
+          actor={actor}
+          /* Ends the visit rather than merely relabelling it: the next record asks for a PIN,
+             which is the only thing that can actually establish who is holding the phone. */
+          onNotMe={() => { endSession(); readActor(); }}
           target={moving}
           derived={moving ? inventory.derived.items[moving.item.itemId] : undefined}
           locations={draft.locations}

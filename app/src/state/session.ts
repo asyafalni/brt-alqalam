@@ -19,6 +19,15 @@ interface Stored {
   token: string;
   /** Wall-clock expiry, refreshed each time the session is used. */
   expiresAt: number;
+  /**
+   * Whose visit this is.
+   *
+   * Kept because the session is REUSED for an hour without asking for anything, so the screen
+   * has to be able to say who the next record will be attributed to. Attribution nobody can see
+   * is attribution nobody can correct — and on a phone somebody borrowed for two minutes, the
+   * correction is the whole point (§58.5).
+   */
+  name?: string;
 }
 
 /** Kept only for the phone path. A device session is over as soon as the visit is. */
@@ -28,12 +37,13 @@ export function keepSession(session: Session, kind?: string, ttlMs?: number): vo
     localStorage.setItem(KEY, JSON.stringify({
       token: session.token,
       expiresAt: Date.now() + ttlMs,
+      name: session.actorName,
     } satisfies Stored));
   } catch { /* private window */ }
 }
 
-/** The still-valid token, or null. Expiry is checked here so a stale one is never sent. */
-export function liveSession(): string | null {
+/** The whole live record, or null. Expiry is checked here so a stale one is never sent. */
+function stored(): Stored | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
@@ -42,18 +52,30 @@ export function liveSession(): string | null {
       localStorage.removeItem(KEY);
       return null;
     }
-    return s.token;
+    return { token: s.token, expiresAt: s.expiresAt, name: s.name };
   } catch {
     return null;
   }
 }
 
+/** The still-valid token, or null. */
+export function liveSession(): string | null {
+  return stored()?.token ?? null;
+}
+
+/** Who the open visit belongs to, or `''`. Same expiry check as `liveSession`. */
+export function sessionName(): string {
+  return stored()?.name ?? '';
+}
+
 /** Push the local expiry out, mirroring the gateway sliding its own on use. */
 export function touchSession(ttlMs: number): void {
-  const token = liveSession();
-  if (!token) return;
+  const s = stored();
+  if (!s) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ token, expiresAt: Date.now() + ttlMs } satisfies Stored));
+    localStorage.setItem(KEY, JSON.stringify({
+      token: s.token, expiresAt: Date.now() + ttlMs, name: s.name,
+    } satisfies Stored));
   } catch { /* private window */ }
 }
 

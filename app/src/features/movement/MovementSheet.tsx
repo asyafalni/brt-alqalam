@@ -44,7 +44,7 @@ export interface MovementTarget {
 }
 
 export function MovementSheet(
-  { target, derived, locations, onCommit, onClose, destination = 'gateway' }:
+  { target, derived, locations, onCommit, onClose, destination = 'gateway', actor, onNotMe }:
   {
     target: MovementTarget | null;
     derived?: DerivedItem;
@@ -61,6 +61,18 @@ export function MovementSheet(
      * had not synced. The mode stays; the ambiguity does not.
      */
     destination?: 'gateway' | 'local';
+    /**
+     * Who this will be recorded as, when a visit is already open.
+     *
+     * A phone session is reused for an HOUR without asking for anything (§58.5), so between the
+     * PIN and the record there was nothing on screen naming the person the register was about
+     * to blame. Said HERE for the same reason the "belum tersambung" banner is here rather than
+     * on the receipt: attribution somebody reads after saving is attribution they have already
+     * trusted.
+     */
+    actor?: string;
+    /** Ends that visit, so the next record asks for a PIN again. */
+    onNotMe?: () => void;
   },
 ) {
   return (
@@ -81,6 +93,26 @@ export function MovementSheet(
             terlihat oleh siapa pun. Sambungkan dulu lewat indikator di pojok kiri bawah kalau
             ini pengambilan sungguhan.
           </span>
+        </p>
+      )}
+
+      {/* Quiet, because it is right nine times out of ten and shouting it would make every
+          withdrawal feel like an interrogation. Present, because the tenth time is somebody
+          recording a bar of soap against a colleague who went home an hour ago. */}
+      {target && destination === 'gateway' && actor && (
+        <p class="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-slate-600">
+          <span>
+            Dicatat sebagai <strong class="font-semibold text-slate-900">{actor}</strong>
+          </span>
+          {onNotMe && (
+            <button
+              type="button"
+              class="font-semibold text-slate-700 underline underline-offset-2 hover:text-slate-900"
+              onClick={onNotMe}
+            >
+              Bukan kamu?
+            </button>
+          )}
         </p>
       )}
 

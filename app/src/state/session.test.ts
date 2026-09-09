@@ -5,7 +5,7 @@
 // walked up next. On a phone one person carries, the same rule is a toll rather than a lock.
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { endSession, keepSession, liveSession, SESSION_TTL_MS, touchSession } from './session';
+import { endSession, keepSession, liveSession, SESSION_TTL_MS, sessionName, touchSession } from './session';
 import type { Session } from '../../../data/gateway';
 
 const session = (over: Partial<Session> = {}): Session => ({
@@ -81,5 +81,25 @@ describe('ending it', () => {
     expect(liveSession()).toBeNull();
     vi.restoreAllMocks();
     expect(typeof original).toBe('function');
+  });
+});
+
+describe('whose visit it is', () => {
+  it('remembers the name, so the screen can say who the next record will blame', () => {
+    keepSession(session({ kind: 'phone', actorName: 'Budi' }), 'phone', SESSION_TTL_MS);
+    expect(sessionName()).toBe('Budi');
+  });
+
+  it('forgets it with the session — an expired visit belongs to nobody', () => {
+    keepSession(session({ kind: 'phone', actorName: 'Budi' }), 'phone', SESSION_TTL_MS);
+    endSession();
+    expect(sessionName()).toBe('');
+  });
+
+  it('keeps it while the visit is slid forward', () => {
+    keepSession(session({ kind: 'phone', actorName: 'Budi' }), 'phone', SESSION_TTL_MS);
+    touchSession(SESSION_TTL_MS);
+    expect(sessionName()).toBe('Budi');
+    expect(liveSession()).not.toBeNull();
   });
 });
