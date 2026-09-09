@@ -20,7 +20,7 @@
 // `actorUserId` is the one field that changes when the gateway lands.
 
 import { useMemo, useState } from 'octane';
-import { Check, Minus, Plus, TriangleAlert } from '@octanejs/lucide';
+import { Check, Minus, Plus, TriangleAlert, Unlink } from '@octanejs/lucide';
 import { planMovement } from '../../../../domain/keterangan';
 import { UNPLACED } from '../../../../domain/stock';
 import type { DerivedItem, Item, Location, Txn } from '../../../../domain/types';
@@ -44,13 +44,23 @@ export interface MovementTarget {
 }
 
 export function MovementSheet(
-  { target, derived, locations, onCommit, onClose }:
+  { target, derived, locations, onCommit, onClose, destination = 'gateway' }:
   {
     target: MovementTarget | null;
     derived?: DerivedItem;
     locations: Location[];
     onCommit: (txn: Txn) => void;
     onClose: () => void;
+    /**
+     * Where this record will actually land.
+     *
+     * `local` is the stock-take on a phone with no gateway (§59 stage 1) — a legitimate mode,
+     * and the one the roadmap starts with. What was NOT legitimate is that it looked identical
+     * to the real thing: same button, same confirmation, no PIN, and nothing reaching the
+     * spreadsheet. Somebody recorded a withdrawal on their own phone and reasonably asked why it
+     * had not synced. The mode stays; the ambiguity does not.
+     */
+    destination?: 'gateway' | 'local';
   },
 ) {
   return (
@@ -60,6 +70,20 @@ export function MovementSheet(
       description={target?.item.name}
       onClose={onClose}
     >
+      {/* Said BEFORE the quantity, not after saving. A note that a record went nowhere is a
+          note somebody reads once they have already trusted it. */}
+      {target && destination === 'local' && (
+        <p class="mb-4 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-slate-700">
+          <Unlink class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>
+            <strong class="font-semibold text-slate-900">Perangkat ini belum tersambung.</strong>
+            {' '}Catatan ini hanya tersimpan di HP ini — tidak masuk spreadsheet dan tidak
+            terlihat oleh siapa pun. Sambungkan dulu lewat indikator di pojok kiri bawah kalau
+            ini pengambilan sungguhan.
+          </span>
+        </p>
+      )}
+
       {target && (
         <MovementForm
           /* Keyed by what is being recorded, so opening this for a second item starts fresh

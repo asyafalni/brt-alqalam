@@ -725,6 +725,10 @@ export function App() {
         </Sheet>
 
         <MovementSheet
+          /* Says where the record lands. Without a connection it goes to this device's own
+             draft and nowhere else — legitimate for a stock-take, indistinguishable from the
+             real thing until it said so. */
+          destination={connection ? 'gateway' : 'local'}
           target={moving}
           derived={moving ? inventory.derived.items[moving.item.itemId] : undefined}
           locations={draft.locations}

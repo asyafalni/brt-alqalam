@@ -107,7 +107,15 @@ export function useDraft(): Draft {
     stock: state.stock,
     txns: state.txns,
     requests: state.requests,
-    // Not connected: this device holds the whole draft, so it may do everything to it.
+    /*
+     * Not connected: this device holds the whole draft, so it may do everything to it — the
+     * stock-take (§59 stage 1) has to work on a phone with no gateway at all.
+     *
+     * ⚠️ But the DESTINATION must be visible. This once recorded withdrawals with no PIN into a
+     * draft nobody else reads, behind the same button and the same confirmation as a real one:
+     * two destinations, one control. Blocking it was the wrong fix — it would break the mode the
+     * roadmap starts with. `MovementSheet` says where the record is going instead.
+     */
     canRecord: true,
     setItems: (update) => setState((prev) => ({ ...prev, items: update(prev.items) })),
     setCategories: (update) => setState((prev) => ({ ...prev, categories: update(prev.categories) })),
