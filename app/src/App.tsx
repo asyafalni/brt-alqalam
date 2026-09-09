@@ -66,6 +66,7 @@ import { newRequestId } from './features/requests/newRequestId';
 import { restoreAdmin } from './features/admin/restore';
 import { PinFlow } from './features/gateway/PinFlow';
 import { canRecord, connectionLost, loadConnection } from './state/connection';
+import { endSession, keepSession, liveSession, SESSION_TTL_MS, touchSession } from './state/session';
 import type { Connection } from './state/connection';
 import { useRegister } from './state/useRegister';
 import { gatewayDraft } from './state/useDraft';
@@ -116,6 +117,67 @@ export function App() {
   const [queued, setQueued] = useState(0);
 
   const refreshQueue = () => { void pendingCount().then(setQueued).catch(() => setQueued(0)); };
+
+  /*
+   * Send a batch under an open session.
+   *
+   * Hoisted out of the PIN sheet because it now has TWO callers: the sheet, when somebody has
+   * just typed a PIN, and the movement itself, when an hour-long phone session is already open
+   * and there is nothing to ask. Leaving it inline would have meant the same twenty lines twice,
+   * which is how the request form quietly lost its photo picker.
+   */
+  async function record(token: string, entries: AppendEntry[]) {
+    if (!connection) return;
+    const { url } = connection;
+    setPinBusy(true);
+    setPinError('');
+    try {
+      /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was recorded —
+         the log is a sequence, and sending today's withdrawal ahead of yesterday's invents a
+         different one. */
+      const waiting = await pending().catch(() => []);
+      const result = await append(url, token, [...waiting.map((w) => w.entry), ...entries]);
+
+      /* Duplicates count as settled: the gateway already holds them, and leaving them queued
+         would retry for ever against rows that exist. */
+      await settle([
+        ...result.appended.map((t) => t.clientTxnId),
+        ...result.duplicates,
+      ]).catch(() => undefined);
+
+      setFreshTxns((prev) => [...prev, ...result.appended]);
+      setPinFor(null);
+      refreshQueue();
+      // The gateway slid its own expiry by serving this; keep the local one in step.
+      touchSession(SESSION_TTL_MS);
+      // Re-read rather than trusting the local fold: the sheet is the register, and anything
+      // another device did belongs on this screen too.
+      register.refresh();
+    } catch (err) {
+      const code = err instanceof GatewayError ? err.code : 'offline';
+
+      /* Only a NETWORK failure is queued. A refused PIN or a revoked person is not something a
+         retry will fix, and queueing it would hide the reason behind a badge that never
+         clears. */
+      if (code === 'offline') {
+        await Promise.all(entries.map((e) => enqueue(e, 'perangkat ini'))).catch(() => undefined);
+        refreshQueue();
+        setPinFor(null);
+        setPinError('');
+      } else {
+        /* A session that is gone or revoked must not linger locally — otherwise every later
+           action retries with it and fails identically, with no way for anyone to guess that
+           the fix is to type a PIN again. */
+        if (code === 'session_expired' || code === 'session_revoked' || code === 'no_session') {
+          endSession();
+          setPinFor(entries);
+        }
+        setPinError(explainPin(code));
+      }
+    } finally {
+      setPinBusy(false);
+    }
+  }
   useEffect(refreshQueue, [connection?.url]);
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
@@ -672,54 +734,11 @@ export function App() {
               /* Signing in is `PinFlow`'s job, including the "whose PIN was that?" step. What is
                  left here is the part that is actually ours: flushing the queue and appending. */
               onSession={(session) => {
-                setPinBusy(true);
-                setPinError('');
-                void (async () => {
-                  const token = session.token;
-                  try {
-                    /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was
-                       recorded — the log is a sequence, and sending today's withdrawal ahead of
-                       yesterday's invents a different one. */
-                    const waiting = await pending().catch(() => []);
-                    const batch = [...waiting.map((w) => w.entry), ...pinFor];
-
-                    const result = await append(url, token, batch);
-                    /* Duplicates count as settled: the gateway already holds them, and leaving
-                       them queued would retry for ever against rows that exist. */
-                    await settle([
-                      ...result.appended.map((t) => t.clientTxnId),
-                      ...result.duplicates,
-                    ]).catch(() => undefined);
-
-                    setFreshTxns((prev) => [...prev, ...result.appended]);
-                    setPinFor(null);
-                    refreshQueue();
-                    // Re-read rather than trusting the local fold: the sheet is the register,
-                    // and anything another device did belongs on this screen too.
-                    register.refresh();
-                  } catch (err) {
-                    const code = err instanceof GatewayError ? err.code : 'offline';
-
-                    /* Only a NETWORK failure is queued. A refused PIN or a revoked device is
-                       not something a retry will fix, and queueing it would hide the reason
-                       behind a badge that never clears. */
-                    if (code === 'offline') {
-                      await Promise.all(pinFor.map((e) => enqueue(e, 'perangkat ini')))
-                        .catch(() => undefined);
-                      refreshQueue();
-                      setPinFor(null);
-                      setPinError('');
-                    } else {
-                      setPinError(explainPin(code));
-                    }
-                  } finally {
-                    setPinBusy(false);
-                    /* Closed even when the append failed: the session covers one visit, and
-                       leaving it open on a shared tablet is exactly the misattribution §58.5
-                       set out to make structurally impossible. */
-                    if (token) await closeSession(url, token).catch(() => undefined);
-                  }
-                })();
+                /* Kept only when the gateway says it is a PHONE session. A shared tablet's
+                   session is a single visit by design (§58.5), so storing it would hand the
+                   next person the last one's identity. */
+                keepSession(session, session.kind, session.expiresInMs);
+                void record(session.token, pinFor);
               }}
             />
             );
@@ -744,11 +763,16 @@ export function App() {
                reaching here at all would be a bug. */
             if (connection && canRecord(connection)) {
               setPinError('');
-              setPinFor([{
+              const entry = {
                 clientTxnId: txn.clientTxnId, type: txn.type, itemId: txn.itemId,
                 assetId: txn.assetId, locationId: txn.locationId, qtyDelta: txn.qtyDelta,
                 recipient: txn.recipient, condition: txn.condition, note: txn.note,
-              }]);
+              };
+              /* An hour-long phone session is already an answer to "who is this?", so asking
+                 again is asking somebody to prove something they proved four minutes ago —
+                 which is what made the PIN feel like a toll rather than a lock. */
+              const open = liveSession();
+              if (open) void record(open, [entry]); else setPinFor([entry]);
             } else if (!connection) {
               localDraft.setTxns((prev) => [...prev, txn]);
             }

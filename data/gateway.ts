@@ -59,6 +59,17 @@ export interface Session {
   actorUserId: string;
   actorName: string;
   role: string;
+  /**
+   * How this session was opened, and therefore whether it is worth keeping.
+   *
+   * A `phone` session belongs to one person carrying one device and is reused for an hour; a
+   * `device` session is a single visit on a shared tablet, where the next person to walk up
+   * really might be somebody else (§58.5). Absent on a gateway that predates the split, which
+   * reads as `device` — the safe end.
+   */
+  kind?: 'phone' | 'device';
+  /** How long the gateway will hold it, idle, before asking for the PIN again. */
+  expiresInMs?: number;
 }
 
 export interface AppendEntry {
