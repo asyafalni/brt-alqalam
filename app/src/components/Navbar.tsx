@@ -73,10 +73,13 @@ export function Navbar(p: Props) {
         )}
       </div>
 
-      {/* Hidden on mobile, where the raised centre button in the bottom bar owns this. */}
+      {/* Hidden on mobile, where the raised centre button in the bottom bar owns this.
+          `ml-auto` keeps it beside the bell: from `sm` up the search field goes back to a fixed
+          width, so without it `justify-between` shares out the slack and strands this in the
+          middle of the bar with nothing on either side of it. */}
       <button
         type="button"
-        class="hidden items-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-semibold text-slate-50 md:flex"
+        class="ml-auto hidden items-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-semibold text-slate-50 md:flex"
         onClick={p.onScan}
       >
         <ScanLine class="h-5 w-5" />
