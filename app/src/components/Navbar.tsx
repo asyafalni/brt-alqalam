@@ -5,7 +5,7 @@
 // and wired to nothing (`Navbar.tsx:47-53`) — carrying that over would ship a permanent red
 // dot that means nothing.
 
-import { Bell, Menu, ScanLine, Search } from '@octanejs/lucide';
+import { Bell, Menu, ScanLine, Search, X } from '@octanejs/lucide';
 
 interface Props {
   search: string;
@@ -45,21 +45,38 @@ export function Navbar(p: Props) {
           the field reads as the one place you can type rather than as a differently-tinted
           patch of header. `slate-400` on the border, not a hairline: a form field's boundary
           has to clear 3:1 (WCAG 1.4.11), and white-on-beige is 1.28:1 by itself. */}
-      <div class="hidden w-72 items-center gap-3 rounded-full border border-slate-500 bg-white px-5 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:flex md:w-96">
+      {/* Shown on a PHONE too, which it was not: it sat behind `hidden sm:flex`, so the one
+          device the gudang actually runs on had no way to search at all — and "where is the
+          soap" is the question §0 says this whole register exists to answer. It takes the
+          leftover width there and its fixed sizes only from `sm` up. */}
+      <div class="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-slate-500 bg-white px-4 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:w-72 sm:flex-none sm:px-5 md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
-          class="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
+          class="w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
           value={p.search}
-          placeholder="Cari barang…"
-          aria-label="Cari barang"
+          placeholder="Cari barang atau rak…"
+          aria-label="Cari barang atau rak"
           onInput={(e: Event) => p.onSearch((e.target as HTMLInputElement).value)}
+          /* Escape clears, because the results replace the page: the way out has to be under
+             the hand that is already on the keyboard, not only on a button further down. */
+          onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Escape') p.onSearch(''); }}
         />
+        {p.search !== '' && (
+          <button
+            type="button"
+            class="-mr-1 shrink-0 rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            onClick={() => p.onSearch('')}
+            aria-label="Hapus pencarian"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Hidden on mobile, where the raised centre button in the bottom bar owns this. */}
       <button
         type="button"
-        class="ml-auto hidden items-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-semibold text-slate-50 md:flex"
+        class="hidden items-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-semibold text-slate-50 md:flex"
         onClick={p.onScan}
       >
         <ScanLine class="h-5 w-5" />

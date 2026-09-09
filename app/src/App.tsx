@@ -13,6 +13,7 @@ import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
 import { AssetBoard } from './features/assets/AssetBoard';
+import { Finder } from './features/search/Finder';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
 // on the path anyone opens first. The label sheet pulls a QR *encoder* (~43kB) and the scanner
@@ -32,6 +33,13 @@ const RequestBoard = lazy(() => import('./features/requests/RequestBoard').then(
 const History = lazy(() => import('./features/history/History').then((m) => ({ default: m.History })));
 const Manage = lazy(() => import('./features/admin/Manage').then((m) => ({ default: m.Manage })));
 const Report = lazy(() => import('./features/report/Report').then((m) => ({ default: m.Report })));
+
+/**
+ * The routes that narrow THEMSELVES as you type. Everywhere else the navbar search opens the
+ * finder instead — see `features/search/Finder.tsx` for why a field that works on some screens
+ * and silently does nothing on the rest is worse than one that is missing.
+ */
+const FILTERS_IN_PLACE = new Set(['opname', 'board', 'racks', 'aset', 'histori']);
 
 /** One wording for a refused sign-in, whether it failed opening the session or appending. */
 function explainPin(code: string): string {
@@ -221,6 +229,10 @@ export function App() {
     : localDraft;
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
+  /* Typing is a question, and on a screen with no list to narrow the only place to answer it
+     is in place of that screen. Nothing navigates, so clearing the field puts the person back
+     exactly where they were. */
+  const finding = search.trim() !== '' && !FILTERS_IN_PLACE.has(route.name);
   /* The bell opens the list where you are, rather than navigating you to a screen that has it.
      Notifikasi Stok is a thing to glance at and act on, not a destination, and sending someone
      to Beranda from the middle of a stock-take costs them their place. */
@@ -448,6 +460,20 @@ export function App() {
               error={register.error}
               onRetry={register.refresh}
               onOpenConnection={() => setConnectOpen(true)}
+            />
+          ) : finding ? (
+            <Finder
+              query={search}
+              items={draft.items}
+              categories={draft.categories}
+              locations={draft.locations}
+              inventory={inventory}
+              /* Clearing as we go: the query answered its question the moment you picked
+                 something, and carrying it onto the next screen would leave a filter running
+                 that nobody set there. */
+              onOpenItem={(id) => { setSearch(''); navigate({ name: 'item', id }); }}
+              onOpenRack={(id) => { setSearch(''); navigate({ name: 'racks', id }); }}
+              onClear={() => setSearch('')}
             />
           ) : (
             <>

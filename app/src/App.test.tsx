@@ -197,11 +197,11 @@ describe('the navbar search filters the screen you are on', () => {
     at('#/opname');
     const r = render(App);
 
-    type(r.getByLabelText('Cari barang'), 'sabun');
+    type(r.getByLabelText('Cari barang atau rak'), 'sabun');
     expect(desk(r).getByText('Sabun cuci')).toBeTruthy();
     expect(r.queryByText('Pisau dapur')).toBeNull();
 
-    type(r.getByLabelText('Cari barang'), 'zzz');
+    type(r.getByLabelText('Cari barang atau rak'), 'zzz');
     expect(r.getByText(/Tidak ada yang cocok/)).toBeTruthy();
   });
 
@@ -210,9 +210,36 @@ describe('the navbar search filters the screen you are on', () => {
     at('#/board');
     const r = render(App);
 
-    type(r.getByLabelText('Cari barang'), 'pisau');
+    type(r.getByLabelText('Cari barang atau rak'), 'pisau');
     expect(desk(r).getByText('Pisau dapur')).toBeTruthy();
     expect(r.queryByText('Sabun cuci')).toBeNull();
+  });
+
+  /*
+   * Beranda has no list to narrow, so the field used to do NOTHING there — and the owner read
+   * that, correctly, as a broken search rather than as a screen where search does not apply.
+   * A control on every screen has to mean something on every screen.
+   */
+  it('answers on Beranda, where there is no list to filter', () => {
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/beranda');
+    const r = render(App);
+
+    type(r.getByLabelText('Cari barang atau rak'), 'pisau');
+    expect(r.getByText(/Hasil untuk/)).toBeTruthy();
+    expect(r.getByText('Pisau dapur')).toBeTruthy();
+  });
+
+  it('gives the screen back when the field is cleared — nothing navigated', () => {
+    seed(input({ name: 'Sabun cuci' }));
+    at('#/laporan');
+    const r = render(App);
+
+    type(r.getByLabelText('Cari barang atau rak'), 'sabun');
+    expect(r.getByText(/Hasil untuk/)).toBeTruthy();
+
+    type(r.getByLabelText('Cari barang atau rak'), '');
+    expect(r.queryByText(/Hasil untuk/)).toBeNull();
   });
 });
 
