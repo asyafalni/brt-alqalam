@@ -3,21 +3,22 @@
 // The app's most important action had NO outcome. A marbot tapped Simpan, the sheet closed,
 // and for the second or two the gateway takes there was nothing on screen at all — then a
 // number quietly changed somewhere they might not be looking. On bad wifi that silence ran to
-// ten seconds, and the record was queued rather than sent, which looked exactly the same.
+// ten seconds, and the record was silently held in an outbox, which looked exactly the same.
 //
 // This is the whole family of bug this project keeps re-finding in new costumes: a write that
 // went nowhere presented identically to one that landed. The banner in `MovementSheet` warns
-// BEFORE an unconnected save; this is the other end, and it distinguishes the three outcomes
-// that actually differ — it is in the sheet, it is on this phone waiting, it did not happen.
+// BEFORE an unconnected save; this is the other end, and it says which of the two happened —
+// it reached the sheet, or it did not. (The outbox is gone: it needed a manual flush that
+// needed a PIN, and its only sign was a count in a sidebar a phone keeps behind a drawer.)
 //
 // ONE AT A TIME, deliberately. Movements are recorded one at a time by one person standing at
 // a shelf; a stack of toasts would be a stack of one, plus code to manage a queue that never
 // fills. It replaces rather than piling up, and it never covers the bottom nav.
 
 import { useEffect, useState } from 'octane';
-import { CircleCheck, TriangleAlert, WifiOff } from '@octanejs/lucide';
+import { CircleCheck, TriangleAlert } from '@octanejs/lucide';
 
-export type FlashKind = 'ok' | 'queued' | 'problem';
+export type FlashKind = 'ok' | 'problem';
 
 export interface FlashMessage {
   kind: FlashKind;
@@ -39,10 +40,6 @@ const STYLE: Record<FlashKind, { box: string; icon: unknown }> = {
   ok: {
     box: 'border-green-200 bg-green-50',
     icon: <CircleCheck class="h-5 w-5 shrink-0 text-green-700" />,
-  },
-  queued: {
-    box: 'border-amber-200 bg-amber-50',
-    icon: <WifiOff class="h-5 w-5 shrink-0 text-amber-700" />,
   },
   problem: {
     box: 'border-red-200 bg-red-50',

@@ -42,13 +42,6 @@ describe('an established connection', () => {
     expect(r.queryByText(/Hanya Admin Utama/)).toBeNull();
   });
 
-  it('still lets anybody send what is stranded in the queue', () => {
-    // The marbot's own work, not an administrative act.
-    const r = render(() => (
-      <ConnectPanel connection={connected} onChange={() => {}} queued={2} onSendQueued={() => {}} />
-    ));
-    expect(r.getByRole('button', { name: /Kirim sekarang/ })).toBeTruthy();
-  });
 });
 
 describe('a device with no connection', () => {

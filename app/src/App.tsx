@@ -84,7 +84,6 @@ import { AdminPanel, AdminSummary } from './features/admin/AdminPanel';
 import type { AdminSession } from './features/admin/AdminPanel';
 import { append, closeSession, finishRequest, GatewayError } from '../../data/gateway';
 import type { AppendEntry } from '../../data/gateway';
-import { enqueue, pending, pendingCount, settle } from '../../data/outbox';
 import type { Txn } from '../../domain/types';
 import type { MovementTarget } from './features/movement/MovementSheet';
 
@@ -131,9 +130,7 @@ export function App() {
   const [actor, setActor] = useState(() => sessionName());
   const readActor = () => setActor(sessionName());
   /** How many movements are recorded but not yet in the sheet. Shown, never hidden. */
-  const [queued, setQueued] = useState(0);
 
-  const refreshQueue = () => { void pendingCount().then(setQueued).catch(() => setQueued(0)); };
 
   /*
    * Send a batch under an open session.
@@ -149,31 +146,16 @@ export function App() {
     setPinBusy(true);
     setPinError('');
     try {
-      /* Anything stranded by earlier bad wifi goes FIRST, and in the order it was recorded —
-         the log is a sequence, and sending today's withdrawal ahead of yesterday's invents a
-         different one. */
-      const waiting = await pending().catch(() => []);
-      const result = await append(url, token, [...waiting.map((w) => w.entry), ...entries]);
-
-      /* Duplicates count as settled: the gateway already holds them, and leaving them queued
-         would retry for ever against rows that exist. */
-      await settle([
-        ...result.appended.map((t) => t.clientTxnId),
-        ...result.duplicates,
-      ]).catch(() => undefined);
+      const result = await append(url, token, entries);
 
       setFreshTxns((prev) => [...prev, ...result.appended]);
-      /* The one thing the person actually wanted to know. Named where it is a single record,
-         counted where a stranded queue went out with it. */
+      // The one thing the person actually wanted to know.
       say({
         kind: 'ok',
         text: what && result.appended.length === 1 ? `Tercatat: ${what}` : 'Tercatat di spreadsheet.',
-        hint: result.appended.length > 1
-          ? `${result.appended.length} catatan terkirim.`
-          : sessionName() ? `Sebagai ${sessionName()}.` : undefined,
+        hint: sessionName() ? `Sebagai ${sessionName()}.` : undefined,
       });
       setPinFor(null);
-      refreshQueue();
       // The gateway slid its own expiry by serving this; keep the local one in step.
       touchSession(SESSION_TTL_MS);
       readActor();
@@ -183,19 +165,24 @@ export function App() {
     } catch (err) {
       const code = err instanceof GatewayError ? err.code : 'offline';
 
-      /* Only a NETWORK failure is queued. A refused PIN or a revoked person is not something a
-         retry will fix, and queueing it would hide the reason behind a badge that never
-         clears. */
+      /*
+       * A NETWORK failure is now a plain refusal, and the record is simply not made.
+       *
+       * It used to be held in an IndexedDB outbox and flushed on the next successful append.
+       * Owner's call to drop that, and it is the right one: the queue needed a manual "Kirim"
+       * that itself needed a PIN, and its only sign was a count in a sidebar that a phone keeps
+       * behind a drawer — so a held record looked exactly like a saved one to the person who
+       * made it. A second, invisible source of truth bought almost nothing over saying plainly
+       * that it failed, which this can now do because the receipt exists (`components/Flash`).
+       *
+       * The residual risk, stated rather than solved: somebody who cannot record a withdrawal
+       * may take the soap anyway (§0.0). What protects against that is signal, not software.
+       */
       if (code === 'offline') {
-        await Promise.all(entries.map((e) => enqueue(e, 'perangkat ini'))).catch(() => undefined);
-        refreshQueue();
-        /* This used to close in silence. A record held on the phone is not a record in the
-           register, and the only sign of it was a count in a sidebar that a phone keeps behind
-           a drawer — so the marbot's evidence that it worked was that nothing happened. */
         say({
-          kind: 'queued',
-          text: 'Belum terkirim — tersimpan di HP ini.',
-          hint: 'Gateway tidak terjangkau. Kirim lagi dari panel sambungan saat sinyal kembali.',
+          kind: 'problem',
+          text: 'Gagal terhubung — catatan tidak tersimpan.',
+          hint: 'Periksa koneksi, lalu ulangi. Tidak ada yang berubah di spreadsheet.',
         });
         setPinFor(null);
         setPinError('');
@@ -253,7 +240,6 @@ export function App() {
     }
   }
 
-  useEffect(refreshQueue, [connection?.url]);
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
      reads `draft.items` and `draft.stock`, so none of them has to know which mode it is in. */
@@ -515,7 +501,6 @@ export function App() {
         onNavigate={navigate}
         connected={connection !== null}
         stale={register.error !== ''}
-        queued={queued}
         canRecord={canRecord(connection)}
         admin={admin ? { name: admin.who.name, role: admin.who.role } : null}
         onOpenAdmin={() => setAdminOpen(true)}
@@ -851,16 +836,7 @@ export function App() {
                so gating that would leave a fresh device unconnectable by anyone. */
             canManage={admin?.who.role === 'admin_utama'}
             connection={connection}
-            queued={queued}
-            onChange={(c) => { setConnection(c); setFreshTxns([]); }}
-            onSendQueued={() => {
-              /* Sending needs a PIN like any other write — the queue holds no credential, so
-                 there is nothing to send it WITH. An empty batch is right: the pending entries
-                 are picked up ahead of it. */
-              setConnectOpen(false);
-              setPinError('');
-              setPinFor([]);
-            }}
+                onChange={(c) => { setConnection(c); setFreshTxns([]); }}
           />
         </Flyout>
 

@@ -53,8 +53,6 @@ interface Props {
   connected: boolean;
   /** Set when the register is being shown but could not be refreshed. */
   stale?: boolean;
-  /** Movements recorded on this device but not yet in the sheet. */
-  queued?: number;
   /** False when this device is connected only to read — the takmir's phone, say. */
   canRecord?: boolean;
   /** Who is signed in as an admin, if anyone. Also decides which nav items exist. */
@@ -113,15 +111,7 @@ export function Sidebar(p: Props) {
    * is the point: an unsent movement outranks everything, since it is the only state where the
    * register on screen and the register in the sheet genuinely disagree.
    */
-  const status = p.queued
-    ? {
-      dot: 'bg-amber-400',
-      tone: 'text-amber-300',
-      title: `${p.queued} belum terkirim`,
-      hint: 'Ketuk untuk mengirim',
-      aria: `${p.queued} catatan belum terkirim ke spreadsheet. Ketuk untuk mengirim.`,
-    }
-    : !p.connected
+  const status = !p.connected
       ? {
         dot: 'bg-slate-600',
         tone: 'text-slate-300',

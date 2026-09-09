@@ -353,3 +353,22 @@ describe('editing a barang from where you were looking at it', () => {
     expect(location.hash).toBe('#/opname');
   });
 });
+
+describe('when the gateway cannot be reached', () => {
+  /*
+   * There used to be an IndexedDB outbox: a failed record was held and flushed on the next
+   * successful append. Owner's call to drop it, and it is the right one — the queue needed a
+   * manual "Kirim" that itself needed a PIN, and its only sign was a count in a sidebar that a
+   * phone keeps behind a drawer, so a held record looked exactly like a saved one to the person
+   * who made it. A second, invisible source of truth bought almost nothing over saying plainly
+   * that it failed.
+   */
+  it('leaves nothing behind that looks like a saved record', () => {
+    seed(input({ name: 'Sabun cuci' }));
+    at('#/beranda');
+    render(App);
+    // The sidebar's connection row carries no "N belum terkirim" state any more, because there
+    // is no queue for it to describe.
+    expect(document.body.textContent).not.toMatch(/belum terkirim/i);
+  });
+});

@@ -39,13 +39,11 @@ const REASON: Record<string, string> = {
 const explain = (code: string) => REASON[code] ?? `Gateway menolak: ${code}`;
 
 export function ConnectPanel(
-  { connection, onChange, queued = 0, onSendQueued, canManage = false }:
+  { connection, onChange, canManage = false }:
   {
     connection: Connection | null;
     onChange: (c: Connection | null) => void;
     /** Movements recorded here but not yet in the sheet. */
-    queued?: number;
-    onSendQueued?: () => void;
     /**
      * Whether the person looking at this may CHANGE an existing connection.
      *
@@ -125,23 +123,6 @@ export function ConnectPanel(
   if (connection && !found) {
     return (
       <div>
-        {/* Above the "all fine" panel, because it is the one thing here that is not fine: the
-            register on this screen and the register in the sheet disagree until it is sent. */}
-        {queued > 0 && (
-          <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4" role="status">
-            <p class="font-bold text-slate-900">
-              {queued} catatan belum masuk ke spreadsheet.
-            </p>
-            <p class="mt-1 text-sm leading-relaxed text-slate-600">
-              Tercatat atas nama siapa pun yang memasukkan PIN saat mengirim — antrean ini
-              memang tidak menyimpan PIN.
-            </p>
-            {onSendQueued && (
-              <Button size="panel" class="mt-3" onClick={onSendQueued}>Kirim sekarang</Button>
-            )}
-          </div>
-        )}
-
         <div class="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50/60 p-3">
           <CircleCheck class="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
           <div class="min-w-0">

@@ -27,11 +27,10 @@ describe('saying what happened to a record', () => {
     expect(r.container.querySelector('[role="status"]')).toBeTruthy();
   });
 
-  it('says a queued record is NOT in the register', () => {
-    // The bug it exists for: a write held on the phone closed in silence, so the only evidence
-    // it had worked was that nothing happened.
-    const r = render(<Harness message={ok({ kind: 'queued', text: 'Belum terkirim — tersimpan di HP ini.' })} />);
-    expect(r.getByText(/Belum terkirim/)).toBeTruthy();
+  it('says plainly when a record did NOT reach the register', () => {
+    // The bug it exists for: a write that went nowhere looked exactly like one that landed.
+    const r = render(<Harness message={ok({ kind: 'problem', text: 'Gagal terhubung — catatan tidak tersimpan.' })} />);
+    expect(r.getByText(/tidak tersimpan/)).toBeTruthy();
   });
 
   it('goes away by itself', () => {
@@ -43,7 +42,7 @@ describe('saying what happened to a record', () => {
 
   it('stays longer when the record did not land', () => {
     vi.useFakeTimers();
-    const r = render(<Harness message={ok({ kind: 'queued', text: 'Belum terkirim.' })} />);
+    const r = render(<Harness message={ok({ kind: 'problem', text: 'Belum terkirim.' })} />);
     act(() => { vi.advanceTimersByTime(3300); });
     expect(r.getByText('Belum terkirim.')).toBeTruthy();
     act(() => { vi.advanceTimersByTime(3000); });
