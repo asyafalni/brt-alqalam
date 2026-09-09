@@ -71,11 +71,31 @@ describe('Laporan', () => {
     expect(render(App).getByText(/1 belum pernah dicek/)).toBeTruthy();
   });
 
-  it('says which sections are missing instead of inventing numbers for them', () => {
+  it('says an EMPTY log is empty, rather than blaming a gateway that is deployed', () => {
+    /* The copy this replaces said the history "tersimpan di gateway, yang belum terpasang" —
+       written before the gateway existed and still saying so long after it shipped. It was
+       also shown on precisely the devices that DO keep a log, and replaced by nothing at all
+       on the connected ones, so the promised section existed in neither mode. */
     seed(catalog(input()));
     const r = render(App);
-    expect(r.getByText('Belum tersedia')).toBeTruthy();
-    expect(r.getByText(/membutuhkan riwayat transaksi/)).toBeTruthy();
+    expect(r.getByText('Pergerakan stok')).toBeTruthy();
+    expect(r.getByText(/Belum ada pengambilan atau pengembalian yang tercatat/)).toBeTruthy();
+    expect(r.queryByText(/belum terpasang/)).toBeNull();
+  });
+
+  it('draws the movement chart once anything has actually moved', () => {
+    seed(catalog(input({ name: 'Sabun cuci', initialStock: 12 })));
+    const stored = JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
+    stored.txns = [{
+      txnId: 'T1', clientTxnId: 'c1', ts: Date.now() - 2 * 24 * 60 * 60 * 1000,
+      type: 'pemakaian', itemId: 'ITM-0001', qtyDelta: -3, actorUserId: 'USR-1',
+    }];
+    localStorage.setItem('brt.stocktake.draft.v6', JSON.stringify(stored));
+
+    const r = render(App);
+    // Aggregate only, like the rest of the report: units and days, never who took them (§39).
+    expect(r.getByLabelText(/Pergerakan stok .* 3 unit keluar/)).toBeTruthy();
+    expect(r.queryByText(/Belum ada pengambilan/)).toBeNull();
   });
 
   it('is aggregate-only: categories and counts, no item roll-call', () => {

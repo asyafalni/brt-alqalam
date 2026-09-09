@@ -23,10 +23,12 @@
 import { useMemo } from 'octane';
 import { CircleCheck, FileText, Printer, TriangleAlert, Wrench, XCircle } from '@octanejs/lucide';
 import { buildReport, percent } from '../../../../domain/report';
+import { movementSeries } from '../../../../domain/movement';
+import { MovementChart } from './MovementChart';
 import type { AssetProblem, Slice } from '../../../../domain/report';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
-import { Button, CARD } from '../../components/ui';
+import { Button, CARD, Stat } from '../../components/ui';
 
 /** What every card on this page needs in order to print like part of a document. */
 const SHEET = 'print:break-inside-avoid print:border-slate-400 print:shadow-none';
@@ -63,6 +65,18 @@ export function Report(
     ),
     [draft.items, draft.locations, draft.categories, inventory, now],
   );
+
+  /*
+   * Read from the LOG, not from whether a gateway happens to be attached.
+   *
+   * The section this replaces said the history "tersimpan di gateway, yang belum terpasang" —
+   * written before the gateway existed, and still saying so months after it was deployed. Worse,
+   * it was shown on exactly the devices that DO hold a log (an unconnected phone keeps its own)
+   * and hidden on the connected ones, where it was replaced by nothing at all. So the promised
+   * section existed in neither mode. Availability is not "is there a gateway", it is "has
+   * anything moved yet".
+   */
+  const movement = useMemo(() => movementSeries(inventory.txns, now), [inventory.txns, now]);
 
   const today = new Date(now).toLocaleDateString('id-ID', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -251,16 +265,43 @@ export function Report(
         </section>
       )}
 
-      {!report.movementAvailable && (
-        <section class={`rounded-lg border border-dashed border-slate-300 p-5 ${SHEET}`}>
-          <h2 class="mb-1 text-sm font-bold uppercase tracking-wider text-slate-600">Belum tersedia</h2>
+      <section class={`${CARD} ${SHEET}`}>
+        <SectionTitle
+          note={movement.span > 0 ? `${movement.span} hari terakhir` : undefined}
+        >
+          Pergerakan stok
+        </SectionTitle>
+
+        {movement.days.length === 0 ? (
+          /* Honest, and specific about which of the two it is. "Belum ada data" would cover
+             both "nothing has moved" and "we are not allowed to show you", and those need
+             different things done about them. */
           <p class="max-w-3xl text-sm leading-relaxed text-slate-600">
-            Pergerakan stok dari waktu ke waktu, kecepatan pemakaian, dan barang yang lama tidak
-            bergerak membutuhkan riwayat transaksi. Riwayat itu tersimpan di gateway, yang belum
-            terpasang — jadi bagian ini sengaja dikosongkan daripada menampilkan angka karangan.
+            Belum ada pengambilan atau pengembalian yang tercatat, jadi belum ada yang bisa
+            digambar. Grafik ini terisi sendiri begitu barang mulai diambil — dari halaman
+            barang, dari rak, atau setelah memindai QR-nya.
           </p>
-        </section>
-      )}
+        ) : (
+          <>
+            <p class="mb-4 max-w-3xl text-sm leading-relaxed text-slate-600">
+              Berapa unit keluar dan kembali setiap hari. Ini satu-satunya bagian laporan yang
+              menunjukkan <i>kecepatan</i> — sisanya memotret keadaan hari ini.
+            </p>
+            <MovementChart summary={movement} />
+            <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-4">
+              {/* Per WEEK: a masjid runs on a weekly rhythm — Jumat, kajian akhir pekan — so a
+                  daily mean lands between two very different kinds of day and describes
+                  neither. */}
+              <Stat value={movement.perWeek} label="Unit keluar / minggu" />
+              <Stat
+                value={movement.totalIn}
+                label="Unit kembali"
+                tint={movement.totalIn > 0 ? 'bg-green-50 text-green-600' : undefined}
+              />
+            </div>
+          </>
+        )}
+      </section>
 
       <footer class="hidden print:block print:break-inside-avoid">
         <hr class="mb-2 border-slate-300" />
