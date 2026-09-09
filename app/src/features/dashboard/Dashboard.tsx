@@ -37,10 +37,14 @@ export function Dashboard(
   },
 ) {
   const { items, locations, categories } = draft;
-  const derived = Object.values(inventory.derived.items);
   const categoryNameOf = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? '';
 
-  const counts = useMemo(() => ({
+  /* `Object.values` INSIDE the memo, not above it. Outside, it is a new array on every render,
+     which is a dependency that never matches — so the memo below never once hit and the whole
+     catalog was walked six times for every keystroke anywhere on the page. */
+  const counts = useMemo(() => {
+    const derived = Object.values(inventory.derived.items);
+    return {
     total: items.length,
     units: derived.reduce((n, d) => n + d.qty, 0),
     available: derived.filter((d) => d.status === 'available').length,
@@ -55,7 +59,8 @@ export function Dashboard(
     // Below zero means more was recorded leaving than ever arrived. Not a rounding
     // artefact — the log and the shelf disagree, and only a physical recount settles it.
     negative: derived.filter((d) => d.qty < 0).length,
-  }), [items, derived]);
+    };
+  }, [items, inventory.derived]);
 
   const racks = useMemo(
     () => rollupLocations(locations, items, inventory.derived),

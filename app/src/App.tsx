@@ -339,6 +339,11 @@ export function App() {
 
   const navigate = (next: Parameters<typeof go>[0]) => {
     go(next);
+    /* Choosing a destination while looking at search results ABANDONS the search — otherwise
+       the new screen opens still showing them, and the query silently follows somebody around
+       the app. Carrying it between two screens that filter IN PLACE is different and stays:
+       narrowing Opname to "sabun" and then opening Stok is one continuous thought. */
+    if (finding) setSearch('');
     if (isMobile) setCollapsed(true);
   };
 
@@ -513,11 +518,10 @@ export function App() {
               categories={draft.categories}
               locations={draft.locations}
               inventory={inventory}
-              /* Clearing as we go: the query answered its question the moment you picked
-                 something, and carrying it onto the next screen would leave a filter running
-                 that nobody set there. */
-              onOpenItem={(id) => { setSearch(''); navigate({ name: 'item', id }); }}
-              onOpenRack={(id) => { setSearch(''); navigate({ name: 'racks', id }); }}
+              /* `navigate` drops the query: picking a result answered the question, and
+                 carrying it onward would leave a filter running that nobody set there. */
+              onOpenItem={(id) => navigate({ name: 'item', id })}
+              onOpenRack={(id) => navigate({ name: 'racks', id })}
               onClear={() => setSearch('')}
             />
           ) : (

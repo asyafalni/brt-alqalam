@@ -230,6 +230,19 @@ describe('the navbar search filters the screen you are on', () => {
     expect(r.getByText('Pisau dapur')).toBeTruthy();
   });
 
+  it('drops the query when a result is opened', () => {
+    seed(input({ name: 'Pisau dapur' }));
+    at('#/beranda');
+    const r = render(App);
+
+    type(r.getByLabelText('Cari barang atau rak'), 'pisau');
+    fireEvent.click(r.getByText('Pisau dapur'));
+
+    // On the item now, not still looking at a result list with the query following behind.
+    expect(r.queryByText(/Hasil untuk/)).toBeNull();
+    expect((r.getByLabelText('Cari barang atau rak') as HTMLInputElement).value).toBe('');
+  });
+
   it('gives the screen back when the field is cleared — nothing navigated', () => {
     seed(input({ name: 'Sabun cuci' }));
     at('#/laporan');
