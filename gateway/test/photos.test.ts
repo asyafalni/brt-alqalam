@@ -276,9 +276,25 @@ describe('deleting one', () => {
   });
 });
 
-describe('the sheet knows about the tab', () => {
-  it('lists Photos among the required tabs, so checkSpreadsheet catches a missing one', () => {
-    const api = load(freshTabs());
-    expect(Object.keys(api.REQUIRED_TABS)).toContain('Photos');
+describe('the join tab looks after itself', () => {
+  it('creates Photos on first use, like AdminLog', () => {
+    /* `REQUIRED_TABS` is for the tabs a PERSON fills in — a missing `Stock` means somebody's
+       counts are gone. Nobody types into this one, so demanding it exist first would turn
+       "upload a photo" into "read an error, open Sheets, type eight headers", and the first
+       person to meet that is a marbot holding a phone in a gudang. */
+    const tabs: Record<string, Tab> = { AdminLog: [['ts', 'who', 'action', 'detail']] };
+    const api = load(tabs, {
+      USERS: JSON.stringify([{ userId: 'USR-1', name: 'Budi', role: 'anggota', type: 'marbot' }]),
+    });
+    cache.set(`session:${SESSION}`, JSON.stringify({
+      userId: 'USR-1', name: 'Budi', role: 'anggota', kind: 'phone', exp: Date.now() + 3_600_000,
+    }));
+
+    expect(api.handlePutPhoto({ session: SESSION, itemId: 'ITM-1', dataBase64: ONE_PIXEL }).ok).toBe(true);
+    expect(tabs.Photos[0]).toEqual(PHOTO_HEADER);
+  });
+
+  it('is NOT in REQUIRED_TABS, so a fresh spreadsheet still passes checkSpreadsheet', () => {
+    expect(Object.keys(load(freshTabs()).REQUIRED_TABS)).not.toContain('Photos');
   });
 });

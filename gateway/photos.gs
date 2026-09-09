@@ -96,7 +96,30 @@ function authorizeDrive() {
   Logger.log('Drive siap. Tidak perlu dijalankan lagi.');
 }
 
+var PHOTO_COLUMNS = ['photoId', 'itemId', 'driveFileId', 'takenTs', 'width', 'height',
+  'bytes', 'caption'];
+
+/**
+ * The join tab, created on first use — like `AdminLog`, and for the same reason.
+ *
+ * `REQUIRED_TABS` exists to fail loudly on a spreadsheet imported without one of the tabs a
+ * PERSON fills in: a missing `Stock` means somebody's counts are gone. Nobody types into this
+ * one. It is the gateway's own bookkeeping, so demanding it be created by hand first would
+ * turn "upload a photo" into "read an error, open Sheets, type eight headers" — and the first
+ * person to meet that is a marbot holding a phone in a gudang.
+ */
+function photoSheet() {
+  var sheet = book().getSheetByName('Photos');
+  if (!sheet) {
+    sheet = book().insertSheet('Photos');
+    sheet.getRange(1, 1, 1, PHOTO_COLUMNS.length).setValues([PHOTO_COLUMNS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 function photoRows() {
+  photoSheet();
   return readTab('Photos');
 }
 
@@ -156,16 +179,20 @@ function handlePutPhoto(body) {
     );
 
     var takenTs = Number(body.takenTs) || Date.now();
-    appendRow('Photos', {
-      photoId: photoId,
-      itemId: itemId,
-      driveFileId: file.id,
-      takenTs: takenTs,
-      width: Number(body.width) || 0,
-      height: Number(body.height) || 0,
-      bytes: Number(body.bytes) || blob.getBytes().length,
-      caption: String(body.caption || ''),
-    });
+    /* Written straight to the sheet rather than through `appendRow`, which validates against
+       `REQUIRED_TABS` — the same reason `adminLog` does not use it either. This tab is the
+       gateway's own bookkeeping and is not on that list. */
+    var sheet = photoSheet();
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, PHOTO_COLUMNS.length).setValues([[
+      photoId,
+      itemId,
+      file.id,
+      takenTs,
+      Number(body.width) || 0,
+      Number(body.height) || 0,
+      Number(body.bytes) || blob.getBytes().length,
+      String(body.caption || ''),
+    ]]);
 
     adminLog(session.who || { name: session.actorName, uid: session.actorUserId },
       'photo_add', itemId + ' ' + photoId);
@@ -230,7 +257,7 @@ function handleDeletePhoto(body) {
   if (!lock.tryLock(20000)) return fail('busy');
 
   try {
-    var sheet = sheetNamed('Photos');
+    var sheet = photoSheet();
     var rows = photoRows();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i].photoId) !== photoId) continue;

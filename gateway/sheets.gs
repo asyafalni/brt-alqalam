@@ -172,9 +172,6 @@ var REQUIRED_TABS = {
   AssetInstances: ['assetId', 'itemId', 'label', 'acquiredTs', 'active'],
   Requests: ['requestId', 'type', 'name', 'itemId', 'assetId', 'qty', 'unit', 'price', 'reason',
     'url', 'status', 'requestedBy', 'requestedTs', 'decidedBy', 'decidedTs', 'note'],
-  /* Photos live in Drive; this tab is the JOIN, so the register stays readable without
-     touching Drive at all — and a photo is found by reading a sheet like everything else. */
-  Photos: ['photoId', 'itemId', 'driveFileId', 'takenTs', 'width', 'height', 'bytes', 'caption'],
   Transactions: TXN_COLUMNS,
 };
 
