@@ -297,10 +297,7 @@ export function Dashboard(
                 Stok yang sudah menyentuh atau melewati batas minimumnya.
               </p>
 
-              {/* Hidden entirely when this device cannot READ requests — the public tier omits
-                  them (§39), so the numerator would be zero and the bar would report that
-                  nobody has done anything, which is a different claim from not knowing. */}
-              {canReview && shopping.total > 0 && (
+              {shopping.total > 0 && (canReview ? (
                 <Meter
                   label="Sudah diajukan"
                   done={shopping.done}
@@ -308,7 +305,21 @@ export function Dashboard(
                   unit="barang"
                   note={shopping.left > 0 ? `${shopping.left} belum diajukan` : 'Semuanya sudah diajukan.'}
                 />
-              )}
+              ) : (
+                /*
+                 * SAID, not silently dropped.
+                 *
+                 * The public tier carries no Requests at all (§39), so on a device that is not
+                 * signed in the numerator would be zero and the bar would report that nobody
+                 * has done anything about the empty shelves — a different claim from not being
+                 * able to see. Hiding it was the right instinct and the wrong execution: an
+                 * absence nobody explains is the same bug in a quieter costume, and it is the
+                 * one this project keeps re-finding.
+                 */
+                <p class="mb-3 text-xs text-slate-500">
+                  Masuk sebagai admin untuk melihat mana yang sudah diajukan.
+                </p>
+              ))}
 
               <LazyList sentinel={alerts.sentinel} done={alerts.done}>
                 <StockAlerts

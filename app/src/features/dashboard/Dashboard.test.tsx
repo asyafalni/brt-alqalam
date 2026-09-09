@@ -289,5 +289,9 @@ describe('the low-stock card measures the shopping, not the shelf', () => {
     ));
     expect(r.getByText(/Perlu dibeli lagi/)).toBeTruthy();
     expect(r.queryByText(/belum diajukan/)).toBeNull();
+    /* And it SAYS so. An absence nobody explains is the same bug in a quieter costume — which
+       is how the owner met it: the bar simply vanished once they were connected but not
+       signed in. */
+    expect(r.getByText(/Masuk sebagai admin untuk melihat mana yang sudah diajukan/)).toBeTruthy();
   });
 });
