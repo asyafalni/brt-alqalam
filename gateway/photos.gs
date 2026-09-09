@@ -32,26 +32,54 @@ var MAX_PHOTOS_PER_ITEM = 6;
 var MAX_PHOTO_BASE64 = 8 * 1024 * 1024;
 
 /**
- * The folder, created on first use.
+ * The folder, created on first use, through the DRIVE API rather than `DriveApp`.
  *
- * By ID from a Script Property, never by searching Drive for a name: a name search needs to
- * read the whole Drive, which the narrow `drive.file` scope deliberately does not allow — and
- * a second folder called "BRT Inventaris" made by hand would silently split the photos in two.
+ * `DriveApp.createFolder` demands `https://www.googleapis.com/auth/drive` — read and write
+ * every file in the owner's account — because it is a convenience wrapper that can enumerate.
+ * This script answers `ANYONE_ANONYMOUS`, so that is a blast radius it has no business holding.
+ * Drive API v3 honours `drive.file`: create files, and touch only files this app created.
+ *
+ * By ID from a Script Property, never by searching for a name: a name search would need to read
+ * the whole Drive, which `drive.file` does not allow — and a second folder made by hand would
+ * silently split the photos in two.
  */
-function photoFolder() {
+function photoFolderId() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty(PHOTO_FOLDER_PROP);
   if (id) {
     try {
-      return DriveApp.getFolderById(id);
+      var found = Drive.Files.get(id, { fields: 'id,trashed' });
+      if (found && !found.trashed) return found.id;
     } catch (e) {
-      // Deleted or trashed by hand. Fall through and make a new one rather than failing every
-      // upload for ever with an error nobody can act on.
+      // Deleted by hand. Fall through and make a new one rather than failing every upload for
+      // ever with an error nobody can act on.
     }
   }
-  var folder = DriveApp.createFolder('BRT Inventaris — Foto');
-  props.setProperty(PHOTO_FOLDER_PROP, folder.getId());
-  return folder;
+  var folder = Drive.Files.create({
+    name: 'BRT Inventaris — Foto',
+    mimeType: 'application/vnd.google-apps.folder',
+  }, null, { fields: 'id' });
+  props.setProperty(PHOTO_FOLDER_PROP, folder.id);
+  return folder.id;
+}
+
+/**
+ * Read a file's bytes.
+ *
+ * `Drive.Files.get(id, {alt:'media'})` is not available through the advanced service, so this
+ * goes to the REST endpoint with the script's own OAuth token — which carries exactly the
+ * scopes granted, `drive.file` among them, and therefore reaches only files this app created.
+ */
+function photoBlob(fileId) {
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media',
+    {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true,
+    },
+  );
+  if (res.getResponseCode() !== 200) throw new Error('drive_read_' + res.getResponseCode());
+  return res.getBlob();
 }
 
 /**
@@ -63,8 +91,8 @@ function photoFolder() {
  * that is supposed to trigger a consent screen has to TOUCH the service.
  */
 function authorizeDrive() {
-  var folder = photoFolder();
-  Logger.log('OK. Folder foto: ' + folder.getName() + ' (' + folder.getId() + ')');
+  var id = photoFolderId();
+  Logger.log('OK. Folder foto dibuat/ditemukan: ' + id);
   Logger.log('Drive siap. Tidak perlu dijalankan lagi.');
 }
 
@@ -121,13 +149,17 @@ function handlePutPhoto(body) {
     var mime = String(body.mimeType || 'image/jpeg');
     var photoId = 'PH-' + Utilities.getUuid().slice(0, 12).toUpperCase();
     var blob = Utilities.newBlob(Utilities.base64Decode(data), mime, photoId + '.jpg');
-    var file = photoFolder().createFile(blob);
+    var file = Drive.Files.create(
+      { name: photoId + '.jpg', parents: [photoFolderId()] },
+      blob,
+      { fields: 'id' },
+    );
 
     var takenTs = Number(body.takenTs) || Date.now();
     appendRow('Photos', {
       photoId: photoId,
       itemId: itemId,
-      driveFileId: file.getId(),
+      driveFileId: file.id,
       takenTs: takenTs,
       width: Number(body.width) || 0,
       height: Number(body.height) || 0,
@@ -173,8 +205,7 @@ function handleGetPhoto(body) {
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i].photoId) !== photoId) continue;
     try {
-      var file = DriveApp.getFileById(String(rows[i].driveFileId));
-      var blob = file.getBlob();
+      var blob = photoBlob(String(rows[i].driveFileId));
       return respond({
         ok: true,
         mimeType: blob.getContentType(),
@@ -204,7 +235,7 @@ function handleDeletePhoto(body) {
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i].photoId) !== photoId) continue;
       try {
-        DriveApp.getFileById(String(rows[i].driveFileId)).setTrashed(true);
+        Drive.Files.update({ trashed: true }, String(rows[i].driveFileId));
       } catch (e) {
         /* Already gone from Drive. The row still has to go, or the list keeps offering a photo
            that cannot be fetched — which is worse than the orphan file this leaves behind. */

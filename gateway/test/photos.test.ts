@@ -45,15 +45,6 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   cache = new Map();
   const store: Record<string, string> = { PIN_PEPPER: 'test-pepper', ...props };
 
-  const fileHandle = (id: string) => ({
-    getId: () => id,
-    getBlob: () => ({
-      getContentType: () => drive.get(id)!.mime,
-      getBytes: () => drive.get(id)!.bytes,
-    }),
-    setTrashed: (v: boolean) => { drive.get(id)!.trashed = v; },
-  });
-
   const sandbox: Record<string, unknown> = {
     PropertiesService: {
       getScriptProperties: () => ({
@@ -79,19 +70,55 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
       MimeType: { TEXT: 'text' },
       createTextOutput: (s: string) => ({ setMimeType: () => JSON.parse(s) }),
     },
-    UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getContentText: () => '{}' }) },
-    DriveApp: {
-      createFolder: (name: string) => {
-        folders.push(name);
-        return { getId: () => 'folder-1', getName: () => name, createFile: createFile };
+    UrlFetchApp: {
+      /* Reading bytes goes to the REST endpoint with the script's own token, because
+         `alt=media` is not reachable through the advanced service. */
+      fetch: (fetchUrl: string) => {
+        const id = decodeURIComponent((/files\/([^?]+)/.exec(fetchUrl) ?? [])[1] ?? '');
+        if (!drive.has(id)) return { getResponseCode: () => 404, getBlob: () => null };
+        const f = drive.get(id)!;
+        return {
+          getResponseCode: () => 200,
+          getBlob: () => ({ getContentType: () => f.mime, getBytes: () => f.bytes }),
+        };
       },
-      getFolderById: (id: string) => {
-        if (id !== 'folder-1') throw new Error('no such folder');
-        return { getId: () => id, getName: () => 'BRT', createFile };
-      },
-      getFileById: (id: string) => {
-        if (!drive.has(id)) throw new Error('gone');
-        return fileHandle(id);
+    },
+    ScriptApp: { getOAuthToken: () => 'ya29.fake' },
+    /*
+     * The Drive ADVANCED SERVICE, not `DriveApp`. The real one demands the full `drive` scope
+     * for `createFolder` — read and write every file in the owner's account — from a script
+     * that answers ANYONE_ANONYMOUS. This fake exposes nothing that could enumerate a Drive,
+     * which is the property the production code is choosing.
+     */
+    Drive: {
+      Files: {
+        create: (
+          meta: { name: string; mimeType?: string; parents?: string[] },
+          blob?: { getBytes: () => number[]; getContentType: () => string } | null,
+        ) => {
+          if (meta.mimeType === 'application/vnd.google-apps.folder') {
+            folders.push(meta.name);
+            return { id: 'folder-1' };
+          }
+          const id = `file-${drive.size + 1}`;
+          drive.set(id, {
+            name: meta.name,
+            bytes: blob ? blob.getBytes() : [],
+            mime: blob ? blob.getContentType() : 'application/octet-stream',
+            trashed: false,
+          });
+          return { id };
+        },
+        get: (id: string) => {
+          if (id === 'folder-1') return { id, trashed: false };
+          if (!drive.has(id)) throw new Error('gone');
+          return { id, trashed: drive.get(id)!.trashed };
+        },
+        update: (patch: { trashed?: boolean }, id: string) => {
+          if (!drive.has(id)) throw new Error('gone');
+          if (patch.trashed != null) drive.get(id)!.trashed = patch.trashed;
+          return { id };
+        },
       },
     },
     Utilities: {
@@ -104,19 +131,13 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
     },
   };
 
-  function createFile(blob: { getBytes: () => number[]; getContentType: () => string; getName: () => string }) {
-    const id = `file-${drive.size + 1}`;
-    drive.set(id, { name: blob.getName(), bytes: blob.getBytes(), mime: blob.getContentType(), trashed: false });
-    return fileHandle(id);
-  }
-
   const src = ['auth.gs', 'sheets.gs', 'roster.gs', 'devices.gs', 'clerk.gs', 'photos.gs', 'Code.gs']
     .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
     .join('\n;\n');
   return new Function(
     ...Object.keys(sandbox),
     `${src}; return { handlePutPhoto, handleListPhotos, handleGetPhoto, handleDeletePhoto,
-       photoFolder, REQUIRED_TABS };`,
+       photoFolderId, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
 }
 
@@ -157,10 +178,11 @@ describe('a photo is not public', () => {
     expect(api.handleGetPhoto({ photoId: 'PH-1' }).ok).toBe(false);
   });
 
-  it('never makes the Drive folder shareable', () => {
+  it('never makes the Drive folder shareable, and never asks for the whole Drive', () => {
+    // `DriveApp` is absent from this sandbox entirely: reaching for it — which would demand
+    // the full `drive` scope on a publicly-callable script — throws rather than passing.
     const api = load(freshTabs());
-    api.photoFolder();
-    // A fake with no `setSharing` at all: if the gateway ever reaches for it, this throws.
+    api.photoFolderId();
     expect(folders).toEqual(['BRT Inventaris — Foto']);
   });
 });

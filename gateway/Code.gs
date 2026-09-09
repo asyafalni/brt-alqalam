@@ -94,7 +94,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.18.0-photos';
+var GATEWAY_VERSION = '0.18.1-photos-drivefile';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
