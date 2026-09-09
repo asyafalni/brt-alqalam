@@ -15,7 +15,29 @@
 // holds the tablet holds the secret. That is the model the design already assumed, and it is
 // why a lost tablet is revoked by deleting one row rather than by changing anything here.
 
+/**
+ * The gateway this build points at, baked in at build time.
+ *
+ * WHY IT IS BAKED IN. It is the same address for every device in the masjid, it is not a
+ * credential, and §99 already accepted that anybody who can reach the app can read the PII-free
+ * tier. Making each phone paste a 120-character Apps Script URL bought nothing and cost the one
+ * thing §0.0 says to protect — it is the difference between "open the app" and "open the app,
+ * find the message with the link in it, and copy it correctly".
+ *
+ * It is NOT in the repository. That is a separate question from whether it is secret: the repo
+ * is public, and putting the address there hands it to crawlers rather than to people who have
+ * the app. It lives in a gitignored `app/.env`, which the Dockerfile copies, so it reaches the
+ * deployed bundle and nothing else.
+ *
+ * Empty is a valid state — a fresh clone with no `.env` still works, it just asks each device
+ * for the address as before.
+ */
+const BUILT_IN_URL = (import.meta.env?.VITE_GATEWAY_URL ?? '').trim();
+
 const KEY = 'brt.gateway.connection';
+
+/** Written by a deliberate disconnect, so the built-in address is not silently re-applied. */
+const OFF_KEY = 'brt.gateway.off';
 
 /**
  * A separate note that this device HAS been connected, once.
@@ -79,7 +101,14 @@ export interface Connection {
 export function loadConnection(): Connection | null {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
+    if (!raw) {
+      /* A device nobody has set up: use the address this build was made with, so a fresh
+         browser shows the register immediately rather than a form. An explicit disconnect is
+         remembered separately — otherwise admin_utama's "Putuskan" would undo itself on the
+         next load. */
+      if (!BUILT_IN_URL || localStorage.getItem(OFF_KEY) === '1') return null;
+      return { url: BUILT_IN_URL, connectedTs: 0 };
+    }
     const c = JSON.parse(raw) as Partial<Connection>;
     if (!c.url) return null;
     return {
@@ -102,6 +131,7 @@ export function saveConnection(url: string, deviceSecret?: string): Connection {
   try {
     localStorage.setItem(KEY, JSON.stringify(c));
     localStorage.setItem(SEEN_KEY, '1');
+    localStorage.removeItem(OFF_KEY);
   } catch { /* private window */ }
   /* Asked at the moment there is finally something worth keeping. Not awaited: a device secret
      that is stored but not yet marked durable is strictly better than a blocked save. */
@@ -131,7 +161,11 @@ export function connectionLost(current: Connection | null): boolean {
 
 export function clearConnection(): void {
   // Chosen, not lost — so the device stops claiming a connection went missing.
-  try { localStorage.removeItem(SEEN_KEY); } catch { /* private window */ }
+  try {
+    localStorage.removeItem(SEEN_KEY);
+    // And chosen means it must stick: without this the built-in address returns on reload.
+    localStorage.setItem(OFF_KEY, '1');
+  } catch { /* private window */ }
   try { localStorage.removeItem(KEY); } catch { /* private window */ }
 }
 
