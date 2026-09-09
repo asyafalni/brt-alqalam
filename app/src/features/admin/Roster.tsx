@@ -17,6 +17,7 @@ import {
 } from '../../../../data/gateway';
 import type { MemberType, RosterRole, RosterUser } from '../../../../data/gateway';
 import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
+import { normalisePhone } from '../../state/member';
 
 /** Which group somebody belongs to. A different axis from the role, which is what they may do. */
 const TYPE_LABEL: Record<MemberType, string> = {
@@ -78,6 +79,11 @@ export function Roster(
   const [role, setRole] = useState<RosterRole>('anggota');
   const [type, setType] = useState<MemberType>('marbot');
   const [phone, setPhone] = useState('');
+  /* Required by default, because forgetting it fails SILENTLY and late: the person gets a PIN,
+     types their number at a shelf, and is refused with the same message as a wrong PIN. The
+     escape exists for somebody who genuinely has no phone and will only ever use the shared
+     gudang tablet — rare, deliberate, one tap. */
+  const [tabletOnly, setTabletOnly] = useState(false);
   const [pin, setPin] = useState('');
   /** Shown once after a successful save, because there is no second chance to read it. */
   const [issued, setIssued] = useState<{ name: string; pin: string } | null>(null);
@@ -106,6 +112,7 @@ export function Roster(
     setRole(user === 'new' ? 'anggota' : user.role);
     setType(user === 'new' ? 'marbot' : user.type);
     setPhone(user === 'new' ? '' : user.phone);
+    setTabletOnly(user !== 'new' && !user.phone);
     setPin('');
     /* Filled in before the admin can type a taken one. Uniqueness by construction rather than
        by refusal — the old flow let them choose, then said no. Still overwritable. */
@@ -210,23 +217,43 @@ export function Roster(
           </div>
 
           <div>
-            <label class={LABEL} for="roster-phone">Nomor HP</label>
+            <label class={LABEL} for="roster-phone">
+              Nomor HP {!tabletOnly && <span class="text-red-600">*</span>}
+            </label>
             <input
               id="roster-phone"
               class={FIELD}
               type="tel"
               inputmode="tel"
               placeholder="0812…"
-              value={phone}
+              disabled={tabletOnly}
+              value={tabletOnly ? '' : phone}
               onInput={(e: Event) => setPhone((e.target as HTMLInputElement).value)}
             />
-            {/* Why it is asked for, said here rather than assumed: it is how somebody signs in on
-                their OWN phone instead of being handed an enrolled device. Optional, because a
-                person who only ever uses the shared gudang tablet needs no number at all. */}
-            <p class="mt-1 text-xs leading-relaxed text-slate-500">
-              Supaya orangnya bisa mencatat dari HP sendiri — cukup nomor ini sekali, lalu PIN.
-              Kosongkan kalau ia hanya memakai tablet gudang.
-            </p>
+            {tabletOnly ? (
+              <p class="mt-1 text-xs leading-relaxed text-slate-500">
+                Orang ini hanya bisa mencatat dari tablet gudang yang sudah terdaftar.{' '}
+                <button
+                  type="button"
+                  class="font-semibold text-slate-700 underline underline-offset-2"
+                  onClick={() => setTabletOnly(false)}
+                >
+                  Isi nomor HP
+                </button>
+              </p>
+            ) : (
+              <p class="mt-1 text-xs leading-relaxed text-slate-500">
+                Ini yang dipakai orangnya untuk mencatat dari HP sendiri — nomor sekali, lalu
+                PIN.{' '}
+                <button
+                  type="button"
+                  class="font-semibold text-slate-700 underline underline-offset-2"
+                  onClick={() => { setTabletOnly(true); setPhone(''); }}
+                >
+                  Tidak punya HP?
+                </button>
+              </p>
+            )}
           </div>
 
           <div>
@@ -259,7 +286,12 @@ export function Roster(
           {error && <p class={ERROR_TEXT} role="alert">{error}</p>}
 
           <div class="flex items-center gap-2">
-            <Button type="submit" size="panel" disabled={busy || !name.trim() || pin.length < 4}>
+            <Button
+              type="submit"
+              size="panel"
+              disabled={busy || !name.trim() || pin.length < 4
+                || (!tabletOnly && normalisePhone(phone).length < 8)}
+            >
               {busy ? 'Menyimpan…' : editing === 'new' ? 'Buat' : 'Ganti PIN'}
             </Button>
             <button
