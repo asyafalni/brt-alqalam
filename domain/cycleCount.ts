@@ -58,6 +58,43 @@ export function racksToCount(
     });
 }
 
+/**
+ * How much of the gudang has been walked at all — the stock-take's finish line.
+ *
+ * §59's stage 1 is a PROJECT: walk the room once and come out with a register. A project needs
+ * an end, and Opname had none — it measured itself in items recorded, a number that only ever
+ * goes up, so the job read as one that never finishes. What actually finishes is the racks:
+ * there is a fixed number of them, and every one either has been visited or has not.
+ *
+ * Deliberately NOT the same question as `racksToCount`. That one asks "what has drifted" and
+ * mixes never-walked racks in with ones due for their monthly re-count. Here they are opposite
+ * facts: a rack nobody has ever opened means the register does not know what is in it, and no
+ * amount of re-counting the other fourteen changes that.
+ */
+export interface Coverage {
+  /** Active racks — the denominator. */
+  total: number;
+  /** Racks walked at least once. */
+  walked: number;
+  /** The ones still unknown, in the order the board shows them. */
+  pending: Location[];
+  /** True only when there is something to have finished. An empty gudang is not "done". */
+  done: boolean;
+}
+
+export function coverage(locations: readonly Location[]): Coverage {
+  const active = locations.filter((l) => l.active);
+  const pending = active
+    .filter((l) => l.lastCountedTs == null)
+    .sort((a, b) => a.zone.localeCompare(b.zone) || a.order - b.order);
+  return {
+    total: active.length,
+    walked: active.length - pending.length,
+    pending,
+    done: active.length > 0 && pending.length === 0,
+  };
+}
+
 export interface CountLine {
   item: Item;
   /** What the system believes is there. */

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  countState, differences, DAY_MS, DEFAULT_INTERVAL_DAYS, racksToCount, summariseCount,
+  countState, coverage, differences, DAY_MS, DEFAULT_INTERVAL_DAYS, racksToCount, summariseCount,
 } from './cycleCount';
 import type { CountLine } from './cycleCount';
 import type { Item, Location } from './types';
@@ -117,5 +117,44 @@ describe('summariseCount', () => {
   it('an untouched sheet reports nothing done', () => {
     expect(summariseCount([{ item: item(), expected: 5, counted: null }]))
       .toMatchObject({ counted: 0, matched: 0, differing: 0, netDelta: 0 });
+  });
+});
+
+describe('the stock-take finish line', () => {
+  const rack = (code: string, over: Partial<Location> = {}): Location => ({
+    locationId: `LOC-${code}`, code, name: '', zone: 'Gudang', order: 1, active: true, ...over,
+  });
+
+  it('counts racks, not items — the only thing here that is finite', () => {
+    // Opname measured itself in items recorded, which only ever goes up, so the job read as
+    // one that never finishes. There is a fixed number of racks and each is walked or not.
+    const c = coverage([rack('A1', { lastCountedTs: 1 }), rack('A2'), rack('A3')]);
+    expect(c.total).toBe(3);
+    expect(c.walked).toBe(1);
+    expect(c.pending.map((l) => l.code)).toEqual(['A2', 'A3']);
+  });
+
+  it('is done only when every rack has been walked', () => {
+    expect(coverage([rack('A1', { lastCountedTs: 1 })]).done).toBe(true);
+    expect(coverage([rack('A1', { lastCountedTs: 1 }), rack('A2')]).done).toBe(false);
+  });
+
+  it('is NOT done when there are no racks at all', () => {
+    // An empty gudang has not finished a walk; it has not started one. Reporting 100% would
+    // announce the register is complete before a single shelf exists.
+    expect(coverage([]).done).toBe(false);
+  });
+
+  it('ignores archived racks, which nobody is going to walk to', () => {
+    expect(coverage([rack('A1', { lastCountedTs: 1 }), rack('OLD', { active: false })]).total)
+      .toBe(1);
+  });
+
+  it('separates NEVER walked from due for a re-count', () => {
+    // `racksToCount` mixes them; here they are opposite facts. A rack nobody has ever opened
+    // means the register does not know what is in it, and re-counting the others cannot help.
+    const never = rack('A2');
+    const stale = rack('A1', { lastCountedTs: Date.now() - 400 * DAY_MS });
+    expect(coverage([stale, never]).pending.map((l) => l.code)).toEqual(['A2']);
   });
 });

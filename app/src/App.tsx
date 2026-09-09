@@ -566,6 +566,7 @@ export function App() {
               /* Dropped from the address as soon as it is used, so a reload or a Back does not
                  reopen the panel over whatever the person moved on to. */
               onEditOpened={() => { if (route.edit) navigate({ name: 'opname' }); }}
+              onOpenRack={(id) => navigate({ name: 'racks', id })}
             />
           )}
           {route.name === 'board' && (
