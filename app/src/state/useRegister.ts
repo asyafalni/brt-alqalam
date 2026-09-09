@@ -76,10 +76,32 @@ export function useRegister(
     return () => { alive = false; };
   }, [connection?.url, tick, !!getAdminToken]);
 
+  /*
+   * Polling stops while the tab is hidden, and re-reads the moment it is shown.
+   *
+   * Two reasons, and the second matters more. Apps Script quotas are finite (§17) and a
+   * forgotten tab was spending one read a minute, all night, for nobody. And a person coming
+   * back to the tablet used to see whatever was on it when they walked away, for up to a minute,
+   * with nothing saying so — on a register that another device may have moved in the meantime.
+   */
   useEffect(() => {
     if (!connection) return;
-    const id = setInterval(() => setTick((n) => n + 1), POLL_MS);
-    return () => clearInterval(id);
+
+    let id: ReturnType<typeof setInterval> | null = null;
+    const stop = () => { if (id !== null) { clearInterval(id); id = null; } };
+    const start = () => {
+      if (id === null) id = setInterval(() => setTick((n) => n + 1), POLL_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) { stop(); return; }
+      setTick((n) => n + 1);
+      start();
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
   }, [connection?.url]);
 
   return { state, loading, error, fetchedTs, refresh: () => setTick((n) => n + 1) };

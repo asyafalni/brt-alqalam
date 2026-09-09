@@ -11,7 +11,7 @@
 // that decides whether a write succeeds — so it is the answer this screen shows, even though a
 // round trip is slower than reading a field we already have.
 
-import { useEffect, useRef, useState } from 'octane';
+import { lazy, Suspense, useEffect, useRef, useState } from 'octane';
 import { ChevronRight, CircleCheck, LogOut, ShieldCheck, TriangleAlert, Users } from '@octanejs/lucide';
 import { whoami } from '../../../../data/gateway';
 import type { Whoami } from '../../../../data/gateway';
@@ -23,8 +23,10 @@ import type { Connection } from '../../state/connection';
 import { adminSession, forgetSignedIn, rememberSignedIn } from './restore';
 import { Button, Card, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 import { Logo } from '../../components/Logo';
-import { MasjidArt } from '../../components/MasjidArt';
-import { Lanterns } from '../../components/Lanterns';
+/* Fetched when the sign-in page is opened, and never otherwise. The fallback is the panel's own
+   ground, so there is nothing to see between the two — the card floats over a dark field either
+   way, and the drawing simply arrives underneath it. */
+const HallPanel = lazy(() => import('./HallPanel').then((m) => ({ default: m.HallPanel })));
 
 
 /** What an admin session gives the rest of the app: who, and a way to mint a fresh token. */
@@ -36,68 +38,6 @@ export interface AdminSession {
 }
 
 type Phase = 'loading' | 'signed-out' | 'checking' | 'ready' | 'error';
-
-/**
- * The full-bleed half of the sign-in screen.
- *
- * A photograph of the prayer hall if one has been put on the server, and the drawing underneath
- * it either way — so the page is composed before the photograph arrives and never shows a broken
- * image if it never does. The drawing is not a placeholder to be replaced; it is the floor the
- * photograph lies on.
- */
-function HallPanel() {
-  const [photo, setPhoto] = useState(true);
-  return (
-    <div class="relative h-full w-full overflow-hidden bg-[#14100b]">
-      {/* The drawing stays UNDERNEATH the photograph rather than being replaced by it. It costs
-          a few kilobytes, it paints instantly, and it means this panel is never a broken image
-          or an empty black rectangle while a photo is still arriving on gudang wifi. */}
-      <MasjidArt class="absolute inset-0 h-full w-full" />
-
-      {photo && (
-        <img
-          src="/masjid.webp"
-          alt=""
-          /* GRADED, not merely darkened. The photograph is bright daylight — cream walls, a
-             green carpet — and the rest of this screen is brass on ink. Dropped in untouched it
-             put two unrelated palettes side by side. The filter pulls it toward the warm end
-             and down in brightness so the ink gradient has something to sit on rather than
-             something to fight. */
-          class="absolute inset-0 h-full w-full object-cover
-                 [filter:saturate(0.7)_contrast(1.1)_brightness(0.6)_sepia(0.28)]"
-          onError={() => setPhoto(false)}
-        />
-      )}
-
-      {/* Warm ink from the bottom, NOT slate: a cool grey scrim over a warm photograph reads as
-          a dirty window. Same hue family as the brass. */}
-      <div class="absolute inset-0 bg-gradient-to-t from-[#0b0805] via-[#0b0805]/55 to-[#0b0805]/25" />
-      {/* A vignette, so the eye goes to the mihrab rather than to the corners. */}
-      <div class="absolute inset-0 [background:radial-gradient(ellipse_at_50%_42%,transparent_30%,rgba(11,8,5,0.62)_100%)]" />
-
-      {/* Lamps instead of the arch that used to be stroked across the whole frame. At full
-          width that line read as a ghost doorway standing in the hall — an ornament has to be
-          quiet enough to be taken for part of the room, and that one was not. */}
-      <Lanterns />
-
-      <div class="absolute inset-x-0 bottom-0 hidden p-8 lg:block lg:p-12">
-        <div class="flex items-center gap-3">
-          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white">
-            <Logo size={38} />
-          </div>
-          <div>
-            <p class="text-lg font-bold leading-tight text-white">BRT Masjid Al-Qalam</p>
-            <p class="text-sm text-[#d8c9a8]">Sistem Inventaris</p>
-          </div>
-        </div>
-        <p class="mt-5 max-w-sm text-sm leading-relaxed text-[#c7b795]">
-          Supaya kita bisa fokus beribadah di masjid — barangnya tercatat, dan tidak ada yang
-          perlu mencari-cari lagi.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function AdminPanel(
   { connection, admin, onAdmin, onHome }:
@@ -429,7 +369,9 @@ export function AdminPanel(
           white text on a 200px strip and the tagline immediately overflowed it onto a grey gap —
           a full bleed with the card floating over it has neither problem and looks better. */}
       <div class="absolute inset-0 overflow-hidden lg:relative lg:inset-auto lg:h-auto">
-        <HallPanel />
+        <Suspense fallback={<div class="h-full w-full bg-[#14100b]" />}>
+          <HallPanel />
+        </Suspense>
       </div>
 
       <div class="relative flex min-h-screen items-center justify-center px-5 py-12 sm:px-10 lg:min-h-0 lg:bg-[#faf7f2]">

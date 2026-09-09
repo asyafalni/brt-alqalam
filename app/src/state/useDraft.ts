@@ -4,7 +4,6 @@ import type { PurchaseRequest } from '../../../domain/requests';
 import { SEED_CATEGORIES } from '../data/seedCategories';
 import type { StoredDraft } from './persist';
 import { clearDraft, loadDraft, saveDraft } from './persist';
-import { demoDraft } from '../data/demo';
 import type { CatalogPatch, CatalogWriter } from './useCatalogWriter';
 import type { GatewayState } from '../../../data/gateway';
 
@@ -138,7 +137,18 @@ export function useDraft(): Draft {
         items: [], categories: SEED_CATEGORIES, locations: [], stock: [], txns: [], requests: [],
       });
     },
-    loadDemo: () => setState(demoDraft()),
+    /*
+     * Fetched on demand, and it is the only thing in the app that is.
+     *
+     * The demo rows are ~16kB of a gudang that does not exist — three racks of invented sabun,
+     * so every derived state (dipinjam, rusak, hilang) is reachable before a single real item
+     * is entered. They earn their place for whoever is being shown the app. They do not earn a
+     * place in the file a marbot downloads to write down how much sabun is on a shelf, and a
+     * CONNECTED device can never reach the button at all.
+     */
+    loadDemo: () => {
+      void import('../data/demo').then((m) => setState(m.demoDraft()));
+    },
     loadFrom: (parts) => setState((prev) => ({ ...prev, ...parts })),
   };
 }

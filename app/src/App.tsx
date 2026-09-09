@@ -9,6 +9,8 @@ import { Card, PageHeader } from './components/ui';
 import { Sheet } from './components/Sheet';
 import { StockAlerts } from './features/alerts/StockAlerts';
 import { openRequests } from '../../domain/requests';
+import { mergeTxns, unsettled } from './state/txns';
+import { useNow } from './state/useNow';
 import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
@@ -204,10 +206,26 @@ export function App() {
      which is precisely the danger — see `ConnectionLost`. */
   const lostConnection = connectionLost(connection);
 
+  /*
+   * One log, folded once. Spread inline this was a new array on every render, so
+   * `useInventory`'s memo never hit and `deriveState` re-ran on every keystroke — and it
+   * carried each appended row TWICE once the poll brought it back (see `state/txns.ts`).
+   */
+  const txns = useMemo(
+    () => mergeTxns(register.state?.txns ?? [], freshTxns),
+    [register.state?.txns, freshTxns],
+  );
+  /* And forget the local copies the register has caught up with, or the list grows for as long
+     as the tablet stays open. `unsettled` returns the same array when nothing settled, so this
+     cannot loop. */
+  useEffect(() => {
+    setFreshTxns((prev) => unsettled(register.state?.txns ?? [], prev));
+  }, [register.state?.txns]);
+
   const draft = register.state
     ? gatewayDraft(
       register.state,
-      [...register.state.txns, ...freshTxns],
+      txns,
       canRecord(connection),
       admin ? writer : undefined,
       admin && connection
@@ -250,9 +268,7 @@ export function App() {
      hoisting it means one implementation instead of three that drift. */
   const [moving, setMoving] = useState<MovementTarget | null>(null);
 
-  // Pinned per mount: `deriveState` is a pure function of `now`, so a moving clock would
-  // recompute the whole fold on every keystroke.
-  const now = useMemo(() => Date.now(), []);
+  const now = useNow();
   const inventory = useInventory(draft, now);
 
   // Broken and lost both need a person to do something; borrowed does not.
