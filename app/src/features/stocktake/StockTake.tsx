@@ -17,8 +17,7 @@ import { FilterField } from '../../components/FilterField';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import {
-  createCategory, createEntry, createLocation, filterItems, instancesFor, isBlocking,
-  markCounted, summarise,
+  createCategory, createEntry, createLocation, filterItems, instancesFor, isBlocking, summarise,
   toCategoriesCsv, toInput, toInstancesCsv, toItemsCsv, toLocationsCsv, toRequestsCsv, toStockCsv,
   updateEntry,
   validate,
@@ -450,14 +449,7 @@ export function StockTake(
       {/* ABOVE the three counters, because it is the one number on this page that can be
           finished. Those three only ever go up — they say how much has been done, never how
           much is left, which is what turned a one-off walk into a chore with no end. */}
-      <Coverage
-        coverage={walk}
-        stock={stock}
-        /* Absent when this device may not write the catalog: a button that silently does
-           nothing is worse than one that is not there. Same stamp Cek rak writes. */
-        onWalked={draft.readOnly ? undefined : (id) => setLocations((prev) => markCounted(prev, id, Date.now()))}
-        onOpenRack={onOpenRack}
-      />
+      <Coverage coverage={walk} onOpenRack={onOpenRack} />
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat value={totals.count} label="Barang dicatat" />

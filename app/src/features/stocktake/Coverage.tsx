@@ -10,18 +10,15 @@
 // or has not, and the number left goes DOWN. That is the same walk, counted in the unit that has
 // a last one.
 
-import { CircleCheck, MapPin } from '@octanejs/lucide';
-import type { Location, StockLine } from '../../../../domain/types';
+import { CircleCheck } from '@octanejs/lucide';
 import type { Coverage as CoverageState } from '../../../../domain/cycleCount';
 import { CARD } from '../../components/ui';
 
 export function Coverage(
-  { coverage, stock, onWalked, onOpenRack }:
+  { coverage, onOpenRack }:
   {
     coverage: CoverageState;
-    stock: readonly StockLine[];
-    /** Marks a rack walked. The same stamp Cek rak writes — one fact, one field. */
-    onWalked?: (locationId: string) => void;
+    /** Opens a rack on Peta Rak, where the counting — and the marking — actually happens. */
     onOpenRack: (locationId: string) => void;
   },
 ) {
@@ -51,8 +48,6 @@ export function Coverage(
   }
 
   const pct = Math.round((coverage.walked / coverage.total) * 100);
-  const counted = (locationId: string) =>
-    stock.filter((l) => l.locationId === locationId).length;
 
   return (
     <div class={CARD}>
@@ -77,47 +72,34 @@ export function Coverage(
         />
       </div>
 
+      {/*
+        * A COUNT and a way there — never a second list of racks with buttons on it.
+        *
+        * This panel first shipped with every un-walked rack listed and a "Selesai didata"
+        * button per row, which was the same act Peta Rak already offers as "Cek rak → Semua
+        * sesuai", writing the same `lastCountedTs`. Two places to press one button is §82's
+        * own complaint: it invites the question of which is current, and somebody eventually
+        * uses the one that does less — this one, which stamped a rack without ever showing
+        * what was on it. Counting belongs where the counting screen is.
+        */}
       <p class="mt-3 text-sm leading-relaxed text-slate-600">
-        Datangi tiap rak sekali, catat apa yang ada di situ, lalu tandai selesai. Kalau raknya
-        memang kosong, tandai selesai saja — kosong itu jawaban, bukan pekerjaan yang tertinggal.
+        Datangi tiap rak sekali, catat apa yang ada di situ, lalu tandai lewat{' '}
+        <button
+          type="button"
+          class="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
+          onClick={() => onOpenRack(coverage.pending[0]?.locationId ?? '')}
+        >
+          Cek rak
+        </button>{' '}
+        di Peta Rak. Sisa {coverage.pending.length} rak:{' '}
+        <span class="font-semibold text-slate-900">
+          {coverage.pending.slice(0, NAMED).map((l) => l.code).join(', ')}
+          {coverage.pending.length > NAMED && `, dan ${coverage.pending.length - NAMED} lagi`}
+        </span>.
       </p>
-
-      <ul class="mt-3 space-y-1.5">
-        {coverage.pending.map((l) => {
-          const n = counted(l.locationId);
-          return (
-            <li
-              key={l.locationId}
-              class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 p-2.5"
-            >
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                onClick={() => onOpenRack(l.locationId)}
-              >
-                <MapPin class="h-4 w-4 shrink-0 text-slate-500" />
-                <span class="min-w-0">
-                  <span class="block truncate font-semibold text-slate-900">{l.code}</span>
-                  <span class="block truncate text-xs text-slate-600">
-                    {/* What is already recorded here, so somebody can tell a rack they have
-                        walked from one they have not even opened. */}
-                    {n === 0 ? 'belum ada barang tercatat' : `${n} barang tercatat`}
-                  </span>
-                </span>
-              </button>
-              {onWalked && (
-                <button
-                  type="button"
-                  class="min-h-[44px] shrink-0 rounded-lg border border-slate-500 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900"
-                  onClick={() => onWalked(l.locationId)}
-                >
-                  Selesai didata
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }
+
+/** Enough to know where to walk next, never enough to become a list of its own. */
+const NAMED = 8;

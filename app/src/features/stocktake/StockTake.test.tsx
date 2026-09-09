@@ -545,13 +545,18 @@ describe('the walk has an end', () => {
     expect(r.getByLabelText('33 persen rak sudah didata')).toBeTruthy();
   });
 
-  it('marks a rack walked, and the number left drops', () => {
+  it('names where to walk next, but does not become a second list of racks', () => {
+    /* It first shipped listing every un-walked rack with a "Selesai didata" button per row —
+       the same act Peta Rak already offers as "Cek rak → Semua sesuai", writing the same
+       `lastCountedTs`. Two places to press one button is §82's own complaint, and somebody
+       eventually uses the one that does less: this one stamped a rack without ever showing
+       what was on it. */
     rackDraft([{ code: 'A1' }, { code: 'A2' }]);
     const r = render(Harness);
-    expect(r.getByLabelText('0 persen rak sudah didata')).toBeTruthy();
 
-    fireEvent.click(r.getAllByText('Selesai didata')[0]);
-    expect(r.getByLabelText('50 persen rak sudah didata')).toBeTruthy();
+    expect(r.getByText(/Sisa 2 rak/)).toBeTruthy();
+    expect(r.getByText(/A1, A2/)).toBeTruthy();
+    expect(r.queryByText('Selesai didata')).toBeNull();
   });
 
   it('says the job is finished, and what keeps the register true from here', () => {
