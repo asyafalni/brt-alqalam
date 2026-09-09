@@ -49,6 +49,17 @@ function seed(items: Item[], txns: Txn[] = [], locations = [RAK]) {
 }
 const at = (hash: string) => { location.hash = hash; };
 
+/** A gudang of racks and nothing else — the shape the first walk starts from. */
+function seedRacks(racks: { code: string; walked?: boolean }[]) {
+  /* With an item, because Beranda replaces itself with "Belum ada barang" on an empty catalog
+     — and a gudang with racks but nothing on them is not the state this is about. */
+  const items = catalog(input({ name: 'Sabun' }));
+  seed(items, [], racks.map((r, i) => ({
+    locationId: `LOC-${r.code}`, code: r.code, name: '', zone: 'Gudang',
+    order: i + 1, active: true, ...(r.walked ? { lastCountedTs: Date.now() } : {}),
+  })));
+}
+
 beforeEach(() => { localStorage.clear(); at('#/'); });
 afterEach(() => { cleanup(); at('#/'); });
 
@@ -176,5 +187,31 @@ describe('the two errands, side by side', () => {
     const r = render(App);
     fireEvent.click(r.getByLabelText(`Buka Rak ${UNCOUNTED.code}`));
     expect(r.getByRole('dialog', { name: `Rak ${UNCOUNTED.code}` })).toBeTruthy();
+  });
+});
+
+describe('the stock-take has a finish line', () => {
+  /*
+   * Opname counted itself in "Barang dicatat", "Kategori", "Unit dihitung" — numbers that only
+   * ever go up, past no target — so the one job in this app that genuinely ends looked endless.
+   * The missing fact is how much of the gudang has EVER been walked, which is a different
+   * question from what is due for a recount.
+   *
+   * It lives on the heading of the list it describes, not in a card of its own. It first
+   * shipped as a panel on Opname and was, correctly, two cards saying one thing (§82).
+   */
+  it('says how far along the first walk is, out of how many', () => {
+    seedRacks([{ code: 'A1', walked: true }, { code: 'A2' }, { code: 'A3' }]);
+    const r = render(App);
+    expect(r.getByLabelText('33 persen rak sudah pernah didata')).toBeTruthy();
+    expect(r.getByText(/dari 3 rak/)).toBeTruthy();
+  });
+
+  it('stops showing it once every rack has been walked', () => {
+    // A permanent "1 dari 1" is a number nobody needs twice; from then on the only question
+    // this list answers is the rotation.
+    seedRacks([{ code: 'A1', walked: true }]);
+    const r = render(App);
+    expect(r.queryByText(/Sudah pernah didata/)).toBeNull();
   });
 });

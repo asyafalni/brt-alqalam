@@ -10,7 +10,7 @@ import {
   CircleCheck, ClipboardCheck, MapPin, Package, ShoppingCart, TriangleAlert, Wrench,
 } from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
-import { racksToCount } from '../../../../domain/cycleCount';
+import { coverage, racksToCount } from '../../../../domain/cycleCount';
 import { overdueLoans } from '../../../../domain/loans';
 import type { Route } from '../../state/route';
 import type { Draft } from '../../state/useDraft';
@@ -69,6 +69,11 @@ export function Dashboard(
   );
   const needWalk = racksNeedingAttention(racks);
   const due = useMemo(() => racksToCount(locations, now), [locations, now]);
+  /* How much of the gudang has EVER been walked — a different question from what is due for a
+     recount, and the only one with a finish. Opname counted itself in items recorded, which
+     only go up, so the one job in this app that genuinely ends looked endless. It lives on the
+     heading of the list it describes rather than in a card of its own (§82). */
+  const walk = useMemo(() => coverage(locations), [locations]);
   const dueCount = due.length;
   // A request nobody looks at is a request nobody answers, so it joins the row of things
   // waiting on a person.
@@ -295,6 +300,39 @@ export function Dashboard(
               <p class="mb-3 text-sm text-slate-500">
                 Hitung ulang satu rak saja — dua menit, dan catatan tetap benar.
               </p>
+
+              {/*
+                * THE FIRST WALK'S PROGRESS, and only while there is one.
+                *
+                * Opname counted itself in items recorded — a number that only goes up, past no
+                * target — so the one job in this app that genuinely ends looked endless. What
+                * is finite is the racks. It belongs HERE, on the list it describes, rather than
+                * in a card of its own on Opname: that shipped first, and was two cards saying
+                * one thing (§82).
+                *
+                * It disappears at 100%. A permanent "14 dari 14" is a number nobody needs
+                * twice, and from then on the only question this list answers is the rotation.
+                */}
+              {!walk.done && (
+                <div class="mb-3">
+                  <div class="mb-1.5 flex items-baseline justify-between gap-3">
+                    <span class="text-xs font-semibold text-slate-600">Sudah pernah didata</span>
+                    <span class="text-xs tabular-nums text-slate-600">
+                      <span class="font-bold text-slate-900">{walk.walked}</span> dari {walk.total} rak
+                    </span>
+                  </div>
+                  <div
+                    class="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+                    role="img"
+                    aria-label={`${Math.round((walk.walked / walk.total) * 100)} persen rak sudah pernah didata`}
+                  >
+                    <div
+                      class="h-full rounded-full bg-slate-900 transition-[width] duration-500"
+                      style={`width:${Math.round((walk.walked / walk.total) * 100)}%;print-color-adjust:exact`}
+                    />
+                  </div>
+                </div>
+              )}
 
               <LazyList sentinel={dueScroll.sentinel} done={dueScroll.done}>
               <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">

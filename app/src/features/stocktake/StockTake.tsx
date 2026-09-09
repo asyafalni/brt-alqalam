@@ -23,11 +23,9 @@ import {
   validate,
 } from './draft';
 import { removeItem as removeStockFor, removeLine, totalFor } from '../../../../domain/stock';
-import { coverage } from '../../../../domain/cycleCount';
 import type { DraftInput } from './draft';
 import { ImportPanel } from './ImportPanel';
 import { ItemForm } from './ItemForm';
-import { Coverage } from './Coverage';
 import { artFor, ItemArt } from '../items/ItemArt';
 
 const emptyInput = (categories: Category[]): DraftInput => ({
@@ -36,14 +34,12 @@ const emptyInput = (categories: Category[]): DraftInput => ({
 });
 
 export function StockTake(
-  { draft, canManage = true, edit, onEditOpened, onOpenRack }:
+  { draft, canManage = true, edit, onEditOpened }:
   {
     draft: Draft;
     /** An item to open the panel on, arriving from a barang's page. Consumed once. */
     edit?: string;
     onEditOpened?: () => void;
-    /** Opens a rack on Peta Rak, so the walk's remaining shelves are one tap from here. */
-    onOpenRack: (locationId: string) => void;
     /**
      * Whether this person may EXPORT the whole catalog or EMPTY it.
      *
@@ -233,9 +229,6 @@ export function StockTake(
     }
     onEditOpened?.();
   }
-
-  /* The finish line. Racks, because they are the only finite thing here — see `Coverage`. */
-  const walk = useMemo(() => coverage(locations), [locations]);
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
   const rackCode = (id?: string) =>
@@ -445,11 +438,6 @@ export function StockTake(
           )
         }
       />
-
-      {/* ABOVE the three counters, because it is the one number on this page that can be
-          finished. Those three only ever go up — they say how much has been done, never how
-          much is left, which is what turned a one-off walk into a chore with no end. */}
-      <Coverage coverage={walk} onOpenRack={onOpenRack} />
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat value={totals.count} label="Barang dicatat" />

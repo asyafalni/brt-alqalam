@@ -10,7 +10,7 @@ import { SEED_CATEGORIES } from '../../data/seedCategories';
 // The draft is owned above the screen (App), so tests supply it the same way. The filter is
 // NOT: it lives on this screen and is driven through its own field, like a person would.
 function Harness() {
-  return <StockTake draft={useDraft()} onOpenRack={() => {}} />;
+  return <StockTake draft={useDraft()} />;
 }
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.
@@ -514,65 +514,5 @@ describe('the form sizes itself to the panel, not to the window', () => {
     fireEvent.click(r.getByText('Atur'));
     expect(r.getByLabelText('Minimum (alarm stok)')).toBeTruthy();
     expect(r.getByTitle('Tanpa minimum')).toBeTruthy();
-  });
-});
-
-describe('the walk has an end', () => {
-  /*
-   * Opname measured itself in "Barang dicatat", "Kategori", "Unit dihitung" — three numbers
-   * that only ever go up, past no target, toward nothing. So the one job in this app that
-   * genuinely finishes was the one that read as never finishing, which fails §0.0 on its own
-   * terms: a permanent chore is admin burden however good the feature is.
-   *
-   * Racks are what is finite. There is a fixed number, each is walked or not, and the number
-   * left goes DOWN.
-   */
-  const rackDraft = (racks: { code: string; walked?: boolean }[]) => {
-    localStorage.setItem('brt.stocktake.draft.v6', JSON.stringify({
-      items: [], categories: SEED_CATEGORIES, stock: [], txns: [], requests: [],
-      locations: racks.map((r, i) => ({
-        locationId: `LOC-${r.code}`, code: r.code, name: '', zone: 'Gudang',
-        order: i + 1, active: true, ...(r.walked ? { lastCountedTs: 1 } : {}),
-      })),
-    }));
-  };
-
-  it('counts down the racks left, not up the items entered', () => {
-    rackDraft([{ code: 'A1', walked: true }, { code: 'A2' }, { code: 'A3' }]);
-    const r = render(Harness);
-    expect(r.getByText('1')).toBeTruthy();
-    expect(r.getByText(/dari 3 rak/)).toBeTruthy();
-    expect(r.getByLabelText('33 persen rak sudah didata')).toBeTruthy();
-  });
-
-  it('names where to walk next, but does not become a second list of racks', () => {
-    /* It first shipped listing every un-walked rack with a "Selesai didata" button per row —
-       the same act Peta Rak already offers as "Cek rak → Semua sesuai", writing the same
-       `lastCountedTs`. Two places to press one button is §82's own complaint, and somebody
-       eventually uses the one that does less: this one stamped a rack without ever showing
-       what was on it. */
-    rackDraft([{ code: 'A1' }, { code: 'A2' }]);
-    const r = render(Harness);
-
-    expect(r.getByText(/Sisa 2 rak/)).toBeTruthy();
-    expect(r.getByText(/A1, A2/)).toBeTruthy();
-    expect(r.queryByText('Selesai didata')).toBeNull();
-  });
-
-  it('says the job is finished, and what keeps the register true from here', () => {
-    // "Done" invites exactly that question, and the honest answer is that this screen steps
-    // back — not that the work is over.
-    rackDraft([{ code: 'A1', walked: true }]);
-    const r = render(Harness);
-    expect(r.getByText(/Semua 1 rak sudah didata/)).toBeTruthy();
-    expect(r.getByText(/Cek rak/)).toBeTruthy();
-    expect(r.getByText(/Pengajuan/)).toBeTruthy();
-  });
-
-  it('claims nothing at all when there are no racks yet', () => {
-    // 0 of 0 would announce a target that does not exist — the racks come from the walk itself.
-    rackDraft([]);
-    const r = render(Harness);
-    expect(r.queryByText(/rak sudah didata/)).toBeNull();
   });
 });
