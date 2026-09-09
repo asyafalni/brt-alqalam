@@ -8,7 +8,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 const state = (rev = 1): GatewayState => ({
   categories: [], locations: [], items: [], stock: [], instances: [], requests: [], txns: [],
-  serverTs: 0, tier: 'public', rev, quarantined: [],
+  requestedItemIds: [], serverTs: 0, tier: 'public', rev, quarantined: [],
 });
 
 beforeEach(() => localStorage.clear());

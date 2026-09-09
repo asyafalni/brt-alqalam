@@ -73,7 +73,7 @@ describe('opening the app a second time', () => {
    */
   const emptyState = () => ({
     categories: [], locations: [], items: [], stock: [], instances: [], requests: [], txns: [],
-    serverTs: 0, tier: 'public', rev: 1, quarantined: [],
+    requestedItemIds: [], serverTs: 0, tier: 'public', rev: 1, quarantined: [],
   });
 
   it('shows the last register instead of a loading screen', () => {

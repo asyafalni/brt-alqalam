@@ -23,6 +23,7 @@ const state = (over: Partial<GatewayState> = {}): GatewayState => ({
   requests: [],
   txns: [],
   serverTs: 0,
+  requestedItemIds: [],
   tier: 'public',
   rev: 3,
   quarantined: [],

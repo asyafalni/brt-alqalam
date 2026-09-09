@@ -12,7 +12,7 @@ import type { GatewayState } from '../../../../data/gateway';
 
 const state = (): GatewayState => ({
   categories: [], locations: [], items: [], stock: [], instances: [], requests: [], txns: [],
-  serverTs: 0, tier: 'detailed', rev: 1, quarantined: [],
+  serverTs: 0, requestedItemIds: [], tier: 'detailed', rev: 1, quarantined: [],
 });
 
 const writer = (): CatalogWriter => ({

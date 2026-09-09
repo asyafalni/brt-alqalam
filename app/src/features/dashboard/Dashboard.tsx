@@ -84,17 +84,19 @@ export function Dashboard(
    * filed a request for it, and stops being on the list at all once that purchase lands.
    *
    * So the denominator is the list itself and the numerator is how many of those already have
-   * an open pengajuan. The remainder is the actual work left, and the bar cannot ever look
-   * calm while nothing has been done about an empty shelf.
+   * an open pengajuan, and the bar cannot ever look calm while nothing has been done about an
+   * empty shelf.
+   *
+   * `requestedItemIds` and not `requests`, because it is the one fact here that EVERYBODY may
+   * see. The rows name who asked, who decided and why, so they are admin-only (§39) — but
+   * "somebody has already asked for more sabun" names nobody, and a marbot is exactly the
+   * person who needs it: they can file a request, and should not file a second one.
    */
   const shopping = useMemo(() => {
-    const asked = new Set(
-      openRequests(draft.requests).map((r) => r.itemId).filter(Boolean) as string[],
-    );
+    const asked = new Set(draft.requestedItemIds);
     const total = inventory.notifications.length;
-    const done = inventory.notifications.filter((n) => asked.has(n.itemId)).length;
-    return { total, done, left: total - done };
-  }, [draft.requests, inventory.notifications]);
+    return { total, done: inventory.notifications.filter((n) => asked.has(n.itemId)).length };
+  }, [draft.requestedItemIds, inventory.notifications]);
   const dueCount = due.length;
   // A request nobody looks at is a request nobody answers, so it joins the row of things
   // waiting on a person.
@@ -297,29 +299,9 @@ export function Dashboard(
                 Stok yang sudah menyentuh atau melewati batas minimumnya.
               </p>
 
-              {shopping.total > 0 && (canReview ? (
-                <Meter
-                  label="Sudah diajukan"
-                  done={shopping.done}
-                  total={shopping.total}
-                  unit="barang"
-                  note={shopping.left > 0 ? `${shopping.left} belum diajukan` : 'Semuanya sudah diajukan.'}
-                />
-              ) : (
-                /*
-                 * SAID, not silently dropped.
-                 *
-                 * The public tier carries no Requests at all (§39), so on a device that is not
-                 * signed in the numerator would be zero and the bar would report that nobody
-                 * has done anything about the empty shelves — a different claim from not being
-                 * able to see. Hiding it was the right instinct and the wrong execution: an
-                 * absence nobody explains is the same bug in a quieter costume, and it is the
-                 * one this project keeps re-finding.
-                 */
-                <p class="mb-3 text-xs text-slate-500">
-                  Masuk sebagai admin untuk melihat mana yang sudah diajukan.
-                </p>
-              ))}
+              {shopping.total > 0 && (
+                <Meter label="Sudah diajukan" done={shopping.done} total={shopping.total} unit="barang" />
+              )}
 
               <LazyList sentinel={alerts.sentinel} done={alerts.done}>
                 <StockAlerts
@@ -487,8 +469,7 @@ const CHIP_TONE = {
  * beneath it is full of emergencies, which is how the first version of this went wrong.
  */
 function Meter(
-  { label, done, total, unit, note }:
-  { label: string; done: number; total: number; unit: string; note?: string },
+  { label, done, total, unit }: { label: string; done: number; total: number; unit: string },
 ) {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
@@ -509,9 +490,6 @@ function Meter(
           style={`width:${pct}%;print-color-adjust:exact`}
         />
       </div>
-      {/* What is LEFT, spelled out. A fraction says it, but only after being subtracted, and
-          the remainder is the thing somebody is actually going to go and do. */}
-      {note && <p class="mt-1.5 text-xs text-slate-600">{note}</p>}
     </div>
   );
 }

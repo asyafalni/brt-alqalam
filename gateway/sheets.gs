@@ -113,6 +113,29 @@ function existingClientTxnIds(sheet) {
  * Person-naming columns are removed, not blanked in place, so a client cannot accidentally
  * render an empty "PENGAMBIL" column and imply nobody took it.
  */
+/**
+ * WHICH items somebody has already asked to buy — the number without the list.
+ *
+ * `Requests` is withheld from the public tier because every row names people: who asked, who
+ * decided, and why (§39). But "somebody has asked for more sabun" names nobody, and it is what
+ * turns Beranda's shopping bar from an admin-only fact into one a marbot can act on — they can
+ * file a request, so they are exactly the person who needs to know one already exists.
+ *
+ * Only OPEN ones, and only item ids. A request for something not yet in the catalog carries no
+ * itemId and simply does not appear, which is right: the bar counts progress against the low
+ * list, and a thing that is not in the catalog cannot be on it.
+ */
+function openRequestItemIds() {
+  var out = [];
+  var rows = readTab('Requests');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].status) !== 'diajukan') continue;
+    var id = String(rows[i].itemId || '');
+    if (id && out.indexOf(id) === -1) out.push(id);
+  }
+  return out;
+}
+
 function readPublicState() {
   return {
     categories: readTab('Categories'),
@@ -131,6 +154,7 @@ function readPublicState() {
       });
       return copy;
     }),
+    requestedItemIds: openRequestItemIds(),
     rev: catalogRev(),
     serverTs: new Date().toISOString(),
     tier: 'public',
@@ -152,6 +176,7 @@ function readDetailedState() {
     txns: readTab('Transactions'),
     rev: catalogRev(),
     serverTs: new Date().toISOString(),
+    requestedItemIds: openRequestItemIds(),
     tier: 'detailed',
   };
 }
@@ -334,7 +359,18 @@ function appendRow(name, row) {
  * catalog write or request drops the entry outright, so a movement recorded on one tablet is
  * visible to the next reader immediately rather than up to 25s later.
  */
-var STATE_CACHE_KEY = 'state:public';
+/**
+ * KEYED BY VERSION, so a deploy invalidates it by construction.
+ *
+ * It used to be a fixed key, which meant any change to the SHAPE of the public state was
+ * invisible for up to 25 seconds after shipping — the new code ran and served the old payload,
+ * so the first check after a deploy showed the field you had just added was missing. That is a
+ * fine way to spend ten minutes debugging code that is already correct.
+ *
+ * `GATEWAY_VERSION` is bumped on every paste (Code.gs says so), which makes it exactly the
+ * right cache-buster: same version, same shape.
+ */
+function stateCacheKey() { return 'state:public:' + GATEWAY_VERSION; }
 var STATE_CACHE_SECONDS = 25;
 
 /** CacheService refuses items over 100kB. Bigger registers simply go uncached, never truncated. */
@@ -342,17 +378,18 @@ var STATE_CACHE_MAX = 90 * 1024;
 
 function cachedPublicState() {
   var cache = CacheService.getScriptCache();
-  var hit = cache.get(STATE_CACHE_KEY);
+  var key = stateCacheKey();
+  var hit = cache.get(key);
   if (hit) return hit;
 
   var body = JSON.stringify(readPublicState());
-  if (body.length <= STATE_CACHE_MAX) cache.put(STATE_CACHE_KEY, body, STATE_CACHE_SECONDS);
+  if (body.length <= STATE_CACHE_MAX) cache.put(key, body, STATE_CACHE_SECONDS);
   return body;
 }
 
 /** Called by every write. Cheap, and the alternative is showing somebody a stale shelf. */
 function dropStateCache() {
-  CacheService.getScriptCache().remove(STATE_CACHE_KEY);
+  CacheService.getScriptCache().remove(stateCacheKey());
 }
 
 

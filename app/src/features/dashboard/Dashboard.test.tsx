@@ -220,9 +220,9 @@ describe('the stock-take has a finish line', () => {
 });
 
 /** A connected VIEWER: the register is readable, Requests are not sent at all (§39). */
-const viewerDraft = (items: Item[]): Draft => ({
+const viewerDraft = (items: Item[], requestedItemIds: string[] = []): Draft => ({
   items, categories: SEED_CATEGORIES, locations: [RAK], stock: lines, txns: [], requests: [],
-  readOnly: true, canRecord: false,
+  requestedItemIds, readOnly: true, canRecord: false,
   setItems: () => {}, setCategories: () => {}, setLocations: () => {}, setStock: () => {},
   setRequests: () => {}, setTxns: () => {}, setRepair: () => {}, setPurchase: () => {},
   setCatalog: () => {}, reset: () => {}, loadDemo: () => {}, loadFrom: () => {},
@@ -258,26 +258,19 @@ describe('the low-stock card measures the shopping, not the shelf', () => {
     expect(r.getByText(/dari 2 barang/)).toBeTruthy();
   });
 
-  it('spells out what is LEFT, which is the thing somebody goes and does', () => {
-    seedWith(lowTwo(), [asking('ITM-0001')]);
-    expect(render(App).getByText('1 belum diajukan')).toBeTruthy();
-  });
-
   it('never looks calm while nothing has been done about an empty shelf', () => {
-    // The whole failure of the previous version: 84% "aman" above three HABIS rows.
+    // The whole failure of the first version: 84% "aman" above three HABIS rows.
     seedWith(lowTwo(), []);
-    const r = render(App);
-    expect(r.getByLabelText('Sudah diajukan: 0 persen')).toBeTruthy();
-    expect(r.getByText('2 belum diajukan')).toBeTruthy();
+    expect(render(App).getByLabelText('Sudah diajukan: 0 persen')).toBeTruthy();
   });
 
-  it('says nothing at all when this device may not read requests', () => {
-    /* The public tier omits Requests entirely (§39), so the numerator would be zero — and
-       "nobody has done anything about the empty shelves" is a very different claim from "we
-       cannot see". Rendered directly, because only App decides `canReview` and this is a fact
-       about the card. */
-    const items = lowTwo();
-    const draft = viewerDraft(items);
+  it('shows the COUNT to somebody who may not read the requests themselves', () => {
+    /* The rows name who asked, who decided and why, so the public tier withholds them (§39) —
+       but "somebody has already asked for more sabun" names nobody, and a marbot is exactly the
+       person who needs it: they can file a request, and should not file a second one. So the
+       gateway sends the item ids on both tiers and the bar is open to everyone.
+       Rendered directly, because a viewer's draft is what carries the distinction. */
+    const draft = viewerDraft(lowTwo(), ['ITM-0001']);
     const r = render(() => (
       <Dashboard
         draft={draft}
@@ -287,11 +280,6 @@ describe('the low-stock card measures the shopping, not the shelf', () => {
         onNavigate={() => {}}
       />
     ));
-    expect(r.getByText(/Perlu dibeli lagi/)).toBeTruthy();
-    expect(r.queryByText(/belum diajukan/)).toBeNull();
-    /* And it SAYS so. An absence nobody explains is the same bug in a quieter costume — which
-       is how the owner met it: the bar simply vanished once they were connected but not
-       signed in. */
-    expect(r.getByText(/Masuk sebagai admin untuk melihat mana yang sudah diajukan/)).toBeTruthy();
+    expect(r.getByLabelText('Sudah diajukan: 50 persen')).toBeTruthy();
   });
 });

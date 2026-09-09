@@ -12,6 +12,7 @@ import type { Draft } from '../../state/useDraft';
 
 const draft: Draft = {
   items: [], categories: [], locations: [], stock: [], txns: [], requests: [],
+  requestedItemIds: [],
   readOnly: true, canRecord: false,
   setItems: () => {}, setCategories: () => {}, setLocations: () => {}, setStock: () => {},
   setRequests: () => {}, setTxns: () => {}, setRepair: () => {}, setPurchase: () => {},

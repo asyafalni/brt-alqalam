@@ -38,6 +38,15 @@ export interface GatewayState {
   instances: AssetInstance[];
   /** Only ever present on the detailed tier — it names people (§39). */
   requests: PurchaseRequest[];
+  /**
+   * Items somebody has already asked to buy — the number WITHOUT the list.
+   *
+   * On both tiers, deliberately. `requests` is withheld from the public one because every row
+   * names who asked, who decided and why; an item id names nobody, and it is what lets a marbot
+   * see that a request already exists for the soap they were about to ask for again. One field
+   * for both tiers so the count cannot differ depending on who is looking.
+   */
+  requestedItemIds: string[];
   txns: Txn[];
   /** The gateway's own clock. Used in preference to the device's, which may be wrong. */
   serverTs: number;
@@ -225,6 +234,11 @@ export function readState(raw: Record<string, unknown>): GatewayState {
        depend on it, and a tablet with a wrong clock would corrupt both silently (§4.1). */
     serverTs: Date.parse(String(raw.serverTs ?? '')) || Date.now(),
     tier,
+    /* Strings only, and de-duplicated by the gateway. An absent field reads as "nothing has
+       been asked for", which is also what a gateway too old to send it means. */
+    requestedItemIds: Array.isArray(raw.requestedItemIds)
+      ? (raw.requestedItemIds as unknown[]).map(String)
+      : [],
     rev: Number(raw.rev) || 0,
     quarantined,
   };

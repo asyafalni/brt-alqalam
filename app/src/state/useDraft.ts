@@ -26,6 +26,14 @@ export interface Draft {
   txns: Txn[];
   /** Things somebody wants bought or repaired. A purchase is not stock until it is finished. */
   requests: PurchaseRequest[];
+  /**
+   * Items somebody has already asked to buy — the number without the list.
+   *
+   * Separate from `requests` because the two have different audiences: the rows name people and
+   * are admin-only (§39), while "somebody has asked for more sabun" names nobody and is exactly
+   * what a marbot needs, since they can file a request and should not file a second one.
+   */
+  requestedItemIds: string[];
   setItems: (update: (prev: Item[]) => Item[]) => void;
   setCategories: (update: (prev: Category[]) => Category[]) => void;
   setLocations: (update: (prev: Location[]) => Location[]) => void;
@@ -106,6 +114,10 @@ export function useDraft(): Draft {
     stock: state.stock,
     txns: state.txns,
     requests: state.requests,
+    // Derived here, because with no gateway this device holds the requests themselves.
+    requestedItemIds: [...new Set(
+      state.requests.filter((r) => r.status === 'diajukan' && r.itemId).map((r) => r.itemId!),
+    )],
     /*
      * Not connected: this device holds the whole draft, so it may do everything to it — the
      * stock-take (§59 stage 1) has to work on a phone with no gateway at all.
@@ -197,6 +209,9 @@ export function gatewayDraft(
        who records a withdrawal must see the number move now, not in a minute. */
     txns,
     requests,
+    /* From the STATE, not from `requests` — those are empty on the public tier, and a count
+       that silently drops to zero for a viewer would say nobody had done anything. */
+    requestedItemIds: state.requestedItemIds,
     /* An admin edits the shared catalog; everybody else reads it. Not the same permission as
        `canRecord`, which is about movements and is earned by a device rather than a person. */
     readOnly: !writer,
