@@ -7,6 +7,8 @@ import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { Card, PageHeader } from './components/ui';
 import { Sheet } from './components/Sheet';
+import { Flash } from './components/Flash';
+import type { FlashMessage } from './components/Flash';
 import { StockAlerts } from './features/alerts/StockAlerts';
 import { openRequests } from '../../domain/requests';
 import { mergeTxns, unsettled } from './state/txns';
@@ -123,6 +125,10 @@ export function App() {
   const [pinFor, setPinFor] = useState<AppendEntry[] | null>(null);
   const [pinError, setPinError] = useState('');
   const [pinBusy, setPinBusy] = useState(false);
+  /* The outcome of the last write, for a few seconds. Three outcomes that look identical
+     without it: in the sheet, waiting on this phone, refused. */
+  const [flash, setFlash] = useState<FlashMessage | null>(null);
+  const say = (m: Omit<FlashMessage, 'at'>) => setFlash({ ...m, at: Date.now() });
   /** How many movements are recorded but not yet in the sheet. Shown, never hidden. */
   const [queued, setQueued] = useState(0);
 
@@ -136,7 +142,7 @@ export function App() {
    * and there is nothing to ask. Leaving it inline would have meant the same twenty lines twice,
    * which is how the request form quietly lost its photo picker.
    */
-  async function record(token: string, entries: AppendEntry[]) {
+  async function record(token: string, entries: AppendEntry[], what?: string) {
     if (!connection) return;
     const { url } = connection;
     setPinBusy(true);
@@ -156,6 +162,15 @@ export function App() {
       ]).catch(() => undefined);
 
       setFreshTxns((prev) => [...prev, ...result.appended]);
+      /* The one thing the person actually wanted to know. Named where it is a single record,
+         counted where a stranded queue went out with it. */
+      say({
+        kind: 'ok',
+        text: what && result.appended.length === 1 ? `Tercatat: ${what}` : 'Tercatat di spreadsheet.',
+        hint: result.appended.length > 1
+          ? `${result.appended.length} catatan terkirim.`
+          : undefined,
+      });
       setPinFor(null);
       refreshQueue();
       // The gateway slid its own expiry by serving this; keep the local one in step.
@@ -172,6 +187,14 @@ export function App() {
       if (code === 'offline') {
         await Promise.all(entries.map((e) => enqueue(e, 'perangkat ini'))).catch(() => undefined);
         refreshQueue();
+        /* This used to close in silence. A record held on the phone is not a record in the
+           register, and the only sign of it was a count in a sidebar that a phone keeps behind
+           a drawer — so the marbot's evidence that it worked was that nothing happened. */
+        say({
+          kind: 'queued',
+          text: 'Belum terkirim — tersimpan di HP ini.',
+          hint: 'Gateway tidak terjangkau. Kirim lagi dari panel sambungan saat sinyal kembali.',
+        });
         setPinFor(null);
         setPinError('');
       } else {
@@ -183,6 +206,9 @@ export function App() {
           setPinFor(entries);
         }
         setPinError(explainPin(code));
+        /* `pinError` shows INSIDE the PIN sheet, and a record made under a live session never
+           opened one — so a refusal had nowhere to appear at all. */
+        if (pinFor === null) say({ kind: 'problem', text: explainPin(code) });
       }
     } finally {
       setPinBusy(false);
@@ -324,8 +350,11 @@ export function App() {
      admin or admin_utama — `onAdmin(null)` is what a valid token with any other role produces —
      so this is the same test the sidebar uses, not a second one to keep in step. Unconnected
      devices are exempt for the reason given there: that mode has no accounts. */
-  const progress = register.loading && (
-    <TopProgress label={firstLoad ? 'Memuat register' : 'Memperbarui data'} />
+  /* `pinBusy` belongs here as much as a read does: a movement recorded under a live session
+     closes its sheet at once and then waits on the gateway for a second or two with nothing on
+     screen moving. */
+  const progress = (register.loading || pinBusy) && (
+    <TopProgress label={pinBusy ? 'Menyimpan catatan' : firstLoad ? 'Memuat register' : 'Memperbarui data'} />
   );
 
   /* `!firstLoad` is load-bearing, not caution: this runs during render, and on the first pass a
@@ -814,15 +843,28 @@ export function App() {
                  again is asking somebody to prove something they proved four minutes ago —
                  which is what made the PIN feel like a toll rather than a lock. */
               const open = liveSession();
-              if (open) void record(open, [entry]); else setPinFor([entry]);
+              const what = `${moving ? moving.item.name : 'barang'} ${txn.qtyDelta > 0 ? '+' : ''}${txn.qtyDelta}`;
+              if (open) void record(open, [entry], what); else setPinFor([entry]);
             } else if (!connection) {
               localDraft.setTxns((prev) => [...prev, txn]);
+              /* Confirmed here too, and it says WHERE — the local draft is a legitimate mode
+                 (§59 stage 1) and the one thing it must never do is read like the register. */
+              say({
+                kind: 'ok',
+                text: `Tercatat: ${moving ? moving.item.name : 'barang'}`,
+                hint: 'Tersimpan di HP ini saja — belum ada gateway.',
+              });
             }
             setMoving(null);
           }}
           onClose={() => setMoving(null)}
         />
       </div>
+
+      {/* At the FRAME, above the bottom bar. A movement is recorded from Beranda, from a rack,
+          from the scanner and from the item page, so its outcome has to reach whichever screen
+          the person was standing on. */}
+      <Flash message={flash} onDone={() => setFlash(null)} />
 
       <BottomNav
         route={route}

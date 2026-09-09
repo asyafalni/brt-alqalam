@@ -269,3 +269,26 @@ describe('the rail on a desktop', () => {
     expect(render(App).getByLabelText('Lebarkan menu')).toBeTruthy();
   });
 });
+
+describe('what happened to the record', () => {
+  /*
+   * The failure this closes: Simpan closed the sheet and then NOTHING happened on screen — for
+   * a second or two on the gateway, longer on gudang wifi, and identically whether the record
+   * reached the spreadsheet, was queued on the phone, or was refused. A write that went
+   * nowhere must never look like one that landed.
+   */
+  it('confirms a movement, and says where it actually went', () => {
+    seed(input({ name: 'Sabun cuci', initialStock: 12 }));
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+
+    fireEvent.click(r.getByText('Ambil'));
+    fireEvent.click(r.getByText('Simpan'));
+
+    const flash = within(r.container.querySelector('[role="status"]')!);
+    expect(flash.getByText('Tercatat: Sabun cuci')).toBeTruthy();
+    /* Unconnected, so this is the phone's own draft (§59 stage 1) — a legitimate mode whose one
+       job is never to read like the shared register. */
+    expect(flash.getByText(/HP ini saja/)).toBeTruthy();
+  });
+});
