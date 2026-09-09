@@ -141,12 +141,15 @@ export function Sidebar(p: Props) {
           dot: 'bg-green-400',
           tone: 'text-slate-200',
           title: 'Tersambung',
-          /* A connected device can record: an enrolled tablet takes anybody's PIN, and any
-             other device identifies its user by phone number. The old "Hanya melihat" branch
-             described a viewer tier that stopped existing when the number became a way in —
-             and an unreachable branch that states something false is worse than no branch. */
-          hint: 'Bisa mencatat',
-          aria: 'Tersambung ke gateway. Perangkat ini bisa mencatat pengambilan.',
+          /* NO SECOND LINE, and this is the only state without one.
+             It used to read "Bisa mencatat", which stopped being news once a phone number
+             became a way in: any connected device can record, given a registered person and
+             their PIN. A line that is true of every device in every state tells nobody
+             anything, and it made the one state needing no attention as loud as the three that
+             do. The others keep their hint because each names something to DO — send the
+             queue, reconnect, or distrust the numbers. */
+          hint: '',
+          aria: 'Tersambung ke gateway. Ketuk untuk mengatur sambungan.',
         };
 
   const width = `${railWidth(p.isMobile, p.collapsed)}px`;
@@ -281,7 +284,9 @@ export function Sidebar(p: Props) {
                     <span class={`block truncate text-xs font-semibold ${status.tone}`}>
                       {status.title}
                     </span>
-                    <span class="block truncate text-[11px] text-slate-400">{status.hint}</span>
+                    {status.hint && (
+                      <span class="block truncate text-[11px] text-slate-400">{status.hint}</span>
+                    )}
                   </span>
                   <ChevronRight class="h-4 w-4 shrink-0 text-slate-600" />
                 </>
