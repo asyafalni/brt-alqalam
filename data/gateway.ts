@@ -238,6 +238,13 @@ export type SessionResult =
 
 export async function openSession(
   url: string,
+  /**
+   * How this device identifies itself: an enrolled secret, or the person's phone number.
+   *
+   * The phone path is what lets enrolment stop being mandatory. It is an IDENTIFIER, not a
+   * credential — it is not secret and is not treated as one; the PIN is what authorises, and the
+   * gateway locks attempts per number.
+   */
   deviceSecret: string,
   pin: string,
   /** Which of the people holding this PIN. Only meaningful after a `choose` reply. */
@@ -376,10 +383,16 @@ export async function fetchStateAsAdmin(
 
 export type RosterRole = 'admin_utama' | 'admin' | 'anggota';
 
+/** Which group somebody belongs to — a different axis from what they may do. */
+export type MemberType = 'marbot' | 'staf' | 'jamaah' | 'security';
+
 export interface RosterUser {
   userId: string;
   name: string;
   role: RosterRole;
+  type: MemberType;
+  /** Identifier, not credential: what somebody types on their own phone instead of a secret. */
+  phone: string;
   /** Retired: their PIN no longer opens a session, their rows in the log are untouched. */
   disabled: boolean;
 }
@@ -391,6 +404,8 @@ const readUsers = (json: Record<string, unknown>): RosterUser[] =>
       userId: String(r.userId ?? ''),
       name: String(r.name ?? ''),
       role: (String(r.role ?? 'anggota') as RosterRole),
+      type: (String(r.type ?? 'marbot') as MemberType),
+      phone: String(r.phone ?? ''),
       disabled: r.disabled === true,
     };
   });
@@ -414,7 +429,10 @@ export async function listRoster(
 export async function setRosterPin(
   url: string,
   token: string,
-  user: { userId?: string; name: string; role: RosterRole; pin: string },
+  user: {
+    userId?: string; name: string; role: RosterRole; pin: string;
+    type?: MemberType; phone?: string;
+  },
   fetchImpl: typeof fetch = fetch,
 ): Promise<RosterUser[]> {
   return readUsers(await call(url, { op: 'setUserPin', token, ...user }, fetchImpl));
@@ -627,4 +645,28 @@ export async function suggestPin(
 ): Promise<string> {
   const json = await call(url, { op: 'suggestPin', token }, fetchImpl);
   return String(json.pin ?? '');
+}
+
+
+/**
+ * Open a session with a phone number instead of an enrolled device.
+ *
+ * The number is remembered on the device and typed once; the PIN is what authorises every visit
+ * after that. A number that belongs to nobody is refused exactly like a wrong PIN, so this
+ * cannot be used to test who is registered.
+ */
+export async function openSessionByPhone(
+  url: string, phone: string, pin: string, fetchImpl: typeof fetch = fetch,
+): Promise<SessionResult> {
+  const json = await call(url, { op: 'openSession', phone, pin }, fetchImpl);
+  if (Array.isArray(json.choose)) {
+    return {
+      choose: (json.choose as Record<string, unknown>[]).map((c) => ({
+        userId: String(c.userId ?? ''), name: String(c.name ?? ''),
+      })),
+    };
+  }
+  const s = json.session as Session | undefined;
+  if (!s?.token) throw new GatewayError('no-session-returned', json);
+  return { session: s };
 }

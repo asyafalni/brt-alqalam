@@ -656,9 +656,11 @@ export function App() {
           description="Sekali untuk satu kunjungan."
           onClose={() => setPinFor(null)}
         >
-          {pinFor && connection?.deviceSecret && (() => {
-            // Narrowed once, so the closures below carry a string rather than re-asserting it.
-            const { url, deviceSecret } = connection;
+          {pinFor && connection && (() => {
+            /* Narrowed once, so the closures below carry a string rather than re-asserting it.
+               An empty secret is the phone-number path — `PinFlow` asks for the number. */
+            const { url } = connection;
+            const deviceSecret = connection.deviceSecret ?? '';
             return (
             <PinFlow
               url={url}

@@ -15,8 +15,16 @@ import { Dices, KeyRound, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus } fr
 import {
   GatewayError, listRoster, setRosterActive, setRosterPin, suggestPin,
 } from '../../../../data/gateway';
-import type { RosterRole, RosterUser } from '../../../../data/gateway';
+import type { MemberType, RosterRole, RosterUser } from '../../../../data/gateway';
 import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
+
+/** Which group somebody belongs to. A different axis from the role, which is what they may do. */
+const TYPE_LABEL: Record<MemberType, string> = {
+  marbot: 'Marbot',
+  staf: 'Staf',
+  jamaah: 'Jamaah',
+  security: 'Security',
+};
 
 const ROLE_LABEL: Record<RosterRole, string> = {
   admin_utama: 'Admin Utama',
@@ -28,6 +36,9 @@ const REASON: Record<string, string> = {
   pin_taken: 'PIN itu sudah dipakai orang lain. Pilih PIN lain — PIN harus unik, karena PIN '
     + 'sendirian yang menentukan siapa yang mencatat.',
   bad_pin: 'PIN harus 4–8 angka.',
+  bad_phone: 'Nomor HP terlalu pendek.',
+  phone_taken: 'Nomor itu sudah dipakai anggota lain — satu nomor satu orang, karena nomor '
+    + 'itulah yang menentukan siapa yang mencatat.',
   bad_role: 'Peran tidak dikenal.',
   name_required: 'Nama tidak boleh kosong.',
   admin_utama_permanent: 'Admin Utama tidak bisa dinonaktifkan.',
@@ -65,6 +76,8 @@ export function Roster(
   const [editing, setEditing] = useState<RosterUser | 'new' | null>(null);
   const [name, setName] = useState('');
   const [role, setRole] = useState<RosterRole>('anggota');
+  const [type, setType] = useState<MemberType>('marbot');
+  const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   /** Shown once after a successful save, because there is no second chance to read it. */
   const [issued, setIssued] = useState<{ name: string; pin: string } | null>(null);
@@ -91,6 +104,8 @@ export function Roster(
     setError('');
     setName(user === 'new' ? '' : user.name);
     setRole(user === 'new' ? 'anggota' : user.role);
+    setType(user === 'new' ? 'marbot' : user.type);
+    setPhone(user === 'new' ? '' : user.phone);
     setPin('');
     /* Filled in before the admin can type a taken one. Uniqueness by construction rather than
        by refusal — the old flow let them choose, then said no. Still overwritable. */
@@ -114,6 +129,8 @@ export function Roster(
       userId: target === 'new' ? undefined : target.userId,
       name: name.trim(),
       role,
+      type,
+      phone: phone.trim(),
       pin,
     }));
     if (!ok) return;
@@ -179,6 +196,39 @@ export function Roster(
                   a second permanent super-admin is not a thing anybody should mint by accident. */}
             </Select>
           </div>
+          <div>
+            <label class={LABEL} for="roster-type">Jenis anggota</label>
+            <Select
+              id="roster-type"
+              value={type}
+              onChange={(e: Event) => setType((e.target as HTMLSelectElement).value as MemberType)}
+            >
+              {(Object.keys(TYPE_LABEL) as MemberType[]).map((t) => (
+                <option key={t} value={t}>{TYPE_LABEL[t]}</option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label class={LABEL} for="roster-phone">Nomor HP</label>
+            <input
+              id="roster-phone"
+              class={FIELD}
+              type="tel"
+              inputmode="tel"
+              placeholder="0812…"
+              value={phone}
+              onInput={(e: Event) => setPhone((e.target as HTMLInputElement).value)}
+            />
+            {/* Why it is asked for, said here rather than assumed: it is how somebody signs in on
+                their OWN phone instead of being handed an enrolled device. Optional, because a
+                person who only ever uses the shared gudang tablet needs no number at all. */}
+            <p class="mt-1 text-xs leading-relaxed text-slate-500">
+              Supaya orangnya bisa mencatat dari HP sendiri — cukup nomor ini sekali, lalu PIN.
+              Kosongkan kalau ia hanya memakai tablet gudang.
+            </p>
+          </div>
+
           <div>
             <label class={LABEL} for="roster-pin">PIN baru (4–8 angka)</label>
             <div class="flex items-center gap-2">
@@ -246,7 +296,10 @@ export function Roster(
                 <span class={`truncate text-sm font-semibold ${u.disabled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                   {u.name}
                 </span>
-                <span class="shrink-0 text-[11px] text-slate-500">{ROLE_LABEL[u.role] ?? u.role}</span>
+                <span class="shrink-0 text-[11px] text-slate-500">
+                  {TYPE_LABEL[u.type] ?? u.type}
+                  {u.role !== 'anggota' && ` · ${ROLE_LABEL[u.role] ?? u.role}`}
+                </span>
               </div>
 
               {/* Icons, not words. "Ganti PIN" as text took a third of the row and pushed the

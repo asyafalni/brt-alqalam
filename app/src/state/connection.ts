@@ -110,7 +110,18 @@ export function saveConnection(url: string, deviceSecret?: string): Connection {
 }
 
 /** Whether this device may append movements, as opposed to only reading the register. */
-export const canRecord = (c: Connection | null): boolean => !!c?.deviceSecret;
+/**
+ * Whether this device can record at all.
+ *
+ * It used to mean "holds a device secret", because a secret was the only thing a PIN attempt
+ * could be rate-limited against. A registered phone number is now the other way in — the person
+ * identifies themselves and the gateway locks attempts per number — so a connected device with
+ * no secret is no longer a viewer, it is somebody who has not said who they are yet.
+ *
+ * What still separates looking from recording is the ROSTER: recording needs a PIN belonging to
+ * a registered member, and the gateway is the only thing that decides that.
+ */
+export const canRecord = (c: Connection | null): boolean => !!c;
 
 /** True when this device was connected at some point and no longer is. */
 export function connectionLost(current: Connection | null): boolean {

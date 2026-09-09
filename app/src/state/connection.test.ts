@@ -19,12 +19,20 @@ describe('remembering how this device reaches the gateway', () => {
     const c = loadConnection();
     expect(c).toMatchObject({ url: EXEC });
     expect(c?.deviceSecret).toBeUndefined();
-    expect(canRecord(c)).toBe(false);
+
+    /* `canRecord` no longer means "holds a device secret". A registered phone number is the
+       other way in, so a connected device with no secret is not a viewer — it is somebody who
+       has not said who they are yet. What still separates looking from recording is the ROSTER:
+       a PIN belonging to a registered member, decided by the gateway and by nothing here. */
+    expect(canRecord(c)).toBe(true);
   });
 
-  it('can record only once a device secret is there', () => {
+  it('records with an enrolled secret too — both models stay live', () => {
+    // A shared gudang tablet is enrolled once and takes anybody's PIN; a phone identifies its
+    // owner by number. Neither was retired to make room for the other.
     saveConnection(EXEC, 'device-secret');
     expect(canRecord(loadConnection())).toBe(true);
+    expect(loadConnection()?.deviceSecret).toBe('device-secret');
   });
 
   it('is not connected at all without a URL', () => {

@@ -11,14 +11,22 @@
 
 import { useState } from 'octane';
 import { UserRound } from '@octanejs/lucide';
-import { GatewayError, openSession } from '../../../../data/gateway';
+import { GatewayError, openSession, openSessionByPhone } from '../../../../data/gateway';
 import type { PinChoice, Session } from '../../../../data/gateway';
 import { PinPad } from './PinPad';
+import { loadPhone, looksLikePhone, savePhone } from '../../state/member';
+import { Button, FIELD, LABEL } from '../../components/ui';
 
 export function PinFlow(
   { url, deviceSecret, busy, error, onSession, onCancel, onError }:
   {
     url: string;
+    /**
+     * An enrolled device secret, or `''` when this device identifies by phone number instead.
+     *
+     * Both models are live: a shared gudang tablet is enrolled once and takes anybody's PIN; a
+     * marbot on their own phone types their number once and their PIN from then on.
+     */
     deviceSecret: string;
     /** The CALLER's work — appending, submitting — not the sign-in itself. */
     busy?: boolean;
@@ -31,12 +39,18 @@ export function PinFlow(
   const [choices, setChoices] = useState<PinChoice[] | null>(null);
   const [pin, setPin] = useState('');
   const [opening, setOpening] = useState(false);
+  /* Typed once and remembered. Asking for it at every visit would be the tax §0.0 exists to
+     refuse — and it is not a secret, so there is nothing gained by making them re-enter it. */
+  const [phone, setPhone] = useState(() => loadPhone());
+  const [askPhone, setAskPhone] = useState(() => !deviceSecret && !loadPhone());
 
   async function open(entered: string, userId?: string) {
     setOpening(true);
     onError('');
     try {
-      const result = await openSession(url, deviceSecret, entered, userId);
+      const result = deviceSecret
+        ? await openSession(url, deviceSecret, entered, userId)
+        : await openSessionByPhone(url, phone, entered);
       if (result.choose) {
         // Held so the second call does not ask for the PIN again — the person already typed it,
         // and typing it twice to answer a question the system asked is not their mistake.
@@ -50,6 +64,58 @@ export function PinFlow(
     } finally {
       setOpening(false);
     }
+  }
+
+  if (askPhone) {
+    return (
+      <form
+        class="space-y-4"
+        onSubmit={(e: Event) => {
+          e.preventDefault();
+          setPhone(savePhone(phone));
+          setAskPhone(false);
+          onError('');
+        }}
+      >
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Nomor HP kamu</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Sekali saja — HP ini akan mengingatnya. Yang dicatat nanti adalah namamu di daftar
+            anggota.
+          </p>
+        </div>
+
+        <div>
+          <label class={LABEL} for="member-phone">Nomor HP</label>
+          <input
+            id="member-phone"
+            class={FIELD}
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="0812…"
+            value={phone}
+            onInput={(e: Event) => setPhone((e.target as HTMLInputElement).value)}
+          />
+          {/* Said plainly, because being asked for a phone number usually means something else. */}
+          <p class="mt-1 text-xs leading-relaxed text-slate-500">
+            Hanya untuk mengenali kamu. Tidak dikirim ke siapa pun, dan bukan kata sandi — PIN-mu
+            yang menjaga.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <Button type="submit" size="touch" disabled={!looksLikePhone(phone)}>Lanjut</Button>
+          <button
+            type="button"
+            class="text-sm font-semibold text-slate-500 hover:text-slate-900"
+            onClick={onCancel}
+          >
+            Batal
+          </button>
+        </div>
+      </form>
+    );
   }
 
   if (choices) {
@@ -92,11 +158,27 @@ export function PinFlow(
   }
 
   return (
-    <PinPad
-      busy={opening || busy === true}
-      error={error ?? ''}
-      onCancel={onCancel}
-      onSubmit={(entered) => void open(entered)}
-    />
+    <>
+      <PinPad
+        busy={opening || busy === true}
+        error={error ?? ''}
+        onCancel={onCancel}
+        onSubmit={(entered) => void open(entered)}
+      />
+      {!deviceSecret && phone && (
+        /* Shown so somebody using a colleague's phone notices before recording under their name
+           — the one misattribution this model can produce. */
+        <p class="mt-3 text-center text-xs text-slate-500">
+          Masuk sebagai nomor <span class="font-mono">{phone}</span>{' · '}
+          <button
+            type="button"
+            class="font-semibold text-slate-700 underline underline-offset-2"
+            onClick={() => { setAskPhone(true); onError(''); }}
+          >
+            bukan kamu?
+          </button>
+        </p>
+      )}
+    </>
   );
 }
