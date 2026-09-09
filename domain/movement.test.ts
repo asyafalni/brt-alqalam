@@ -63,3 +63,35 @@ describe('bucketing the log by day', () => {
     expect(movementSeries([txn(0, -1)], NOW).peak).toBeGreaterThan(0);
   });
 });
+
+describe('what moved, not only how much', () => {
+  it('breaks a day down by item, biggest first', () => {
+    const s = movementSeries([
+      txn(1, -1, { itemId: 'ITM-0001' }),
+      txn(1, -4, { itemId: 'ITM-0002' }),
+      txn(1, -2, { itemId: 'ITM-0001' }),
+    ], NOW);
+    const day = s.days.find((d) => d.ts === startOfDay(NOW - DAY))!;
+    expect(day.items.map((r) => [r.key, r.out])).toEqual([['ITM-0002', 4], ['ITM-0001', 3]]);
+  });
+
+  it('keeps the breakdown adding up to the total it sits under', () => {
+    // Derived here rather than in the tooltip, so a chart and its own detail cannot disagree.
+    const s = movementSeries([txn(0, -3, { itemId: 'A' }), txn(0, -2, { itemId: 'B' })], NOW);
+    const day = s.days[s.days.length - 1];
+    expect(day.items.reduce((n, r) => n + r.out, 0)).toBe(day.out);
+  });
+
+  it('keys a per-unit movement by its assetId, which the UI resolves back to a name', () => {
+    const s = movementSeries(
+      [txn(0, -1, { itemId: undefined, assetId: 'ALQ-ITM-0007-002' })], NOW,
+    );
+    expect(s.days[s.days.length - 1].items[0].key).toBe('ALQ-ITM-0007-002');
+  });
+
+  it('separates what left from what came back, per item', () => {
+    const s = movementSeries([txn(0, -5, { itemId: 'A' }), txn(0, 2, { itemId: 'A' })], NOW);
+    const row = s.days[s.days.length - 1].items[0];
+    expect([row.out, row.in]).toEqual([5, 2]);
+  });
+});

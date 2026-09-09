@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach , vi } from 'vitest';
-import { render, cleanup } from '@octanejs/testing-library';
+import { render, cleanup, fireEvent } from '@octanejs/testing-library';
 import { App } from '../../App';
 // The screen is lazily loaded so the kiosk bundle does not carry it (§64.2's reasoning applied
 // to screens, not just to Clerk). Resolving the module here keeps these tests synchronous.
@@ -127,5 +127,54 @@ describe('Laporan', () => {
   it('says so plainly when there is nothing to report', () => {
     seed([], []);
     expect(render(App).getByText(/Belum ada data untuk dilaporkan/)).toBeTruthy();
+  });
+});
+
+describe('pointing at a day on the movement chart', () => {
+  const withLog = () => {
+    seed(catalog(
+      input({ name: 'Sabun cuci', initialStock: 12 }),
+      input({ name: 'Karbol wangi', initialStock: 9 }),
+    ));
+    const stored = JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
+    const day = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    stored.txns = [
+      { txnId: 'T1', clientTxnId: 'c1', ts: day, type: 'pemakaian', itemId: 'ITM-0001', qtyDelta: -3, actorUserId: 'USR-1' },
+      { txnId: 'T2', clientTxnId: 'c2', ts: day, type: 'pemakaian', itemId: 'ITM-0002', qtyDelta: -5, actorUserId: 'USR-1' },
+    ];
+    localStorage.setItem('brt.stocktake.draft.v6', JSON.stringify(stored));
+    return render(App);
+  };
+
+  /*
+   * The chart had a native SVG `<title>` on each dot: a 3px target, nothing at all on the quiet
+   * days, and no way to reach it on a tablet. "Berapa yang keluar" it answered badly and "apa
+   * saja yang keluar" it could not answer at all.
+   */
+  it('names what moved, not just how much', () => {
+    const r = withLog();
+    const columns = r.container.querySelectorAll('rect[fill="transparent"]');
+    expect(columns.length).toBeGreaterThan(0);
+
+    fireEvent.pointerEnter(columns[columns.length - 3]);
+    const panel = r.getByRole('status');
+    expect(panel.textContent).toContain('8 keluar');
+    expect(panel.textContent).toContain('Karbol wangi');   // biggest mover first
+    expect(panel.textContent).toContain('Sabun cuci');
+  });
+
+  it('answers on a quiet day too, instead of showing nothing', () => {
+    // A blank panel reads as the tooltip being broken, and "nothing moved" is a real answer.
+    const r = withLog();
+    const columns = r.container.querySelectorAll('rect[fill="transparent"]');
+    fireEvent.pointerEnter(columns[0]);
+    expect(r.getByRole('status').textContent).toContain('Tidak ada pergerakan');
+  });
+
+  it('carries the same detail in text, for anybody not pointing at anything', () => {
+    const r = withLog();
+    const table = r.container.querySelector('table.sr-only');
+    expect(table?.textContent).toContain('Karbol wangi');
+    expect(table?.textContent).toContain('Sabun cuci');
   });
 });

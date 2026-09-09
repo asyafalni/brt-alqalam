@@ -287,7 +287,7 @@ export function Report(
               Berapa unit keluar dan kembali setiap hari. Ini satu-satunya bagian laporan yang
               menunjukkan <i>kecepatan</i> — sisanya memotret keadaan hari ini.
             </p>
-            <MovementChart summary={movement} />
+            <MovementChart summary={movement} items={draft.items} />
             <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-4">
               {/* Per WEEK: a masjid runs on a weekly rhythm — Jumat, kajian akhir pekan — so a
                   daily mean lands between two very different kinds of day and describes

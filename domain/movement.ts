@@ -11,6 +11,14 @@
 
 import type { Txn } from './types';
 
+/** One item's share of a day, so the chart can answer "what moved" and not only "how much". */
+export interface MovementItem {
+  /** `itemId` where there is one; an `assetId` otherwise, which the UI resolves back. */
+  key: string;
+  out: number;
+  in: number;
+}
+
 export interface MovementDay {
   /** Midnight, local time, of the day this bucket covers. */
   ts: number;
@@ -18,6 +26,15 @@ export interface MovementDay {
   out: number;
   /** Units that came back or were added, as a positive number. */
   in: number;
+  /**
+   * What moved, biggest first.
+   *
+   * A total answers "was it a busy day"; this answers the question somebody actually has next,
+   * which is "busy with WHAT" — and it is the difference between a chart you look at and a
+   * chart you can act on. Kept in the domain rather than re-derived in the tooltip so the
+   * breakdown and the total can never disagree.
+   */
+  items: MovementItem[];
 }
 
 export interface MovementSummary {
@@ -73,7 +90,7 @@ export function movementSeries(
   const buckets = new Map<number, MovementDay>();
   for (let i = 0; i < span; i += 1) {
     const ts = from + i * DAY;
-    buckets.set(ts, { ts, out: 0, in: 0 });
+    buckets.set(ts, { ts, out: 0, in: 0, items: [] });
   }
 
   let totalOut = 0;
@@ -83,10 +100,24 @@ export function movementSeries(
     // Older than the window: counted in neither total, because a total that disagrees with the
     // chart above it is the kind of number somebody takes to a meeting and is wrong there.
     if (!day) continue;
-    if (t.qtyDelta < 0) { day.out += -t.qtyDelta; totalOut += -t.qtyDelta; } else { day.in += t.qtyDelta; totalIn += t.qtyDelta; }
+    const key = t.itemId ?? t.assetId ?? '';
+    let row = day.items.find((r) => r.key === key);
+    if (!row) { row = { key, out: 0, in: 0 }; day.items.push(row); }
+
+    if (t.qtyDelta < 0) {
+      day.out += -t.qtyDelta;
+      row.out += -t.qtyDelta;
+      totalOut += -t.qtyDelta;
+    } else {
+      day.in += t.qtyDelta;
+      row.in += t.qtyDelta;
+      totalIn += t.qtyDelta;
+    }
   }
 
   const days = [...buckets.values()];
+  // Biggest mover first: on a day with six items the first one is usually the story.
+  for (const d of days) d.items.sort((a, b) => (b.out + b.in) - (a.out + a.in));
   const peak = Math.max(1, ...days.map((d) => Math.max(d.out, d.in)));
 
   return {

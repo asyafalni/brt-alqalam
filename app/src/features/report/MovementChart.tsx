@@ -8,7 +8,10 @@
 // back it reads as circulation, which is what actually happened — a Qurban week where forty
 // knives go out and thirty-eight return is a very different fact from one where they do not.
 
+import { useState } from 'octane';
 import type { MovementDay, MovementSummary } from '../../../../domain/movement';
+import type { Item } from '../../../../domain/types';
+import { assetOwner } from '../stocktake/draft';
 
 /** Viewport units. The SVG scales to its container; these only set the drawing's proportions. */
 const W = 720;
@@ -18,6 +21,23 @@ const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom };
 
 const OUT = '#b45309';
 const IN = '#0f766e';
+
+/**
+ * The name behind a breakdown key.
+ *
+ * A quantity movement is keyed by `itemId`; a per-unit one by `assetId`, which is the item's
+ * barcode plus a unit number — the same resolution Histori does, and for the same reason: an id
+ * on screen is a question, not an answer.
+ */
+function nameOf(key: string, items: readonly Item[]): string {
+  const direct = items.find((i) => i.itemId === key);
+  if (direct) return direct.name;
+  const owner = assetOwner(key, items);
+  return owner ? `${owner.item.name} #${owner.unit}` : key;
+}
+
+const fullDate = (ts: number) =>
+  new Date(ts).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const dayLabel = (ts: number) =>
   new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
@@ -55,8 +75,13 @@ function smooth(points: { x: number; y: number }[]): string {
   return d;
 }
 
-export function MovementChart({ summary }: { summary: MovementSummary }) {
+export function MovementChart(
+  { summary, items }: { summary: MovementSummary; items: readonly Item[] },
+) {
   const { days, peak } = summary;
+  /* Which day is being pointed at. `null` is the resting state, and the chart reads perfectly
+     well without it — the tooltip adds detail, it does not carry the meaning. */
+  const [at, setAt] = useState<number | null>(null);
   const top = ceiling(peak);
 
   const x = (i: number) => PAD.left + (days.length <= 1 ? PLOT.w / 2 : (i * PLOT.w) / (days.length - 1));
@@ -77,8 +102,11 @@ export function MovementChart({ summary }: { summary: MovementSummary }) {
      only needs enough to place the shape in time. */
   const every = Math.max(1, Math.ceil(days.length / 6));
 
+  const day = at === null ? null : days[at];
+
   return (
     <figure class="m-0">
+      <div class="relative" onPointerLeave={() => setAt(null)}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         class="h-44 w-full sm:h-52"
@@ -121,15 +149,49 @@ export function MovementChart({ summary }: { summary: MovementSummary }) {
         {/* A dot only where something actually happened. A marker on every quiet day turns the
             baseline into a dotted rule and hides the days that are the story. */}
         {days.map((d, i) => (d.out > 0 ? (
-          <circle key={`o${d.ts}`} cx={x(i)} cy={y(d.out)} r="3" fill={OUT}>
-            <title>{`${dayLabel(d.ts)} — ${d.out} unit keluar`}</title>
-          </circle>
+          <circle key={`o${d.ts}`} cx={x(i)} cy={y(d.out)} r={at === i ? 4.5 : 3} fill={OUT} />
         ) : null))}
         {days.map((d, i) => (d.in > 0 ? (
-          <circle key={`i${d.ts}`} cx={x(i)} cy={y(d.in)} r="2.5" fill={IN}>
-            <title>{`${dayLabel(d.ts)} — ${d.in} unit kembali`}</title>
-          </circle>
+          <circle key={`i${d.ts}`} cx={x(i)} cy={y(d.in)} r={at === i ? 4 : 2.5} fill={IN} />
         ) : null))}
+
+        {/* The day being pointed at, marked on the chart itself — otherwise the panel names a
+            date and leaves the eye to find it. */}
+        {at !== null && (
+          <line
+            x1={x(at)}
+            x2={x(at)}
+            y1={PAD.top}
+            y2={y(0)}
+            stroke="#0f172a"
+            stroke-width="1"
+            stroke-dasharray="3 3"
+            opacity="0.35"
+          />
+        )}
+
+        {/*
+          * FULL-HEIGHT hit areas, one per day.
+          *
+          * A 3px dot is a target nobody can hit, and on the quiet days there is no dot at all —
+          * yet "nothing moved that day" is an answer worth being able to ask for. A column
+          * spanning the plot means pointing anywhere near a day works, which is how a person
+          * actually points at a chart.
+          */}
+        {days.map((d, i) => (
+          <rect
+            key={`h${d.ts}`}
+            x={x(i) - PLOT.w / Math.max(1, days.length - 1) / 2}
+            y={PAD.top}
+            width={PLOT.w / Math.max(1, days.length - 1)}
+            height={PLOT.h}
+            fill="transparent"
+            /* Pointer events cover mouse, pen and TOUCH in one listener — a tablet has no
+               hover, and a chart whose detail only mouse users can reach is half a chart. */
+            onPointerEnter={() => setAt(i)}
+            onPointerDown={() => setAt(i)}
+          />
+        ))}
 
         {days.map((d, i) => (i % every === 0 || i === days.length - 1 ? (
           <text
@@ -145,6 +207,29 @@ export function MovementChart({ summary }: { summary: MovementSummary }) {
         ) : null))}
       </svg>
 
+      {day && <Detail day={day} items={items} at={at!} of={days.length} />}
+      </div>
+
+      {/* The whole series in text, for anybody not pointing at anything — a screen reader, a
+          printed copy, or somebody who just wants the numbers. `sr-only` keeps it out of the
+          page without keeping it out of the document. */}
+      <table class="sr-only">
+        <caption>Pergerakan stok per hari</caption>
+        <thead>
+          <tr><th>Tanggal</th><th>Unit keluar</th><th>Unit kembali</th><th>Barang</th></tr>
+        </thead>
+        <tbody>
+          {days.filter((d) => d.out > 0 || d.in > 0).map((d) => (
+            <tr key={d.ts}>
+              <td>{fullDate(d.ts)}</td>
+              <td>{d.out}</td>
+              <td>{d.in}</td>
+              <td>{d.items.map((r) => `${nameOf(r.key, items)} ${r.out > 0 ? `-${r.out}` : `+${r.in}`}`).join(', ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
       <figcaption class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
         <span class="flex items-center gap-1.5">
           <span class="h-0.5 w-4 rounded-full" style={`background:${OUT};print-color-adjust:exact`} />
@@ -156,5 +241,73 @@ export function MovementChart({ summary }: { summary: MovementSummary }) {
         </span>
       </figcaption>
     </figure>
+  );
+}
+
+/** At most this many named items before the rest collapse into a count. */
+const NAMED = 4;
+
+/**
+ * What happened on one day.
+ *
+ * Positioned along the chart in PERCENT, because the SVG is `preserveAspectRatio="none"` over a
+ * fixed viewBox — so a viewBox x maps straight onto a percentage of the rendered width whatever
+ * the container is doing. It flips its anchor near either end rather than being clipped: a panel
+ * that runs off the card is a panel that answers nothing on the two days most likely to be the
+ * interesting ones, the first and the last.
+ */
+function Detail(
+  { day, items, at, of }:
+  { day: MovementDay; items: readonly Item[]; at: number; of: number },
+) {
+  const pct = of <= 1 ? 50 : (PAD.left + (at * PLOT.w) / (of - 1)) / W * 100;
+  const anchor = pct < 30 ? 'left-0' : pct > 70 ? 'right-0' : '';
+  const style = anchor === '' ? `left:${pct}%;transform:translateX(-50%)` : '';
+
+  const shown = day.items.slice(0, NAMED);
+  const rest = day.items.length - shown.length;
+
+  return (
+    <div
+      class={`pointer-events-none absolute top-1 z-10 w-56 rounded-lg border border-slate-300 bg-white p-3 shadow-lg ${anchor}`}
+      style={style}
+      role="status"
+    >
+      <p class="text-xs font-bold text-slate-900">{fullDate(day.ts)}</p>
+
+      {day.out === 0 && day.in === 0 ? (
+        /* Said out loud. A blank panel on a quiet day reads as the tooltip being broken, and
+           "nothing moved" is a real answer somebody came looking for. */
+        <p class="mt-1 text-xs text-slate-600">Tidak ada pergerakan.</p>
+      ) : (
+        <>
+          <p class="mt-1 flex flex-wrap gap-x-3 text-xs">
+            {day.out > 0 && (
+              <span style={`color:${OUT}`} class="font-semibold tabular-nums">
+                {day.out} keluar
+              </span>
+            )}
+            {day.in > 0 && (
+              <span style={`color:${IN}`} class="font-semibold tabular-nums">
+                {day.in} kembali
+              </span>
+            )}
+          </p>
+          <ul class="mt-2 space-y-1 border-t border-slate-100 pt-2">
+            {shown.map((r) => (
+              <li key={r.key} class="flex items-baseline justify-between gap-2 text-xs">
+                <span class="min-w-0 truncate text-slate-700">{nameOf(r.key, items)}</span>
+                <span class="shrink-0 font-semibold tabular-nums text-slate-900">
+                  {r.out > 0 ? `−${r.out}` : `+${r.in}`}
+                </span>
+              </li>
+            ))}
+            {rest > 0 && (
+              <li class="text-xs italic text-slate-500">dan {rest} barang lain</li>
+            )}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
