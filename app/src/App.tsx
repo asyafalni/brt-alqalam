@@ -20,6 +20,7 @@ import { AssetBoard } from './features/assets/AssetBoard';
 import { LoanSheet } from './features/movement/LoanSheet';
 import type { LoanTarget } from './features/movement/LoanSheet';
 import { InspectSheet } from './features/movement/InspectSheet';
+import { createDrivePhotoStore } from '../../data/drivePhotos';
 import type { InspectTarget } from './features/movement/InspectSheet';
 import { Finder } from './features/search/Finder';
 
@@ -343,6 +344,19 @@ export function App() {
      ever verified (Q5b). */
   const [inspecting, setInspecting] = useState<InspectTarget | null>(null);
 
+  /*
+   * Photos go to DRIVE once this device has a gateway, and to its own disk before that.
+   *
+   * Rebuilt only when the address changes, never per render: the store holds a cache of bytes
+   * already fetched, and a new one on every render would throw that away and re-fetch a gallery
+   * on every keystroke. The session is read at CALL time inside it, so this closure staying put
+   * is not the same as pinning a token.
+   */
+  const sharedPhotos = useMemo(
+    () => (connection ? createDrivePhotoStore(connection.url, liveSession) : undefined),
+    [connection?.url],
+  );
+
   const now = useNow();
   const inventory = useInventory(draft, now);
 
@@ -643,6 +657,7 @@ export function App() {
               onMove={setMoving}
               onLoan={setLoan}
               onInspect={setInspecting}
+              photos={sharedPhotos}
             />
           )}
           {route.name === 'aset' && (

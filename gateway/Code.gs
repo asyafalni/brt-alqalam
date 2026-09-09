@@ -77,6 +77,10 @@ function doPost(e) {
       case 'revokeInvitation': return handleRevokeInvitation(body);
       case 'submitRequest': return handleSubmitRequest(body);
       case 'finishRequest': return handleFinishRequest(body);
+      case 'photos': return handleListPhotos(body);
+      case 'putPhoto': return handlePutPhoto(body);
+      case 'photo': return handleGetPhoto(body);
+      case 'deletePhoto': return handleDeletePhoto(body);
       default: return fail('unknown_op');
     }
   } catch (err) {
@@ -90,7 +94,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.17.0-edit-member';
+var GATEWAY_VERSION = '0.18.0-photos';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).

@@ -26,10 +26,15 @@ import { inspection, lastInspected } from '../../../../domain/inspect';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
 import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
+import type { PhotoStore } from '../../../../data/photoStore';
 
 /* One store for the whole app, created once. Building it per render would open a fresh
    IndexedDB connection every time somebody opened an item. */
-const photoStore = createIndexedDbPhotoStore();
+/**
+ * This device's own disk. Still the store when there is no gateway — the stock-take walk is
+ * exactly where the wifi is worst, and a photo that needs the network is a photo that is lost.
+ */
+const localPhotos = createIndexedDbPhotoStore();
 
 const when = (ts: number) =>
   new Date(ts).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
@@ -81,7 +86,7 @@ const HISTORY: Column<Txn>[] = [
 ];
 
 export function ItemDetail(
-  { id, draft, inventory, now, onNavigate, onMove, onLoan, onInspect }:
+  { id, draft, inventory, now, onNavigate, onMove, onLoan, onInspect, photos }:
   {
     id: string; draft: Draft; inventory: Inventory; now: number;
     onNavigate: (r: Route) => void;
@@ -91,6 +96,13 @@ export function ItemDetail(
     onLoan?: (target: LoanTarget) => void;
     /** Records that a unit was looked at and found still good — or found broken. */
     onInspect?: (target: InspectTarget) => void;
+    /**
+     * The SHARED photo store, when this device has a gateway to share through.
+     *
+     * Absent means the local disk, which is the honest answer for a phone walking the gudang
+     * with no connection — and the screen already says the photos are device-only in that case.
+     */
+    photos?: PhotoStore;
   },
 ) {
   const item = draft.items.find((i) => i.itemId === id || i.barcode === id);
@@ -443,7 +455,7 @@ export function ItemDetail(
 
       {/* Above the history, below the identity: a photo answers "is this the one?", which is a
           question asked before "what happened to it?" and after "what is it?". */}
-      <ItemPhotos itemId={item.itemId} itemName={item.name} store={photoStore} />
+      <ItemPhotos itemId={item.itemId} itemName={item.name} store={photos ?? localPhotos} />
 
       <section class={CARD_FLUSH}>
         <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/50 p-4">

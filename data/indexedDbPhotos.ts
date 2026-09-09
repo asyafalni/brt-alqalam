@@ -181,13 +181,19 @@ async function encode(
   });
 }
 
-interface Downscaled {
+export interface Downscaled {
   blob: Blob;
   width: number;
   height: number;
 }
 
-async function downscale(file: Blob): Promise<Downscaled> {
+/**
+ * Exported because the DRIVE store needs it too, and for a sharper reason than reuse: an
+ * original goes up as base64, which inflates it by a third, and Apps Script's POST ceiling
+ * would reject a phone's 6 MB shot outright. Two copies of this budget would be two numbers to
+ * keep in step, and the one that drifted would fail only on the biggest photos.
+ */
+export async function downscale(file: Blob): Promise<Downscaled> {
   if (typeof createImageBitmap !== 'function') {
     // We refuse rather than storing the original. Saving an 8 MB file is not a graceful
     // degradation — it is the exact failure the downscale exists to prevent, arriving silently
