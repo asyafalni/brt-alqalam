@@ -115,3 +115,33 @@ function rosterIsAdmin(userId) {
   }
   return false;
 }
+
+
+/**
+ * A 4-digit PIN nobody is using yet.
+ *
+ * WHY THE SYSTEM PICKS IT. The admin was choosing, which meant occasionally choosing one that
+ * was taken — and the old answer to that was a refusal and a retry, which is work handed to a
+ * person by a machine that could have avoided it (§0.0). Suggesting a free one makes uniqueness
+ * true by construction instead of by rejection, and the admin can still overwrite it.
+ *
+ * Random rather than sequential: 0001, 0002, 0003 down the roster is a pattern anybody standing
+ * at the kiosk can guess after seeing one person type theirs.
+ *
+ * Returns '' if the space is somehow full — 10,000 PINs against a roster of fifteen makes that
+ * impossible in practice, but a caller that silently got a duplicate would be worse than one
+ * that got nothing.
+ */
+function rosterFreePin() {
+  var users = rosterUsers();
+  for (var attempt = 0; attempt < 200; attempt++) {
+    var pin = String(Math.floor(Math.random() * 10000));
+    while (pin.length < 4) pin = '0' + pin;
+    var taken = false;
+    for (var i = 0; i < users.length; i++) {
+      if (safeEqual(users[i].pinHash, hashPin(pin, users[i].salt))) { taken = true; break; }
+    }
+    if (!taken) return pin;
+  }
+  return '';
+}

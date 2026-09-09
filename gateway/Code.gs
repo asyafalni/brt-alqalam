@@ -66,6 +66,7 @@ function doPost(e) {
       case 'listUsers': return handleListUsers(body);
       case 'setUserPin': return handleSetUserPin(body);
       case 'setUserActive': return handleSetUserActive(body);
+      case 'suggestPin': return handleSuggestPin(body);
       case 'listDevices': return handleListDevices(body);
       case 'enrollDevice': return handleEnrollDevice(body);
       case 'setDeviceRevoked': return handleSetDeviceRevoked(body);
@@ -88,7 +89,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.12.0-finish-request';
+var GATEWAY_VERSION = '0.13.0-suggest-pin';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -663,4 +664,20 @@ function handleFinishRequest(body) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+/**
+ * Hand the admin a PIN that is free.
+ *
+ * Admin-gated like the rest of the roster. Revealing an UNUSED PIN tells an attacker which code
+ * does not work, which is the opposite of useful — but it also names how many are left, so it
+ * stays behind the same door as everything else here.
+ */
+function handleSuggestPin(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+  var pin = rosterFreePin();
+  if (!pin) return fail('no_free_pin');
+  return respond({ ok: true, pin: pin });
 }

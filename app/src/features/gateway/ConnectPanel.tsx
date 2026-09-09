@@ -18,10 +18,10 @@
 // So it TESTS before it saves. Pasting a wrong value and finding out in the gudang is the
 // outcome this screen exists to prevent.
 
-import { useState } from 'octane';
-import { CircleCheck, Link2, Lock, TriangleAlert, Unlink } from '@octanejs/lucide';
+import { useEffect, useState } from 'octane';
+import { CircleCheck, HardDrive, Link2, Lock, TriangleAlert, Unlink } from '@octanejs/lucide';
 import { fetchState, GatewayError, openSession, closeSession } from '../../../../data/gateway';
-import { clearConnection, saveConnection, urlProblem } from '../../state/connection';
+import { clearConnection, keepStorage, saveConnection, urlProblem } from '../../state/connection';
 import type { Connection } from '../../state/connection';
 import { Button, CODE, ERROR_TEXT, FIELD, LABEL } from '../../components/ui';
 
@@ -69,6 +69,16 @@ export function ConnectPanel(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [found, setFound] = useState('');
+  /* `null` while unknown: "we have not asked yet" and "the browser said no" are different
+     answers, and only one of them is worth acting on. */
+  const [durable, setDurable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!connection?.deviceSecret) return;
+    let alive = true;
+    void keepStorage().then((ok) => { if (alive) setDurable(ok); });
+    return () => { alive = false; };
+  }, [connection?.deviceSecret]);
 
   async function connect() {
     setError('');
@@ -141,6 +151,22 @@ export function ConnectPanel(
             <p class={`${CODE} mt-1 break-all`}>{connection.url}</p>
           </div>
         </div>
+
+        {/* Whether the browser has PROMISED to keep the enrolment, which is otherwise invisible
+            until the day it is gone. Storage is evictable under pressure and Safari discards it
+            after seven days unvisited — a kiosk used daily never notices, a phone that goes a
+            week between busy periods loses its enrolment for no visible reason. */}
+        {connection.deviceSecret && (
+          <p class="mt-2.5 flex items-start gap-2 text-[11px] leading-relaxed text-slate-600">
+            <HardDrive class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+            {durable === null
+              ? 'Memeriksa ketahanan penyimpanan…'
+              : durable
+                ? 'Browser berjanji menyimpan pendaftaran perangkat ini secara permanen.'
+                : 'Browser belum menjamin penyimpanan permanen. Kalau data situs terhapus, '
+                  + 'daftarkan ulang lewat QR — sepuluh detik.'}
+          </p>
+        )}
 
         {/* One line, not a paragraph. This panel is a status somebody glances at; the reasoning
             behind the device code belongs in SETUP.md, where somebody is actually reading. */}

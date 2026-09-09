@@ -112,7 +112,7 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
     `${src}; return { handlePutCatalog, handleWhoami, handleDetailedRead, handleListUsers,
        handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
        handleSetDeviceRevoked, handleRenameDevice, handleInviteAdmin,
-       handleListInvitations, handleRevokeInvitation, handleFinishRequest,
+       handleListInvitations, handleRevokeInvitation, handleFinishRequest, handleSuggestPin,
        writeTab, txnRow, updateRowById, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
@@ -826,5 +826,42 @@ describe('updateRowById', () => {
 
   it('says so when the id is not there', () => {
     expect(load(freshTabs()).updateRowById('Items', 'itemId', 'nope', { name: 'x' })).toBe(false);
+  });
+});
+
+describe('suggesting a PIN', () => {
+  it('refuses without an admin token', () => {
+    expect(load(freshTabs()).handleSuggestPin({}).ok).toBe(false);
+  });
+
+  it('returns four digits', () => {
+    const r = load(freshTabs()).handleSuggestPin({ token: admin });
+    expect(r.ok).toBe(true);
+    expect(r.pin).toMatch(/^\d{4}$/);
+  });
+
+  it('never suggests one somebody already has', () => {
+    const g = load(freshTabs());
+    // Fill a slice of the space, then check every suggestion avoids all of it.
+    const taken = ['1111', '2222', '3333', '4444', '5555'];
+    taken.forEach((pin, i) =>
+      g.handleSetUserPin({ token: admin, name: 'U' + i, role: 'anggota', pin }));
+    for (let i = 0; i < 40; i++) {
+      expect(taken).not.toContain(g.handleSuggestPin({ token: admin }).pin);
+    }
+  });
+
+  it('is random, not sequential — a pattern is guessable from one person typing theirs', () => {
+    const g = load(freshTabs());
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) seen.add(g.handleSuggestPin({ token: admin }).pin);
+    // Twenty draws from 10,000 landing on one value would mean it is not random at all.
+    expect(seen.size).toBeGreaterThan(10);
+  });
+
+  it('accepts the suggestion it just made', () => {
+    const g = load(freshTabs());
+    const pin = g.handleSuggestPin({ token: admin }).pin;
+    expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin }).ok).toBe(true);
   });
 });

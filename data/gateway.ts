@@ -613,3 +613,18 @@ export async function finishRequest(
   const rows = parseRecords(lower([json.appended as Record<string, unknown>]), buildTxn);
   return { appended: rows.ok[0] ?? null };
 }
+
+/**
+ * A 4-digit PIN nobody is using yet.
+ *
+ * The admin used to choose, which meant occasionally choosing one that was taken — and the old
+ * answer was a refusal and a retry, which is a machine handing work to a person it could have
+ * saved them (§0.0). Uniqueness is true by construction now, and the suggestion is still
+ * overwritable.
+ */
+export async function suggestPin(
+  url: string, token: string, fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const json = await call(url, { op: 'suggestPin', token }, fetchImpl);
+  return String(json.pin ?? '');
+}

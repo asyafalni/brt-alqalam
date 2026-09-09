@@ -33,6 +33,30 @@ const KEY = 'brt.gateway.connection';
  */
 const SEEN_KEY = 'brt.gateway.seen';
 
+/**
+ * Ask the browser not to evict this origin's storage.
+ *
+ * WHY IT MATTERS HERE. The device secret is not a session token — it is written once and lives
+ * in `localStorage` indefinitely. But "indefinitely" is the browser's word, not ours: storage is
+ * evictable under pressure, and Safari discards it entirely after seven days without a visit.
+ * A kiosk used every day is safe; a marbot's phone that goes a week between busy periods is
+ * exactly the case that quietly loses its enrolment and has to be re-enrolled for no visible
+ * reason. Asking costs one call and removes that class of loss where the browser grants it.
+ *
+ * Best-effort by design: Chrome grants it on engagement or installation, Firefox prompts, and
+ * some browsers refuse. A refusal is not a failure to handle — it is the status quo, and the
+ * enrolment QR is the recovery either way.
+ */
+export async function keepStorage(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted?.()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 export interface Connection {
   /** The Apps Script `/exec` URL. */
   url: string;
@@ -79,6 +103,9 @@ export function saveConnection(url: string, deviceSecret?: string): Connection {
     localStorage.setItem(KEY, JSON.stringify(c));
     localStorage.setItem(SEEN_KEY, '1');
   } catch { /* private window */ }
+  /* Asked at the moment there is finally something worth keeping. Not awaited: a device secret
+     that is stored but not yet marked durable is strictly better than a blocked save. */
+  void keepStorage();
   return c;
 }
 

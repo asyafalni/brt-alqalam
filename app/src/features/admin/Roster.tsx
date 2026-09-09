@@ -11,8 +11,10 @@
 // so the screen says it out loud rather than letting an admin discover it by needing it.
 
 import { useEffect, useState } from 'octane';
-import { KeyRound, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus } from '@octanejs/lucide';
-import { GatewayError, listRoster, setRosterActive, setRosterPin } from '../../../../data/gateway';
+import { Dices, KeyRound, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus } from '@octanejs/lucide';
+import {
+  GatewayError, listRoster, setRosterActive, setRosterPin, suggestPin,
+} from '../../../../data/gateway';
 import type { RosterRole, RosterUser } from '../../../../data/gateway';
 import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
 
@@ -90,6 +92,18 @@ export function Roster(
     setName(user === 'new' ? '' : user.name);
     setRole(user === 'new' ? 'anggota' : user.role);
     setPin('');
+    /* Filled in before the admin can type a taken one. Uniqueness by construction rather than
+       by refusal — the old flow let them choose, then said no. Still overwritable. */
+    void fresh();
+  }
+
+  async function fresh() {
+    try {
+      setPin(await suggestPin(url, await getToken()));
+    } catch {
+      /* Silent: an admin who has to type their own PIN is mildly inconvenienced, and the
+         gateway still refuses a genuinely bad one. An error here would be noise. */
+    }
   }
 
   async function save(e: Event) {
@@ -167,15 +181,29 @@ export function Roster(
           </div>
           <div>
             <label class={LABEL} for="roster-pin">PIN baru (4–8 angka)</label>
-            <input
-              id="roster-pin"
-              class={`${FIELD} tracking-[0.3em]`}
-              type="text"
-              inputmode="numeric"
-              maxlength={8}
-              value={pin}
-              onInput={(e: Event) => setPin((e.target as HTMLInputElement).value)}
-            />
+            <div class="flex items-center gap-2">
+              <input
+                id="roster-pin"
+                class={`${FIELD} tracking-[0.3em]`}
+                type="text"
+                inputmode="numeric"
+                maxlength={8}
+                value={pin}
+                onInput={(e: Event) => setPin((e.target as HTMLInputElement).value)}
+              />
+              <button
+                type="button"
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-500 text-slate-600 hover:bg-slate-100"
+                aria-label="Ambil PIN lain yang belum dipakai"
+                title="Ambil PIN lain"
+                onClick={() => void fresh()}
+              >
+                <Dices class="h-4 w-4" />
+              </button>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">
+              Sudah dipilihkan yang belum dipakai siapa pun. Boleh diganti.
+            </p>
           </div>
 
           {error && <p class={ERROR_TEXT} role="alert">{error}</p>}
