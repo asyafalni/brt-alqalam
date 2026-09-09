@@ -11,6 +11,7 @@ import {
 } from '@octanejs/lucide';
 import { racksNeedingAttention, rollupLocations } from '../../../../domain/locations';
 import { racksToCount } from '../../../../domain/cycleCount';
+import { overdueLoans } from '../../../../domain/loans';
 import type { Route } from '../../state/route';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -84,8 +85,12 @@ export function Dashboard(
       broken: all.filter((d) => d.status === 'broken').length,
       lost: all.filter((d) => d.status === 'lost').length,
       out: all.filter((d) => d.status === 'out').length,
+      /* Loans past a week. This is the only one of the four that nobody would ever go looking
+         for: broken and lost are reported by a person, and a loan that is quietly becoming a
+         loss is reported by nobody — which is exactly how things go missing. */
+      overdue: overdueLoans(all, now),
     };
-  }, [inventory.derived]);
+  }, [inventory.derived, now]);
 
   /* Both columns scroll and grow as they are scrolled, rather than ending in a "see all"
      button. The button asked whether to read the rest before showing any of it, and answering
@@ -96,7 +101,8 @@ export function Dashboard(
   const shownAlerts = inventory.notifications.slice(0, alerts.count);
 
   const nothingWrong =
-    inventory.notifications.length === 0 && counts.out === 0 && assets.broken === 0 && assets.lost === 0;
+    inventory.notifications.length === 0 && counts.out === 0
+    && assets.broken === 0 && assets.lost === 0 && assets.overdue === 0;
 
   if (items.length === 0) {
     return (
@@ -155,6 +161,14 @@ export function Dashboard(
           )}
           {assets.lost > 0 && (
             <Chip tone="rose" count={assets.lost} label="hilang" onClick={() => onNavigate({ name: 'aset' })} />
+          )}
+          {assets.overdue > 0 && (
+            <Chip
+              tone="amber"
+              count={assets.overdue}
+              label="pinjaman lewat seminggu"
+              onClick={() => onNavigate({ name: 'aset' })}
+            />
           )}
           {needWalk > 0 && (
             <Chip tone="slate" count={needWalk} label="rak perlu didatangi" onClick={() => onNavigate({ name: 'racks' })} />

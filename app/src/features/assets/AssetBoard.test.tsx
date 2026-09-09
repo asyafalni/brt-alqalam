@@ -22,6 +22,7 @@ function Harness() {
     <AssetBoard
       draft={draft}
       inventory={useInventory(draft, NOW)}
+      now={NOW}
       onOpenItem={opened}
       onRequest={requested}
       onOpenCounted={counted}
@@ -250,5 +251,44 @@ describe('the barang tetap that are NOT here', () => {
     // A permanent note explaining an empty set is furniture.
     seed(ITEMS(), []);
     expect(render(Harness).queryByText(/barang tetap lainnya/)).toBeNull();
+  });
+});
+
+describe('a loan that is quietly becoming a loss', () => {
+  /*
+   * A unit borrowed three days ago and one borrowed since last Qurban looked identical here:
+   * status and holder, nothing about time — even though `DerivedInstance.since` has carried it
+   * all along. So nothing escalated on its own, and the only way to notice was to already
+   * suspect it and go looking. That is the owner's boss's second complaint, "things go
+   * missing", stated as a UI fact.
+   */
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /** One knife, borrowed `daysAgo` days ago and never returned. */
+  const loan = (unit: string, daysAgo: number): Txn => ({
+    txnId: `L-${unit}`, clientTxnId: `l-${unit}`, ts: NOW - daysAgo * DAY,
+    type: 'peminjaman', assetId: `ALQ-ITM-0001-${unit}`, qtyDelta: 0,
+    actorUserId: 'USR-ADMIN', recipient: 'Pak Yusuf',
+  });
+
+  const out = (...txns: Txn[]) => { seed(ITEMS(), txns); return render(Harness); };
+
+  it('says how long each one has been out', () => {
+    expect(out(loan('001', 9)).getAllByText('9 hari').length).toBeGreaterThan(0);
+  });
+
+  it('puts the oldest at the top, so the one worth chasing arrives there by itself', () => {
+    const r = out(loan('001', 2), loan('002', 40));
+    const rows = [...r.container.querySelectorAll('table tbody tr')];
+    expect(rows[0].textContent).toContain('40 hari');
+    expect(rows[1].textContent).toContain('2 hari');
+  });
+
+  it('gets louder as it ages, on a scale of its own', () => {
+    // Status already owns colour here (§66). Overdue-ness is a different axis, and the badge
+    // carries a NUMBER OF DAYS rather than a word so it cannot read as a fourth status.
+    const r = out(loan('001', 2), loan('002', 40));
+    expect(r.getAllByText('2 hari')[0].getAttribute('class')).toContain('slate');
+    expect(r.getAllByText('40 hari')[0].getAttribute('class')).toContain('red');
   });
 });

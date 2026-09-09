@@ -616,6 +616,7 @@ export function App() {
             <AssetBoard
               draft={draft}
               inventory={inventory}
+              now={now}
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onRequest={(type, assetId) => {
                 /* An admin goes to the Pengajuan screen, where the new request lands in the

@@ -20,6 +20,8 @@
 import { useMemo, useState } from 'octane';
 import { CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { FilterField } from '../../components/FilterField';
+import { loanAge, loansByAge } from '../../../../domain/loans';
+import type { LoanLevel } from '../../../../domain/loans';
 import type { RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
@@ -49,9 +51,9 @@ const TABLE_SHAPE_ACTION =
   `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, onOpenItem, onRequest, onOpenCounted }:
+  { draft, inventory, now, onOpenItem, onRequest, onOpenCounted }:
   {
-    draft: Draft; inventory: Inventory; onOpenItem: (id: string) => void;
+    draft: Draft; inventory: Inventory; now: number; onOpenItem: (id: string) => void;
     /** To the stock list, narrowed to barang tetap — where the counted ones actually live. */
     onOpenCounted: () => void;
     /**
@@ -94,10 +96,13 @@ export function AssetBoard(
   );
 
   const groups = useMemo(() => ({
-    out: all.filter((d) => d.status === 'out' && matches(d)),
+    /* OLDEST FIRST. A unit borrowed three days ago and one borrowed since last Qurban looked
+       identical here, so nothing ever escalated on its own — a loan quietly became a loss and
+       the only way to notice was to already suspect it. */
+    out: loansByAge(all.filter(matches), now).map((l) => l.instance),
     broken: all.filter((d) => d.status === 'broken' && matches(d)),
     lost: all.filter((d) => d.status === 'lost' && matches(d)),
-  }), [all, q]);
+  }), [all, q, now]);
 
   // The whole point of separating hilang: it leaves the active base entirely.
   const activeBase = all.filter((d) => d.status !== 'lost' && d.status !== 'retired').length;
@@ -199,6 +204,8 @@ export function AssetBoard(
         emptyHint="Semua unit berlabel ada di tempatnya."
         holderHeader="Dipegang"
         showHolder
+        showAge
+        now={now}
       />
 
       <Section
@@ -230,16 +237,34 @@ export function AssetBoard(
   );
 }
 
+/*
+ * A TIME ramp, kept off the status palette on purpose.
+ *
+ * Status already owns colour here — sky for dipinjam, orange for rusak, rose for hilang (§66) —
+ * and overdue-ness is a different axis: a thing can be borrowed and fine, or borrowed and long
+ * overdue, and both are "dipinjam". The badge carries a NUMBER OF DAYS rather than a word, so
+ * it cannot be misread as a fourth status.
+ */
+const AGE_TINT: Record<LoanLevel, string> = {
+  baru: 'bg-slate-100 text-slate-600',
+  ditanya: 'bg-amber-50 text-amber-700 border border-amber-200',
+  lama: 'bg-orange-50 text-orange-700 border border-orange-200',
+  'mungkin-hilang': 'bg-red-50 text-red-700 border border-red-200',
+};
+
 function Section(
   {
     title, subtitle, icon: Icon, rows, empty, emptyHint, itemOf, draft, onOpenItem,
-    showHolder, showNote, holderHeader = 'Dipegang', noteFor, onRequest, action,
+    showHolder, showNote, showAge, now = 0, holderHeader = 'Dipegang', noteFor, onRequest,
+    action,
   }: {
     title: string; subtitle: string; icon: (p: { class?: string }) => unknown;
     rows: DerivedInstance[]; empty: string; emptyHint: string;
     itemOf: (d: DerivedInstance) => Item | undefined;
     draft: Draft; onOpenItem: (id: string) => void;
     showHolder?: boolean; showNote?: boolean; holderHeader?: string;
+    /** Adds "sejak berapa lama", which is the difference between a loan and a loss. */
+    showAge?: boolean; now?: number;
     noteFor: (d: DerivedInstance) => string | undefined;
     onRequest: (type: RequestType, assetId: string) => void;
     /** The next step this list offers. "Dipinjam" has none — it resolves by being returned. */
@@ -280,6 +305,19 @@ function Section(
       cell: (d: DerivedInstance) => (
         <span class="block max-w-[16rem] truncate text-sm text-slate-600">{d.holder ?? '—'}</span>
       ),
+    }] : []),
+    ...(showAge ? [{
+      key: 'age',
+      header: 'Sejak',
+      mobile: 'meta' as const,
+      cell: (d: DerivedInstance) => {
+        const age = loanAge(d.since, now);
+        return (
+          <span class={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${AGE_TINT[age.level]}`}>
+            {age.days === 0 ? 'hari ini' : `${age.days} hari`}
+          </span>
+        );
+      },
     }] : []),
     ...(showNote ? [{
       key: 'note',
