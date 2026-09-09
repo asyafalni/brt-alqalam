@@ -19,6 +19,7 @@ import type { Item, Location, StockLine, Txn } from '../../../../domain/types';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Select, Stat } from '../../components/ui';
 import { FilterField } from '../../components/FilterField';
 import { DataTable } from '../../components/DataTable';
+import { assetOwner } from '../stocktake/draft';
 import type { Column } from '../../components/DataTable';
 
 const when = (ts: number) =>
@@ -68,6 +69,13 @@ export function historyRows(
   });
 }
 
+/** "Pisau potong #7", the way the unit is labelled everywhere else it appears. */
+function unitLabel(assetId: string | undefined, items: readonly Item[]): string | undefined {
+  if (!assetId) return undefined;
+  const owner = assetOwner(assetId, items);
+  return owner ? `${owner.item.name} #${owner.unit}` : assetId;
+}
+
 export function History(
   { txns, items, locations, stock }:
   { txns: readonly Txn[]; items: Item[]; locations: Location[]; stock: StockLine[] },
@@ -115,13 +123,21 @@ export function History(
       mobile: 'title',
       cell: (r) => (
         <div class="min-w-0">
+          {/* A NAME, even for a per-unit movement.
+              A `peminjaman` carries an `assetId` and no `itemId`, so this printed the raw
+              `ALQ-ITM-0039-001` — and the two rows a person most wants to read in this log,
+              what was borrowed and what went missing, were the two that never said what the
+              thing was. `assetOwner` reads the item back out of the id. */}
           <p class="truncate text-sm font-bold text-slate-900">
-            {r.item?.name ?? r.txn.assetId ?? '—'}
+            {r.item?.name ?? unitLabel(r.txn.assetId, items) ?? '—'}
           </p>
           {/* A rack only under a quantity row. An instance has no shelf in the log — it has a
               holder — so labelling it "belum ditempatkan" would report a problem that is not
-              one. */}
-          {r.quantity && <p class={`${CODE} truncate`}>{rackOf(r.txn.locationId)}</p>}
+              one. Its printed id goes here instead: demoted, not lost, since that is what is
+              written on the sticker somebody may be holding. */}
+          <p class={`${CODE} truncate`}>
+            {r.quantity ? rackOf(r.txn.locationId) : r.txn.assetId ?? ''}
+          </p>
         </div>
       ),
     },

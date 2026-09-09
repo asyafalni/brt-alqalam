@@ -143,3 +143,44 @@ describe('rows that are not about a quantity', () => {
     expect(rows[0].quantity).toBe(true);
   });
 });
+
+describe('a per-unit movement still says WHAT the thing is', () => {
+  /*
+   * A `peminjaman` carries an `assetId` and no `itemId`, so this column printed the raw
+   * `ALQ-ITM-0039-001` — and the two rows a person most wants to read in this log, what was
+   * borrowed and what went missing, were the two that never said what the thing was.
+   */
+  it('names the item and which unit it was', () => {
+    const items = catalog(input({ name: 'Pisau potong', kind: 'equipment', initialStock: 3 }));
+    seed(items, [txn({
+      type: 'peminjaman', itemId: undefined, locationId: undefined,
+      assetId: `${items[0].barcode}-002`, qtyDelta: 0, recipient: 'Pak Yusuf',
+    })]);
+    const r = render(App);
+
+    expect(r.getAllByText('Pisau potong #2').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the printed id underneath — it is what is on the sticker', () => {
+    const items = catalog(input({ name: 'Pisau potong', kind: 'equipment', initialStock: 3 }));
+    seed(items, [txn({
+      type: 'peminjaman', itemId: undefined, locationId: undefined,
+      assetId: `${items[0].barcode}-002`, qtyDelta: 0,
+    })]);
+    const r = render(App);
+
+    expect(r.getAllByText(`${items[0].barcode}-002`).length).toBeGreaterThan(0);
+  });
+
+  it('falls back to the id when the item is genuinely unknown', () => {
+    // A row naming something the catalog no longer holds is quarantine-shaped, not a crash.
+    const items = catalog(input({ name: 'Pisau potong', kind: 'equipment', initialStock: 1 }));
+    seed(items, [txn({
+      type: 'peminjaman', itemId: undefined, locationId: undefined,
+      assetId: 'ALQ-ITM-9999-001', qtyDelta: 0,
+    })]);
+    const r = render(App);
+
+    expect(r.getAllByText('ALQ-ITM-9999-001').length).toBeGreaterThan(0);
+  });
+});

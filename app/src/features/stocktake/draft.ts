@@ -174,6 +174,29 @@ export function instancesFor(item: Item, acquiredTs: number, count: number): Ass
   }));
 }
 
+/**
+ * The inverse of `instancesFor`: which item a printed unit id belongs to, and which unit it is.
+ *
+ * Kept RIGHT HERE, beside the function that mints these ids, so the two cannot drift apart —
+ * an id scheme with its parser in another file is an id scheme that gets changed in one place.
+ *
+ * Resolved by BARCODE PREFIX rather than by looking the unit up in the live instance list, and
+ * that is the whole point: instances are derived from the count, so a knife that was lost no
+ * longer HAS an instance — and the history rows about lost knives are exactly the ones somebody
+ * needs to read. A lookup would leave precisely those unnamed.
+ */
+export function assetOwner(
+  assetId: string, items: readonly Item[],
+): { item: Item; unit: number } | null {
+  const cut = assetId.lastIndexOf('-');
+  if (cut < 1) return null;
+  const barcode = assetId.slice(0, cut);
+  const unit = Number(assetId.slice(cut + 1));
+  const item = items.find((i) => i.barcode === barcode);
+  if (!item || !Number.isFinite(unit)) return null;
+  return { item, unit };
+}
+
 const INSTANCES_HEADER = 'assetId,itemId,label,acquiredTs,active';
 
 export function toInstancesCsv(
