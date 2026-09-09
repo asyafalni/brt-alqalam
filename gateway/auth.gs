@@ -105,10 +105,46 @@ function verifyDevice(deviceSecret) {
 
 var cache = CacheService.getScriptCache();
 
-function failureKey(deviceId) { return 'fail:' + deviceId; }
+function failureKey(id) { return 'fail:' + id; }
 
-function checkThrottle(deviceId) {
-  var raw = cache.get(failureKey(deviceId));
+/*
+ * WHY THIS GREW A DURABLE HALF.
+ *
+ * Lockout used to be a backstop behind device enrolment: an attacker had to hold an issued
+ * secret before a PIN attempt reached here at all. With a phone number as the identity, that
+ * outer door is gone by design — anybody with the `/exec` URL can attempt — so this counter IS
+ * the defence rather than a second layer behind one.
+ *
+ * `CacheService` alone was therefore not enough: it is explicitly evictable and capped at six
+ * hours, so a patient attacker outlasts it and starts again from zero. Counting stays in the
+ * cache because it is cheap and happens on every failure; a lockout, once actually triggered,
+ * is ALSO written to `PropertiesService`, which survives eviction. Rare event, durable record —
+ * the quota cost is paid only by somebody who has already failed five times.
+ */
+var LOCK_PROP = 'LOCKOUTS';
+
+function durableLockouts() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty(LOCK_PROP) || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function setDurableLockout(id, until) {
+  var all = durableLockouts();
+  var now = Date.now();
+  // Swept on write, so the property cannot grow without bound.
+  Object.keys(all).forEach(function (k) { if (all[k] <= now) delete all[k]; });
+  all[id] = until;
+  PropertiesService.getScriptProperties().setProperty(LOCK_PROP, JSON.stringify(all));
+}
+
+function checkThrottle(id) {
+  var until = durableLockouts()[id] || 0;
+  if (until > Date.now()) return { ok: false, retryAfterMs: until - Date.now() };
+
+  var raw = cache.get(failureKey(id));
   if (!raw) return { ok: true };
   var state = JSON.parse(raw);
   if (state.count < MAX_ATTEMPTS) return { ok: true };
@@ -116,12 +152,35 @@ function checkThrottle(deviceId) {
   return remaining > 0 ? { ok: false, retryAfterMs: remaining } : { ok: true };
 }
 
-function recordFailure(deviceId) {
-  var raw = cache.get(failureKey(deviceId));
+function recordFailure(id) {
+  var raw = cache.get(failureKey(id));
   var state = raw ? JSON.parse(raw) : { count: 0, until: 0 };
   state.count += 1;
-  if (state.count >= MAX_ATTEMPTS) state.until = Date.now() + LOCKOUT_MS;
-  cache.put(failureKey(deviceId), JSON.stringify(state), Math.ceil(LOCKOUT_MS / 1000) + 60);
+  if (state.count >= MAX_ATTEMPTS) {
+    state.until = Date.now() + LOCKOUT_MS;
+    setDurableLockout(id, state.until);
+  }
+  cache.put(failureKey(id), JSON.stringify(state), Math.ceil(LOCKOUT_MS / 1000) + 60);
+
+  /*
+   * A GLOBAL CEILING, and it is not the same control as the per-account one.
+   *
+   * Per-account lockout stops somebody grinding ONE person's PIN. It does nothing against
+   * somebody spreading five attempts each across every number they can think of — which, with
+   * PINs no longer unique, is the cheaper attack. This bounds the whole endpoint.
+   *
+   * Deliberately generous and short: a masjid produces a handful of genuine mistypes an hour,
+   * and locking everybody out for a long time is itself the denial of service.
+   */
+  var globalRaw = cache.get('fail:__all__');
+  var count = (globalRaw ? Number(globalRaw) : 0) + 1;
+  cache.put('fail:__all__', String(count), 3600);
+}
+
+/** True when the whole endpoint has taken more failures in an hour than a masjid ever produces. */
+function globalFloodgate() {
+  var raw = cache.get('fail:__all__');
+  return raw ? Number(raw) >= 200 : false;
 }
 
 function clearFailures(deviceId) { cache.remove(failureKey(deviceId)); }

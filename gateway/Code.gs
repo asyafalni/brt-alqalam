@@ -89,7 +89,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.13.0-suggest-pin';
+var GATEWAY_VERSION = '0.14.0-phone-identity';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -101,14 +101,57 @@ var GATEWAY_VERSION = '0.13.0-suggest-pin';
  */
 var SESSION_TTL_MS = 15 * 60 * 1000;
 
+/**
+ * Open a session with EITHER an enrolled device or a registered phone number.
+ *
+ * TWO MODELS, both live, because the operating model is genuinely two models. A shared gudang
+ * tablet is enrolled once and anybody's PIN opens a visit on it. A marbot on their OWN phone
+ * types their number once — it is remembered by the browser, not issued by us — and their PIN
+ * from then on.
+ *
+ * The phone path is what lets device enrolment stop being mandatory, and the reason is narrower
+ * than §65.2's original conclusion. That said per-IP limiting is impossible so only an issued
+ * secret can be locked; what was actually missing was an ACCOUNT. A PIN alone names nobody, so
+ * the only options were a global lock (one attacker silences everyone) or a client-supplied id
+ * (rotated at will). A phone number names somebody, and a named account is the thing every
+ * login system in the world locks.
+ *
+ * ⚠️ The trade, taken deliberately: without an enrolled secret, anybody holding the `/exec` URL
+ * may ATTEMPT. Five failures per number per five minutes makes walking 10,000 PINs take
+ * thousands of hours — against 15/10,000 per blind guess when a PIN alone identified anybody —
+ * but the attempts now reach us, and somebody can deliberately fail a colleague's number to lock
+ * them out. `globalFloodgate` bounds the first; the second is the price of the model.
+ */
 function handleOpenSession(body) {
-  var device = verifyDevice(body.deviceSecret);
-  if (!device.ok) return fail(device.error);
+  /* Independent of who is asking, so a flood cannot be hidden behind rotating numbers. */
+  if (globalFloodgate()) return fail('locked', { retryAfterMs: 60000 });
 
-  var throttle = checkThrottle(device.deviceId);
-  if (!throttle.ok) return fail('locked', { retryAfterMs: throttle.retryAfterMs });
+  var lockKey = '';
+  var actorFilter = null;
+
+  if (body.phone) {
+    var member = rosterByPhone(body.phone);
+    lockKey = 'ph:' + normalisePhone(body.phone);
+    var throttlePhone = checkThrottle(lockKey);
+    if (!throttlePhone.ok) return fail('locked', { retryAfterMs: throttlePhone.retryAfterMs });
+    /* An unregistered number is answered EXACTLY like a wrong PIN, further down. Saying "no such
+       number" here would turn this into a way to test which numbers belong to the masjid. */
+    actorFilter = member ? member.userId : '__none__';
+  } else {
+    var device = verifyDevice(body.deviceSecret);
+    if (!device.ok) return fail(device.error);
+    lockKey = 'dev:' + device.deviceId;
+    var throttle = checkThrottle(lockKey);
+    if (!throttle.ok) return fail('locked', { retryAfterMs: throttle.retryAfterMs });
+  }
 
   var found = resolvePins(body.pin);
+
+  /* On the phone path the PIN must be THAT person's. This is what makes PIN collisions
+     irrelevant here — the number has already said who, so there is nothing to disambiguate. */
+  if (actorFilter !== null) {
+    found = found.filter(function (u) { return u.userId === actorFilter; });
+  }
 
   /* A second step ONLY when the PIN is ambiguous, which at 10–15 people happens about one time
      in a hundred rosters. The fast path is unchanged: type the PIN, you are in. Asking everybody
@@ -117,7 +160,7 @@ function handleOpenSession(body) {
 
      The failure counter is NOT touched here: the PIN was right. */
   if (found.length > 1 && !body.userId) {
-    clearFailures(device.deviceId);
+    clearFailures(lockKey);
     return respond({
       ok: true,
       choose: found.map(function (u) { return { userId: u.userId, name: u.name }; }),
@@ -135,17 +178,17 @@ function handleOpenSession(body) {
   }
 
   if (!actor) {
-    recordFailure(device.deviceId);
-    // Deliberately identical to an unknown PIN: saying "no such PIN" would let someone
-    // enumerate which 4-digit codes exist.
-    return fail('invalid_pin', { attemptsLeft: attemptsLeft(device.deviceId) });
+    recordFailure(lockKey);
+    /* One reply for three different failures — unknown PIN, wrong PIN, and a phone number that
+       belongs to nobody. Distinguishing them would hand out a directory of who is registered. */
+    return fail('invalid_pin', { attemptsLeft: attemptsLeft(lockKey) });
   }
 
-  clearFailures(device.deviceId);
+  clearFailures(lockKey);
   var token = Utilities.getUuid();
   CacheService.getScriptCache().put(
     'session:' + token,
-    JSON.stringify({ userId: actor.userId, name: actor.name, role: actor.role, deviceId: device.deviceId }),
+    JSON.stringify({ userId: actor.userId, name: actor.name, role: actor.role, lockKey: lockKey }),
     Math.floor(SESSION_TTL_MS / 1000)
   );
 
@@ -386,7 +429,7 @@ function handleSetUserPin(body) {
     /* Under the lock, because uniqueness is a check-then-write: two admins issuing "1234" at the
        same moment would both find it free and both write it, and the PIN alone resolves WHO you
        are (Part VII) — so the loser's withdrawals would be recorded as the winner's. */
-    var result = rosterSetPin(body.name, body.role, body.pin, body.userId);
+    var result = rosterSetPin(body.name, body.role, body.pin, body.userId, body.type, body.phone);
     if (!result.ok) return fail(result.error);
     /* `sharedWith` so the screen can say "Budi has this one too" — informational, not a
        refusal: the admin may well want them to share it, and if not they can pick another. */

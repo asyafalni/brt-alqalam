@@ -55,10 +55,15 @@ function fakeBook(tabs: Record<string, Tab>) {
 /** What the fake Clerk was asked, and what it should answer. Reset per `load`. */
 let clerkCalls: { url: string; options: Record<string, unknown> }[] = [];
 let clerkReplies: { code: number; body: unknown }[] = [];
+/** Script cache contents, reset per `load`, pre-seeded with one live PIN session. */
+let clerkCache = new Map<string, string>();
 
 function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   clerkCalls = [];
   clerkReplies = [];
+  clerkCache = new Map([['session:sesi-marbot', JSON.stringify(
+    { userId: 'USR-marbot', name: 'Budi', role: 'anggota', deviceId: 'DEV-1' },
+  )]]);
   const store: Record<string, string> = {
     CLERK_JWT_KEY: KEY, CLERK_ISSUER: ISS, PIN_PEPPER: 'test-pepper', ...props,
   };
@@ -70,12 +75,13 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
       }),
     },
     CacheService: {
+      /* A cache that actually CACHES. It used to discard every write, so the failed-PIN counter
+         read back zero for ever and no lockout could be reached — a fake looser than the real
+         thing hides exactly the behaviour it exists to check. */
       getScriptCache: () => ({
-        // One live session, so the PIN-gated paths can be exercised without a Clerk token.
-        get: (k: string) => (k === 'session:sesi-marbot'
-          ? JSON.stringify({ userId: 'USR-marbot', name: 'Budi', role: 'anggota', deviceId: 'DEV-1' })
-          : null),
-        put: () => {}, remove: () => {},
+        get: (k: string) => (clerkCache.has(k) ? clerkCache.get(k)! : null),
+        put: (k: string, v: string) => { clerkCache.set(k, v); },
+        remove: (k: string) => { clerkCache.delete(k); },
       }),
     },
     SpreadsheetApp: { getActiveSpreadsheet: () => fakeBook(tabs), openById: () => fakeBook(tabs), flush: () => {} },
@@ -342,7 +348,8 @@ describe('the roster', () => {
     expect(text).not.toContain('4321');
     expect(text).not.toContain('pinHash');
     expect(text).not.toContain('salt');
-    expect(Object.keys(r.users[0]).sort()).toEqual(['disabled', 'name', 'role', 'userId']);
+    expect(Object.keys(r.users[0]).sort())
+      .toEqual(['disabled', 'name', 'phone', 'role', 'type', 'userId']);
   });
 
   it("reissues a retired person's PIN, and their old rows stay theirs anyway", () => {
@@ -863,5 +870,111 @@ describe('suggesting a PIN', () => {
     const g = load(freshTabs());
     const pin = g.handleSuggestPin({ token: admin }).pin;
     expect(g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin }).ok).toBe(true);
+  });
+});
+
+describe('signing in with a phone number instead of an enrolled device', () => {
+  function roster() {
+    const tabs = freshTabs();
+    const g = load(tabs, {
+      DEVICES: JSON.stringify([{ deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia', revoked: false }]),
+    });
+    g.handleSetUserPin({
+      token: admin, name: 'Budi', role: 'anggota', type: 'marbot', phone: '0812 3456 7890', pin: '4321',
+    });
+    g.handleSetUserPin({
+      token: admin, name: 'Sari', role: 'anggota', type: 'staf', phone: '081299998888', pin: '4321',
+    });
+    return g;
+  }
+
+  it('opens a session with the right phone and PIN', () => {
+    const r = roster().handleOpenSession({ phone: '081234567890', pin: '4321' });
+    expect(r.ok).toBe(true);
+    expect(r.session.actorName).toBe('Budi');
+  });
+
+  it('needs NO enrolled device at all — that is the whole point', () => {
+    const r = roster().handleOpenSession({ phone: '081234567890', pin: '4321' });
+    expect(r.session).toBeDefined();
+  });
+
+  it('reads a number the same however it was typed', () => {
+    const g = roster();
+    for (const written of ['0812-3456-7890', '+62 812 3456 7890', '0812 3456 7890']) {
+      expect(g.handleOpenSession({ phone: written, pin: '4321' }).session.actorName).toBe('Budi');
+    }
+  });
+
+  it('never disambiguates on the phone path — the number already said who', () => {
+    // Budi and Sari share the PIN 4321 deliberately. On a device it would ask which; here it
+    // cannot, because the number is the answer.
+    const g = roster();
+    expect(g.handleOpenSession({ phone: '081299998888', pin: '4321' }).session.actorName).toBe('Sari');
+  });
+
+  it('refuses somebody else’s PIN on your number', () => {
+    const g = roster();
+    g.handleSetUserPin({ token: admin, name: 'Rudi', role: 'anggota', phone: '081277776666', pin: '9999' });
+    expect(g.handleOpenSession({ phone: '081234567890', pin: '9999' }))
+      .toMatchObject({ ok: false, error: 'invalid_pin' });
+  });
+
+  it('answers an UNREGISTERED number exactly like a wrong PIN', () => {
+    // Anything else turns this endpoint into a way to test who belongs to the masjid.
+    const g = roster();
+    const unknown = g.handleOpenSession({ phone: '080000000000', pin: '4321' });
+    const wrong = g.handleOpenSession({ phone: '081234567890', pin: '0000' });
+    expect(unknown.error).toBe(wrong.error);
+    expect(JSON.stringify(unknown)).not.toContain('phone');
+  });
+
+  it('locks that NUMBER after five failures, not the whole masjid', () => {
+    const g = roster();
+    for (let i = 0; i < 5; i++) g.handleOpenSession({ phone: '081234567890', pin: '0000' });
+    expect(g.handleOpenSession({ phone: '081234567890', pin: '4321' }))
+      .toMatchObject({ ok: false, error: 'locked' });
+    // Sari is untouched — a per-account lock must not be a per-masjid one.
+    expect(g.handleOpenSession({ phone: '081299998888', pin: '4321' }).ok).toBe(true);
+  });
+
+  it('still lets an enrolled device in with a PIN alone', () => {
+    // Both models stay live: a shared gudang tablet is not going to type a phone number.
+    const r = roster().handleOpenSession({ deviceSecret: 'rahasia', pin: '9999' });
+    expect(r.ok).toBe(false);
+    expect(roster().handleOpenSession({ deviceSecret: 'rahasia', pin: '4321' }).ok).toBe(true);
+  });
+});
+
+describe('the phone number on the roster', () => {
+  it('is unique — two people cannot be "the person with this number"', () => {
+    const g = load(freshTabs());
+    g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', phone: '081234567890', pin: '1111' });
+    expect(g.handleSetUserPin({
+      token: admin, name: 'Sari', role: 'anggota', phone: '0812-3456-7890', pin: '2222',
+    })).toMatchObject({ ok: false, error: 'phone_taken' });
+  });
+
+  it('lets somebody keep their own number when their row is edited', () => {
+    const g = load(freshTabs());
+    const budi = g.handleSetUserPin({
+      token: admin, name: 'Budi', role: 'anggota', phone: '081234567890', pin: '1111',
+    });
+    expect(g.handleSetUserPin({
+      token: admin, userId: budi.userId, name: 'Budi S', role: 'anggota',
+      phone: '081234567890', pin: '1111',
+    }).ok).toBe(true);
+  });
+
+  it('records the member type, which is a different axis from the role', () => {
+    const g = load(freshTabs());
+    g.handleSetUserPin({ token: admin, name: 'Pak Aji', role: 'anggota', type: 'security', pin: '3333' });
+    expect(g.handleListUsers({ token: admin }).users[0].type).toBe('security');
+  });
+
+  it('falls back to marbot for an unknown type rather than storing nonsense', () => {
+    const g = load(freshTabs());
+    g.handleSetUserPin({ token: admin, name: 'X', role: 'anggota', type: 'presiden', pin: '3333' });
+    expect(g.handleListUsers({ token: admin }).users[0].type).toBe('marbot');
   });
 });

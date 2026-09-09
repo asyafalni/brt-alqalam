@@ -18,6 +18,19 @@
 
 var ROSTER_ROLES = ['admin_utama', 'admin', 'anggota'];
 
+/*
+ * WHICH GROUP somebody belongs to — a different axis from `role`, which is what they may DO.
+ * A karyawan can be an admin; a jamaah is almost certainly not. Collapsing the two would force
+ * a choice between "this person can edit the catalog" and "this person is a jamaah", which are
+ * not alternatives.
+ *
+ * It also closes §60's gap. The design had operators (PIN holders) and borrowers (jamaah,
+ * panitia, contractors) as different populations, with the borrower — the identity that actually
+ * answers "who walked off with the drill" — reduced to an optional free-text field. With jamaah
+ * on the roster, the borrower is a person the register knows.
+ */
+var ROSTER_TYPES = ['marbot', 'staf', 'jamaah', 'security'];
+
 function rosterUsers() {
   return JSON.parse(PropertiesService.getScriptProperties().getProperty('USERS') || '[]');
 }
@@ -29,8 +42,38 @@ function rosterSave(users) {
 /** What a caller is allowed to see: never a hash, never a salt. */
 function rosterList() {
   return rosterUsers().map(function (u) {
-    return { userId: u.userId, name: u.name, role: u.role, disabled: !!u.disabled };
+    return {
+      userId: u.userId,
+      name: u.name,
+      role: u.role,
+      type: u.type || 'marbot',
+      /* The phone is an IDENTIFIER, not a credential — it is what somebody types on their own
+         device instead of being handed a device secret. Returned to admins so the roster screen
+         can show and correct it; never returned by any public-tier read. */
+      phone: u.phone || '',
+      disabled: !!u.disabled,
+    };
   });
+}
+
+/** Digits only, so `0812-3456` and `08123456` are the same person and cannot both be enrolled. */
+function normalisePhone(phone) {
+  var digits = String(phone || '').replace(/[^0-9]/g, '');
+  // A leading 62 and a leading 0 are the same Indonesian number written two ways.
+  if (digits.indexOf('62') === 0) digits = '0' + digits.slice(2);
+  return digits;
+}
+
+/** Who holds this phone number, or null. Never exposed except through an authenticated path. */
+function rosterByPhone(phone) {
+  var wanted = normalisePhone(phone);
+  if (wanted.length < 8) return null;
+  var users = rosterUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].disabled) continue;
+    if (normalisePhone(users[i].phone) === wanted) return users[i];
+  }
+  return null;
 }
 
 /**
@@ -39,11 +82,25 @@ function rosterList() {
  * Keyed on `userId` when given and on `name` otherwise, so the editor helper and the app agree
  * on what "the same person" means.
  */
-function rosterSetPin(name, role, pin, userId) {
+function rosterSetPin(name, role, pin, userId, type, phone) {
   name = String(name || '').trim();
   if (!name) return { ok: false, error: 'name_required' };
   if (ROSTER_ROLES.indexOf(role) === -1) return { ok: false, error: 'bad_role' };
   if (!/^[0-9]{4,8}$/.test(String(pin))) return { ok: false, error: 'bad_pin' };
+  type = ROSTER_TYPES.indexOf(type) === -1 ? 'marbot' : type;
+
+  var digits = normalisePhone(phone);
+  if (phone && digits.length < 8) return { ok: false, error: 'bad_phone' };
+
+  /* UNIQUE, unlike the PIN. The phone is what identifies somebody on their own device, so two
+     people sharing one would make the sign-in ambiguous in a way no picker can resolve — they
+     would both be "the person with this number". */
+  if (digits) {
+    var holder = rosterByPhone(digits);
+    if (holder && (!userId || holder.userId !== userId)) {
+      return { ok: false, error: 'phone_taken' };
+    }
+  }
 
   var users = rosterUsers();
   var existing = null;
@@ -67,6 +124,8 @@ function rosterSetPin(name, role, pin, userId) {
   if (existing) {
     existing.name = name;
     existing.role = role;
+    existing.type = type;
+    existing.phone = digits;
     existing.salt = salt;
     existing.pinHash = hashPin(pin, salt);
     existing.disabled = false;
@@ -75,6 +134,8 @@ function rosterSetPin(name, role, pin, userId) {
       userId: 'USR-' + Utilities.getUuid().slice(0, 8),
       name: name,
       role: role,
+      type: type,
+      phone: digits,
       salt: salt,
       pinHash: hashPin(pin, salt),
       disabled: false,
