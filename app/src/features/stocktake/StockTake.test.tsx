@@ -478,3 +478,40 @@ describe('the form is a panel, not a slab under the list', () => {
     expect(r.getByLabelText('Nama barang')).toBeTruthy();
   });
 });
+
+describe('the form sizes itself to the panel, not to the window', () => {
+  /*
+   * Tailwind's breakpoints measure the VIEWPORT. This form used to fill one; it now lives in a
+   * 448px side panel, so on any desktop `sm:grid-cols-2` split ~400px into two ~190px columns —
+   * and the minimum row needs three 56px buttons before its number field gets a pixel, which
+   * pushed the "( - )" button off the right edge.
+   *
+   * Container queries are the tool that does express it, and Kategori/Satuan uses one: it
+   * pairs two short fields side by side when the PANEL is wide enough and stacks them when it
+   * is not. The minimum row stays one column at every width — three 56px buttons and a number
+   * field do not fit in half of 400px however the question is asked.
+   *
+   * Asserting on classes is normally a poor test, but jsdom has no layout engine: there is no
+   * geometry to measure, and the invariant — this form must not take its column count from the
+   * window — is exactly a class-level fact.
+   */
+  it('takes no column count from a viewport breakpoint', () => {
+    const r = render(Harness);
+    openForm(r);
+    const panel = r.container.querySelector('[role="dialog"]') ?? r.container;
+    const offenders = [...panel.querySelectorAll('*')]
+      .map((el) => el.getAttribute('class') ?? '')
+      /* `@sm:` is allowed and `sm:` is not — the whole distinction this test exists for. The
+         lookbehind is what keeps `@sm:grid-cols-2` from matching as a bare `sm:`. */
+      .filter((c) => /(?<![@\w])(sm|md|lg|xl):grid-cols-/.test(c));
+    expect(offenders).toEqual([]);
+  });
+
+  it('still offers every control on the minimum row once it is set', () => {
+    const r = render(Harness);
+    openForm(r);
+    fireEvent.click(r.getByText('Atur'));
+    expect(r.getByLabelText('Minimum (alarm stok)')).toBeTruthy();
+    expect(r.getByTitle('Tanpa minimum')).toBeTruthy();
+  });
+});

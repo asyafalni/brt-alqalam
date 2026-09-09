@@ -78,8 +78,10 @@ export function ItemForm(p: Props) {
   /* NO frame of its own. This lives inside a side panel that already draws one, already has a
      title saying whether you are adding or changing, and already offers a way out — the
      "Mengubah barang / Batal" banner that used to sit here was all three of those said twice. */
+  /* `@container` makes every `@`-prefixed utility below measure THIS element rather than the
+     window — see the Kategori/Satuan grid. */
   return (
-    <section>
+    <section class="@container">
 
       <div class="mb-4">
         <label class={LABEL} for="nama">Nama barang</label>
@@ -151,7 +153,11 @@ export function ItemForm(p: Props) {
         )}
       </div>
 
-      <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* A CONTAINER query, not a viewport one. These two pair naturally and both hold short
+          values, so they belong side by side when the panel is wide enough — and stacked when
+          it is not. `sm:` cannot express that: it asks how big the WINDOW is, which stopped
+          describing this form the moment it moved into a fixed-width panel. */}
+      <div class="mb-4 grid grid-cols-1 gap-4 @sm:grid-cols-2">
         <div>
           <label class={LABEL} for="kategori">Kategori</label>
           {/* Categories are free-form (Part XI). Hitting a thing that fits nowhere must not
@@ -340,7 +346,19 @@ export function ItemForm(p: Props) {
         </div>
       )}
 
-      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/*
+        * ONE COLUMN, and `sm:grid-cols-2` is gone rather than tuned.
+        *
+        * Tailwind's breakpoints measure the VIEWPORT, and this form no longer fills one — it
+        * lives in a 448px side panel. So on any desktop the grid split a ~400px panel into two
+        * ~190px columns, and the minimum row needs 56 + 56 + 56 for its three buttons before
+        * the number field gets a single pixel. The "( - )" button was pushed off the right edge.
+        * A breakpoint cannot express "as wide as my container", so the column count must not
+        * depend on one.
+        *
+        * Full width is better here anyway: a stepper worked with wet hands wants the room.
+        */}
+      <div class="mb-5 space-y-4">
         <div>
           <label class={LABEL} for="jumlah">Jumlah dihitung</label>
           <Stepper id="jumlah" value={p.input.initialStock} onChange={(v) => p.onChange('initialStock', v)} />
@@ -374,9 +392,12 @@ export function ItemForm(p: Props) {
         </div>
       </div>
 
+      {/* TYPE shrinks, the TARGET does not. `min-h-touch` is 56px on purpose — a shared tablet
+          handled with wet or gloved hands (§66) — but 20px type on a 56px bar in a 400px panel
+          is what reads as oversized, not the height. Every other button in the app is 16px. */}
       <button
         type="button"
-        class="min-h-touch w-full rounded-lg bg-slate-900 text-xl font-bold text-slate-50 hover:bg-slate-800"
+        class="min-h-touch w-full rounded-lg bg-slate-900 text-base font-bold text-slate-50 hover:bg-slate-800"
         onClick={p.onSubmit}
       >
         {/* Not "Tambah barang": that is what the button that OPENED this panel says, and what
@@ -406,19 +427,22 @@ function Choice(
       }
       onClick={onPick}
     >
-      <span class="block font-bold">{title}</span>
-      <span class="block text-sm text-slate-500">{hint}</span>
+      <span class="block text-sm font-bold">{title}</span>
+      <span class="block text-xs leading-relaxed text-slate-500">{hint}</span>
     </button>
   );
 }
 
 export function Stepper({ id, value, onChange }: { id: string; value: number; onChange: (v: number) => void }) {
   const step = (d: number) => onChange(Math.max(0, value + d));
+  /* `min-w-0 flex-1`: the minimum row puts this beside a "( - )" button, and a flex item will
+     not shrink below its content's intrinsic width without it — which is how three 56px
+     buttons and a number field push the last one off the edge of a narrow panel. */
   return (
-    <div class="flex items-stretch gap-2">
+    <div class="flex min-w-0 flex-1 items-stretch gap-2">
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(-1)}
         aria-label="Kurangi"
       >
@@ -426,7 +450,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
       </button>
       <input
         id={id}
-        class={`${FIELD} text-center text-xl font-bold tabular-nums`}
+        class={`${FIELD} min-w-0 text-center text-lg font-bold tabular-nums`}
         inputmode="numeric"
         value={String(value)}
         onInput={(e: Event) => {
@@ -436,7 +460,7 @@ export function Stepper({ id, value, onChange }: { id: string; value: number; on
       />
       <button
         type="button"
-        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-2xl font-bold text-slate-500 hover:bg-slate-50"
+        class="min-h-touch w-touch shrink-0 rounded-lg border border-slate-400 bg-white text-xl font-bold text-slate-500 hover:bg-slate-50"
         onClick={() => step(1)}
         aria-label="Tambah"
       >
