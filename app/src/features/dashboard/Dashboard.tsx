@@ -74,6 +74,20 @@ export function Dashboard(
      only go up, so the one job in this app that genuinely ends looked endless. It lives on the
      heading of the list it describes rather than in a card of its own (§82). */
   const walk = useMemo(() => coverage(locations), [locations]);
+
+  /*
+   * How much of the catalog is at a safe level.
+   *
+   * The denominator is the SAME predicate `deriveNotifications` uses — quantity-tracked, with a
+   * minimum set — and not "all items". An item with Setting Minimum "(-)" can never be low
+   * (§46), so counting it as safe would inflate the bar permanently with rows that were never
+   * at risk. Built off `notifications.length` rather than re-deriving the low set, so the bar
+   * and the list underneath it cannot disagree.
+   */
+  const stock = useMemo(() => {
+    const tracked = items.filter((i) => i.trackBy === 'quantity' && i.minStock != null).length;
+    return { tracked, safe: Math.max(0, tracked - inventory.notifications.length) };
+  }, [items, inventory.notifications]);
   const dueCount = due.length;
   // A request nobody looks at is a request nobody answers, so it joins the row of things
   // waiting on a person.
@@ -276,6 +290,15 @@ export function Dashboard(
                 Stok yang sudah menyentuh atau melewati batas minimumnya.
               </p>
 
+              {/* The same shape as the rack bar, measuring a different KIND of thing: that one
+                  is a walk that finishes, this is a level that moves up and down for ever. So
+                  it is labelled by the state it reports — how much of the catalog is stocked —
+                  rather than as progress toward an end it does not have. The list shrinking as
+                  things are restocked is what fills it. */}
+              {stock.tracked > 0 && (
+                <Meter label="Stok aman" done={stock.safe} total={stock.tracked} unit="barang" />
+              )}
+
               <LazyList sentinel={alerts.sentinel} done={alerts.done}>
                 <StockAlerts
                   notifications={shownAlerts}
@@ -314,24 +337,7 @@ export function Dashboard(
                 * twice, and from then on the only question this list answers is the rotation.
                 */}
               {!walk.done && (
-                <div class="mb-3">
-                  <div class="mb-1.5 flex items-baseline justify-between gap-3">
-                    <span class="text-xs font-semibold text-slate-600">Sudah pernah didata</span>
-                    <span class="text-xs tabular-nums text-slate-600">
-                      <span class="font-bold text-slate-900">{walk.walked}</span> dari {walk.total} rak
-                    </span>
-                  </div>
-                  <div
-                    class="h-2 w-full overflow-hidden rounded-full bg-slate-200"
-                    role="img"
-                    aria-label={`${Math.round((walk.walked / walk.total) * 100)} persen rak sudah pernah didata`}
-                  >
-                    <div
-                      class="h-full rounded-full bg-slate-900 transition-[width] duration-500"
-                      style={`width:${Math.round((walk.walked / walk.total) * 100)}%;print-color-adjust:exact`}
-                    />
-                  </div>
-                </div>
+                <Meter label="Sudah pernah didata" done={walk.walked} total={walk.total} unit="rak" />
               )}
 
               <LazyList sentinel={dueScroll.sentinel} done={dueScroll.done}>
@@ -451,6 +457,38 @@ const CHIP_TONE = {
  * The count and the label are separate props so the number can carry the emphasis; passing one
  * pre-joined string would mean bolding by regex.
  */
+/**
+ * A bar and its fraction, shared by the two cards on this row so they cannot drift apart.
+ *
+ * Both answer "how much of a finite set is in the good state", which is the only question a
+ * bar can answer honestly — a bar without a denominator is decoration.
+ */
+function Meter(
+  { label, done, total, unit }: { label: string; done: number; total: number; unit: string },
+) {
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  return (
+    <div class="mb-3">
+      <div class="mb-1.5 flex items-baseline justify-between gap-3">
+        <span class="text-xs font-semibold text-slate-600">{label}</span>
+        <span class="text-xs tabular-nums text-slate-600">
+          <span class="font-bold text-slate-900">{done}</span> dari {total} {unit}
+        </span>
+      </div>
+      <div
+        class="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+        role="img"
+        aria-label={`${label}: ${pct} persen`}
+      >
+        <div
+          class="h-full rounded-full bg-slate-900 transition-[width] duration-500"
+          style={`width:${pct}%;print-color-adjust:exact`}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Chip(
   { tone, count, label, onClick }:
   { tone: keyof typeof CHIP_TONE; count: number; label: string; onClick: () => void },

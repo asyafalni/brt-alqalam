@@ -203,7 +203,7 @@ describe('the stock-take has a finish line', () => {
   it('says how far along the first walk is, out of how many', () => {
     seedRacks([{ code: 'A1', walked: true }, { code: 'A2' }, { code: 'A3' }]);
     const r = render(App);
-    expect(r.getByLabelText('33 persen rak sudah pernah didata')).toBeTruthy();
+    expect(r.getByLabelText('Sudah pernah didata: 33 persen')).toBeTruthy();
     expect(r.getByText(/dari 3 rak/)).toBeTruthy();
   });
 
@@ -213,5 +213,35 @@ describe('the stock-take has a finish line', () => {
     seedRacks([{ code: 'A1', walked: true }]);
     const r = render(App);
     expect(r.queryByText(/Sudah pernah didata/)).toBeNull();
+  });
+});
+
+describe('the low-stock card carries a level, not a finish line', () => {
+  /*
+   * A bar needs a denominator that means something. This one counts only what
+   * `deriveNotifications` counts — quantity-tracked items with a minimum set — because an item
+   * with Setting Minimum "(-)" can never be low (§46), and counting it as safe would inflate
+   * the bar permanently with rows that were never at risk.
+   */
+  it('measures the safe items against the ones that CAN be low', () => {
+    seed(catalog(
+      input({ name: 'Sabun', initialStock: 12, minStock: 5 }),   // safe
+      input({ name: 'Karbol', initialStock: 1, minStock: 4 }),   // low
+      input({ name: 'Terpal', initialStock: 0, minStock: null }), // no minimum — not counted
+    ));
+    const r = render(App);
+    expect(r.getByLabelText('Stok aman: 50 persen')).toBeTruthy();
+    expect(r.getByText(/dari 2 barang/)).toBeTruthy();
+  });
+
+  it('never disagrees with the list underneath it', () => {
+    // Built off `notifications.length` rather than re-deriving the low set: two derivations of
+    // one fact is how a bar ends up contradicting the rows it sits above.
+    seed(catalog(
+      input({ name: 'Sabun', initialStock: 1, minStock: 5 }),
+      input({ name: 'Karbol', initialStock: 1, minStock: 4 }),
+    ));
+    const r = render(App);
+    expect(r.getByLabelText('Stok aman: 0 persen')).toBeTruthy();
   });
 });
