@@ -175,8 +175,9 @@ export function Devices(
         <p class="mt-3 text-sm text-slate-500">Memuat…</p>
       ) : devices.length === 0 ? (
         <p class="mt-3 text-xs leading-relaxed text-slate-500">
-          Belum ada perangkat. Tanpa satu pun, tidak ada yang bisa mencatat pengambilan — PIN
-          saja tidak cukup.
+          Belum ada perangkat terdaftar, dan itu tidak apa-apa: orang bisa mencatat dari HP
+          sendiri dengan nomor HP dan PIN. Daftarkan perangkat hanya untuk <b>tablet gudang
+          bersama</b>, supaya siapa pun bisa mencatat di situ tanpa mengetik nomor.
         </p>
       ) : (
         <ul class="mt-3 divide-y divide-slate-200">

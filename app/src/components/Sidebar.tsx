@@ -141,12 +141,12 @@ export function Sidebar(p: Props) {
           dot: 'bg-green-400',
           tone: 'text-slate-200',
           title: 'Tersambung',
-          /* Which of the two this device is, said plainly. A viewer that has quietly lost its
-             Ambil buttons should be able to see WHY without opening anything. */
-          hint: p.canRecord ? 'Bisa mencatat' : 'Hanya melihat',
-          aria: p.canRecord
-            ? 'Tersambung ke gateway. Perangkat ini bisa mencatat pengambilan.'
-            : 'Tersambung ke gateway. Perangkat ini hanya membaca — tidak bisa mencatat.',
+          /* A connected device can record: an enrolled tablet takes anybody's PIN, and any
+             other device identifies its user by phone number. The old "Hanya melihat" branch
+             described a viewer tier that stopped existing when the number became a way in —
+             and an unreachable branch that states something false is worse than no branch. */
+          hint: 'Bisa mencatat',
+          aria: 'Tersambung ke gateway. Perangkat ini bisa mencatat pengambilan.',
         };
 
   const width = `${railWidth(p.isMobile, p.collapsed)}px`;

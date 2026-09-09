@@ -30,8 +30,8 @@ const REASON: Record<string, string> = {
   'not-json': 'Gateway menjawab dengan halaman login, bukan data. Di Apps Script, Deploy → '
     + 'Manage deployments → Who has access harus "Anyone" (bukan "Anyone with Google account").',
   offline: 'Tidak bisa menghubungi alamat itu. Periksa koneksi, dan periksa alamatnya.',
-  device_not_enrolled: 'Kode perangkat ini tidak dikenali gateway. Jalankan enrollDevice() lagi '
-    + 'di Apps Script dan salin kode yang baru.',
+  device_not_enrolled: 'Kode perangkat ini tidak dikenali gateway. Minta admin membuat yang baru '
+    + 'di Admin → Pengguna & Perangkat → Perangkat, atau kosongkan dan pakai nomor HP saja.',
   device_revoked: 'Perangkat ini sudah dicabut aksesnya.',
   invalid_pin: 'Perangkatnya dikenali — PIN-nya yang salah, dan itu wajar di layar ini.',
   gateway_misconfigured: 'Gateway belum selesai disetel. Jalankan setupGateway() di Apps Script.',
@@ -146,7 +146,13 @@ export function ConnectPanel(
           <CircleCheck class="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
           <div class="min-w-0">
             <p class="text-sm font-bold text-slate-900">
-              {connection.deviceSecret ? 'Perangkat ini bisa mencatat.' : 'Perangkat ini bisa melihat.'}
+              {/* Both can record now — what differs is HOW somebody says who they are. A code
+                  means the tablet is already trusted and any PIN opens a visit; without one the
+                  person identifies by their own number. Saying "bisa melihat" for the second
+                  was true only under the old model. */}
+              {connection.deviceSecret
+                ? 'Tablet terdaftar — siapa pun bisa mencatat dengan PIN.'
+                : 'Tersambung — mencatat pakai nomor HP dan PIN kamu.'}
             </p>
             <p class={`${CODE} mt-1 break-all`}>{connection.url}</p>
           </div>
@@ -173,7 +179,7 @@ export function ConnectPanel(
         <p class="mt-2.5 text-xs leading-relaxed text-slate-600">
           {connection.deviceSecret
             ? 'Katalog dibaca dari spreadsheet; pengambilan dicatat lewat gateway.'
-            : 'Bisa melihat katalog dan laporan. Untuk mencatat, perlu kode perangkat.'}
+            : 'Katalog dibaca dari spreadsheet; untuk mencatat, masukkan nomor HP dan PIN.'}
         </p>
 
         {/* Quiet and compact. This is a rare, mildly destructive action and it was carrying
@@ -231,20 +237,30 @@ export function ConnectPanel(
         Dari Apps Script: Deploy → Manage deployments. Harus yang berakhiran <b>/exec</b>.
       </p>
 
+      {/*
+        * This text was teaching the OLD model and had to be rewritten, not tidied. It said a
+        * blank code meant "this device can only look", which stopped being true when a
+        * registered phone number became the other way in: a phone with no code records
+        * perfectly well, its owner just signs in by number instead. It also sent people to
+        * `enrollDevice()` in the Apps Script editor, which is no longer where enrolment lives.
+        */}
       <div class="mt-4">
         <label class={LABEL} for="gw-secret">Kode perangkat (opsional)</label>
         <input
           id="gw-secret"
           class={`${FIELD} min-h-touch font-mono text-sm`}
           value={secret}
-          placeholder="dicetak sekali oleh enrollDevice()"
+          placeholder="kosongkan kalau ini HP pribadi"
           autocomplete="off"
           onInput={(e: Event) => setSecret((e.target as HTMLInputElement).value)}
         />
-        <p class="mt-1.5 text-xs leading-relaxed text-slate-400">
-          <b>Kosongkan kalau perangkat ini hanya untuk melihat</b> — laporan, stok, peta rak.
-          Isi hanya untuk tablet gudang yang dipakai mencatat pengambilan: kode inilah yang
-          membuat PIN 4 angka berarti, dan ia dicetak sekali oleh enrollDevice().
+        <p class="mt-1.5 text-xs leading-relaxed text-slate-500">
+          <b>HP pribadi: kosongkan saja.</b> Nanti cukup masukkan nomor HP sekali, lalu PIN —
+          dan pengambilan tercatat atas namamu.
+        </p>
+        <p class="mt-1 text-xs leading-relaxed text-slate-500">
+          <b>Tablet gudang bersama:</b> isi dengan kode dari <i>Admin → Pengguna &amp; Perangkat →
+          Perangkat</i>, supaya siapa pun bisa mencatat dengan PIN-nya tanpa mengetik nomor.
         </p>
       </div>
 
@@ -258,7 +274,7 @@ export function ConnectPanel(
       <div class="mt-5">
         <Button size="panel" disabled={busy} onClick={() => void connect()}>
           <Link2 class="h-5 w-5" />
-          {busy ? 'Menguji…' : secret.trim() === '' ? 'Sambungkan untuk melihat' : 'Sambungkan'}
+          {busy ? 'Menguji…' : 'Sambungkan'}
         </Button>
       </div>
 
