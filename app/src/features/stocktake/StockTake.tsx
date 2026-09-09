@@ -292,7 +292,16 @@ export function StockTake(
     },
     {
       key: 'jumlah',
-      header: 'Jumlah',
+      /*
+       * "Jumlah dihitung", not "Jumlah" — the same words the form's own field uses.
+       *
+       * This column and Stok's are DIFFERENT FIELDS that happen to hold the same number
+       * until somebody records a withdrawal: this one is what was counted on the shelf and
+       * never moves on its own; that one is that figure plus every movement since. Both
+       * lists also carry Barang, Kategori and Rak, so the header was the only thing left to
+       * tell them apart — and "Jumlah" beside "Stok" told nobody anything.
+       */
+      header: 'Jumlah dihitung',
       align: 'right',
       mobile: 'trailing',
       cell: ({ item: i, line }) => (
@@ -498,6 +507,7 @@ export function StockTake(
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
           <h2 class="text-sm font-bold text-slate-900">
             Sudah dicatat
+            <span class="ml-2 font-normal text-slate-500">· hasil hitungan, belum dikurangi pemakaian</span>
             {search.trim() !== '' && (
               <span class="ml-2 font-normal text-slate-500">· hasil cari "{search}"</span>
             )}
