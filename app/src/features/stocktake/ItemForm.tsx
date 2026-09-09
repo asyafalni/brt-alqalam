@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'octane';
 import type { Category, Location } from '../../../../domain/types';
 import { COMMON_UNITS } from '../../data/seedCategories';
 import type { DraftInput, DraftProblem } from './draft';
-import { CARD, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
+import { ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
 import { ART_IDS, artFor, ItemArt } from '../items/ItemArt';
 
 
@@ -75,16 +75,11 @@ export function ItemForm(p: Props) {
     setNewRack(null);
   }
 
+  /* NO frame of its own. This lives inside a side panel that already draws one, already has a
+     title saying whether you are adding or changing, and already offers a way out — the
+     "Mengubah barang / Batal" banner that used to sit here was all three of those said twice. */
   return (
-    <section class={`${CARD} mb-6 p-5 ${p.editing ? 'border-slate-900' : ''}`}>
-      {p.editing && (
-        <p class="mb-4 flex items-center justify-between rounded-xl bg-slate-900/5 px-4 py-3 font-semibold text-slate-900">
-          <span>Mengubah barang</span>
-          <button type="button" class="font-semibold text-slate-900 underline" onClick={p.onCancelEdit}>
-            Batal
-          </button>
-        </p>
-      )}
+    <section>
 
       <div class="mb-4">
         <label class={LABEL} for="nama">Nama barang</label>
@@ -384,7 +379,10 @@ export function ItemForm(p: Props) {
         class="min-h-touch w-full rounded-lg bg-slate-900 text-xl font-bold text-slate-50 hover:bg-slate-800"
         onClick={p.onSubmit}
       >
-        {p.editing ? 'Simpan perubahan' : 'Tambah barang'}
+        {/* Not "Tambah barang": that is what the button that OPENED this panel says, and what
+            its title says. Three of one phrase on one screen is three things to read before
+            finding the one that acts. */}
+        {p.editing ? 'Simpan perubahan' : 'Tambah ke daftar'}
       </button>
     </section>
   );

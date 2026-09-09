@@ -7,7 +7,7 @@
 // a real table on a desk and stacks the same rows as cards below `sm`, actions included.
 
 import { useMemo, useState } from 'octane';
-import { Download, Package, Pencil, Trash2 } from '@octanejs/lucide';
+import { CircleCheck, Download, Package, Pencil, Plus, Trash2 } from '@octanejs/lucide';
 import type { Category, Item, Location, StockLine } from '../../../../domain/types';
 import type { PurchaseRequest } from '../../../../domain/requests';
 import type { Draft } from '../../state/useDraft';
@@ -63,6 +63,18 @@ export function StockTake(
   /* The opname list's own filter. It used to be the navbar box, which meant the query stayed
      with you when you left — narrowing Stok and Histori from a field up in the chrome. */
   const [search, setSearch] = useState('');
+  /*
+   * The form is a PANEL now, not a slab under the list.
+   *
+   * Inline it took most of a screen and never went away — so the thing this page is named for,
+   * the list of what has been found, started below the fold and every added row pushed it
+   * further down. Same move as "Rak baru" on Peta Rak (§91), and the same reason: the list is
+   * the context you add against.
+   */
+  const [adding, setAdding] = useState(false);
+  /* What the last save produced, so the panel can confirm without the list being visible —
+     on a phone it is behind this sheet. */
+  const [justAdded, setJustAdded] = useState('');
 
   const problems = useMemo(
     () => validate(input, items, editingId ?? undefined),
@@ -86,8 +98,11 @@ export function StockTake(
     [items, stock],
   );
 
-  const change = <K extends keyof DraftInput>(k: K, v: DraftInput[K]) =>
+  const change = <K extends keyof DraftInput>(k: K, v: DraftInput[K]) => {
+    // Typing the next name means the last one has been read and moved on from.
+    if (k === 'name') setJustAdded('');
     setInput((prev) => ({ ...prev, [k]: v }));
+  };
 
   function submit() {
     setShowProblems(true);
@@ -100,11 +115,16 @@ export function StockTake(
       setEditingId(null);
       setEditingAt('');
       setInput(emptyInput(categories));
+      /* An edit is FINISHED when it is saved; adding is not. Walking one shelf means many
+         items in a row, which is exactly what the sticky context below is for — closing the
+         panel after each would put the taps straight back. */
+      setAdding(false);
     } else {
       setCatalog((prev) => {
         const { item, stock: next } = createEntry(input, prev.items, prev.stock);
         return { items: [...prev.items, item], stock: next };
       });
+      setJustAdded(input.name.trim());
       // Sticky context: walking one shelf means many items sharing a category, unit and kind —
       // and, now, the same rack. Only the name and the count reset; that is the difference
       // between 6 taps and 2, and shelving is exactly the field that repeats down a shelf.
@@ -118,7 +138,18 @@ export function StockTake(
     setEditingAt(at);
     setInput(toInput(item, stock, at));
     setShowProblems(false);
-    scrollTo({ top: 0, behavior: 'smooth' });
+    setJustAdded('');
+    /* No scroll-to-top any more: the form comes to you. That jump existed only because the
+       form lived at the top of a page you had scrolled down. */
+    setAdding(true);
+  }
+
+  function startAdd() {
+    setEditingId(null);
+    setEditingAt('');
+    setShowProblems(false);
+    setJustAdded('');
+    setAdding(true);
   }
 
   function cancelEdit() {
@@ -126,6 +157,8 @@ export function StockTake(
     setEditingAt('');
     setInput(emptyInput(categories));
     setShowProblems(false);
+    setJustAdded('');
+    setAdding(false);
   }
 
   function addCategory(name: string) {
@@ -146,6 +179,9 @@ export function StockTake(
    * take the other rack's count with it.
    */
   function remove(item: Item, at: string) {
+    /* Otherwise the panel keeps saying "Kanebo masuk daftar" about a row that has just been
+       deleted — a note that outlives the fact it states. */
+    setJustAdded('');
     if (editingId === item.itemId && editingAt === at) cancelEdit();
     setCatalog((prev) => {
       const nextStock = removeLine(prev.stock, item.itemId, at);
@@ -334,6 +370,10 @@ export function StockTake(
                 label="Saring daftar opname"
                 placeholder="Saring daftar…"
               />
+              {/* The page's one job, so it is the one primary button on it. */}
+              <Button class="min-h-[44px]" onClick={startAdd}>
+                <Plus class="h-4 w-4" /> Tambah barang
+              </Button>
               {/* HIDDEN, not disabled. A greyed-out Ekspor invites the tap that explains
                   nothing, and neither of these is something a marbot was looking for — the
                   same reasoning that hides Ambil on a device that may only read. */}
@@ -342,7 +382,7 @@ export function StockTake(
                 variant="secondary"
                 class="min-h-[44px]"
                 disabled={items.length === 0}
-                onClick={() => setExporting(true)}
+                onClick={() => { setAdding(false); setExporting(true); }}
               >
                 <Download class="h-4 w-4" />
                 <span class="hidden sm:inline">Ekspor</span>
@@ -371,9 +411,25 @@ export function StockTake(
         <Stat value={totals.units} label="Unit dihitung" tint="bg-green-50 text-green-600" />
       </div>
 
-      {/* The form card carries its own trailing margin, which doubles up against this page's
-          vertical rhythm. Neutralised here rather than in the shared component. */}
-      <div class="[&>section]:mb-0">
+      <Sheet
+        open={adding}
+        title={editingId ? 'Ubah barang' : 'Tambah barang'}
+        description={editingId
+          ? 'Perubahan berlaku pada rak yang dipilih.'
+          : 'Kategori, satuan, rak dan jenisnya tetap terisi untuk barang berikutnya.'}
+        onClose={cancelEdit}
+      >
+        {/* Named, and only after an add. It is the one piece of feedback the list behind used
+            to give for free — and on a phone the list is behind this panel. */}
+        {justAdded !== '' && !editingId && (
+          <p
+            class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-slate-800"
+            role="status"
+          >
+            <CircleCheck class="h-4 w-4 shrink-0 text-green-700" />
+            <span><strong class="font-semibold">{justAdded}</strong> masuk daftar.</span>
+          </p>
+        )}
         <ItemForm
           input={input}
           categories={categories}
@@ -388,7 +444,7 @@ export function StockTake(
           onSubmit={submit}
           onCancelEdit={cancelEdit}
         />
-      </div>
+      </Sheet>
 
       <Sheet
         open={exporting}
@@ -442,6 +498,14 @@ export function StockTake(
                   <p class="mx-auto mt-1 max-w-sm text-sm text-slate-400">
                     Mulai dari rak paling dekat pintu.
                   </p>
+                  {/* Offered HERE as well as in the header: on an empty page the header button
+                      is a long way from where the eye has landed, and this is the only thing
+                      there is to do. */}
+                  <div class="mt-5">
+                    <Button size="touch" onClick={startAdd}>
+                      <Plus class="h-4 w-4" /> Tambah barang
+                    </Button>
+                  </div>
                   <div class="mt-5">
                     <Button variant="secondary" size="touch" onClick={draft.loadDemo}>Muat contoh data</Button>
                     <p class="mt-2 text-xs text-slate-400">

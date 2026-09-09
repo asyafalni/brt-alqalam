@@ -25,10 +25,23 @@ const desk = (r: R) => within(r.container.querySelector('table')!);
 // that only the phone list carries is what picks it out.
 const phone = (r: R) => within(r.container.querySelector('ul[class~="sm:hidden"]')!);
 
+/**
+ * Opens the add/edit panel, if it is not already open.
+ *
+ * The form is a side Sheet now, not a slab under the list — so a test has to walk in the same
+ * door a person does. It STAYS open after an add (sticky context: walking one shelf means many
+ * items in a row), which is why this is a no-op the second time.
+ */
+function openForm(r: R) {
+  const opener = r.queryAllByText('Tambah barang')[0];
+  if (opener) fireEvent.click(opener);
+}
+
 function addItem(r: R, name: string, qty: string) {
+  openForm(r);
   type(r.getByLabelText('Nama barang'), name);
   type(r.getByLabelText('Jumlah dihitung'), qty);
-  fireEvent.click(r.getByText('Tambah barang'));
+  fireEvent.click(r.getByText('Tambah ke daftar'));
 }
 
 const stored = () => JSON.parse(localStorage.getItem('brt.stocktake.draft.v6')!);
@@ -55,6 +68,7 @@ describe('StockTake — walking the gudang', () => {
 
   it('keeps category, unit and kind but clears the name — the sticky-context win', () => {
     const r = render(Harness);
+    openForm(r);
     // Satuan is a picker now, not a text box — a `<datalist>` only opens once somebody starts
     // typing, which is the moment they have stopped needing suggestions.
     fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'galon' } });
@@ -68,13 +82,15 @@ describe('StockTake — walking the gudang', () => {
 
   it('refuses to add a nameless item, and says why', () => {
     const r = render(Harness);
-    fireEvent.click(r.getByText('Tambah barang'));
+    openForm(r);
+    fireEvent.click(r.getByText('Tambah ke daftar'));
     expect(r.getByText('Nama barang belum diisi')).toBeTruthy();
     expect(r.getByText(/Belum ada barang/)).toBeTruthy();
   });
 
   it('steppers adjust the count and never go below zero', () => {
     const r = render(Harness);
+    openForm(r);
     const qty = r.getByLabelText('Jumlah dihitung') as HTMLInputElement;
     fireEvent.click(r.getByLabelText('Tambah'));
     fireEvent.click(r.getByLabelText('Tambah'));
@@ -85,6 +101,7 @@ describe('StockTake — walking the gudang', () => {
 
   it('minimum starts as "(-)" — no alarm — until the operator sets one', () => {
     const r = render(Harness);
+    openForm(r);
     expect(r.getByText(/Tidak ada minimum/)).toBeTruthy();
     fireEvent.click(r.getByText('Atur'));
     expect(r.getByLabelText('Minimum (alarm stok)')).toBeTruthy();
@@ -101,6 +118,7 @@ describe('StockTake — walking the gudang', () => {
 describe('durables must be asked how they are tracked', () => {
   it('the question only appears for Barang tetap', () => {
     const r = render(Harness);
+    openForm(r);
     expect(r.queryByText('Label satu-satu')).toBeNull();
     fireEvent.click(r.getByText('Barang tetap'));
     expect(r.getByText('Label satu-satu')).toBeTruthy();
@@ -110,6 +128,7 @@ describe('durables must be asked how they are tracked', () => {
 
   it('choosing "Hitung jumlahnya" produces no per-unit labels', () => {
     const r = render(Harness);
+    openForm(r);
     fireEvent.click(r.getByText('Barang tetap'));
     fireEvent.click(r.getByText('Hitung jumlahnya'));
     addItem(r, 'Terpal', '10');
@@ -119,6 +138,7 @@ describe('durables must be asked how they are tracked', () => {
 
   it('labelling one-by-one yields one QR-able unit per count', () => {
     const r = render(Harness);
+    openForm(r);
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '3');
     const parsed = parseInstances(
@@ -157,7 +177,10 @@ describe('editing a row mid-walk', () => {
     addItem(r, 'Sapu', '2');
     fireEvent.click(desk(r).getByLabelText('Ubah Sapu'));
     type(r.getByLabelText('Nama barang'), 'Bukan sapu');
-    fireEvent.click(r.getByText('Batal'));
+    /* The panel's own close IS the cancel now. The form used to carry a second one in a
+       "Mengubah barang / Batal" banner, which said what the panel's title says and offered
+       what its close button offers. */
+    fireEvent.click(r.getByLabelText('Tutup'));
     expect(desk(r).getByText('Sapu')).toBeTruthy();
     expect(r.queryByText('Bukan sapu')).toBeNull();
   });
@@ -210,6 +233,7 @@ describe('editing a row mid-walk', () => {
 describe('categories are free-form', () => {
   it('a new category can be added mid-walk and is selected immediately', () => {
     const r = render(Harness);
+    openForm(r);
     // Adding one is an option IN the list now, the same as satuan and rak — one idea, one shape.
     fireEvent.change(r.getByLabelText('Kategori'), { target: { value: '\u0000new' } });
     type(r.getByLabelText('Nama kategori baru'), 'Alat Masak');
@@ -224,6 +248,7 @@ describe('categories are free-form', () => {
 
   it('backing out of the new-category field adds nothing', () => {
     const r = render(Harness);
+    openForm(r);
     // Adding one is an option IN the list now, the same as satuan and rak — one idea, one shape.
     fireEvent.change(r.getByLabelText('Kategori'), { target: { value: '\u0000new' } });
     type(r.getByLabelText('Nama kategori baru'), 'Tidak jadi');
@@ -252,12 +277,15 @@ describe('export', () => {
     addItem(r, 'Sabun', '5');
     // Export is an occasional errand, so it lives in a panel rather than at the foot of the
     // page somebody scrolls past on every visit.
+    /* Opening the export panel CLOSES the item panel: two side sheets stacked on one screen
+       is one overlay too many, and the second one's backdrop dims the first. */
     fireEvent.click(r.getByText('Ekspor'));
     expect(r.getByText('Items')).toBeTruthy();
     expect(r.getByText('Categories')).toBeTruthy();
     expect(r.queryByText('AssetInstances')).toBeNull();
 
     fireEvent.click(r.getByLabelText('Tutup'));
+    openForm(r);
     fireEvent.click(r.getByText('Barang tetap'));
     addItem(r, 'Pisau', '2');
     fireEvent.click(r.getByText('Ekspor'));
@@ -287,12 +315,14 @@ describe('export', () => {
 describe('gambar barang', () => {
   it('is guessed as you type, with no field to fill in', () => {
     const r = render(Harness);
+    openForm(r);
     type(r.getByLabelText('Nama barang'), 'Pisau potong');
     expect(r.getByLabelText(/Gambar barang: pisau/)).toBeTruthy();
   });
 
   it('can be overridden when the guess is wrong, and the choice sticks', () => {
     const r = render(Harness);
+    openForm(r);
     type(r.getByLabelText('Nama barang'), 'Sabun cuci tangan');
 
     fireEvent.click(r.getByLabelText(/Gambar barang/));
@@ -300,7 +330,7 @@ describe('gambar barang', () => {
     expect(r.getByLabelText(/Gambar barang: kantong/)).toBeTruthy();
 
     type(r.getByLabelText('Jumlah dihitung'), '3');
-    fireEvent.click(r.getByText('Tambah barang'));
+    fireEvent.click(r.getByText('Tambah ke daftar'));
     expect(stored().items[0].artId).toBe('kantong');
   });
 
@@ -312,6 +342,7 @@ describe('gambar barang', () => {
 
   it('can be handed back to the guess', () => {
     const r = render(Harness);
+    openForm(r);
     type(r.getByLabelText('Nama barang'), 'Pisau potong');
     fireEvent.click(r.getByLabelText(/Gambar barang/));
     fireEvent.click(r.getByLabelText('lampu'));
@@ -326,6 +357,7 @@ describe('gambar barang', () => {
 describe('picking a satuan', () => {
   it('offers the common ones without anybody typing first', () => {
     const r = render(Harness);
+    openForm(r);
     const options = [...(r.getByLabelText('Satuan') as HTMLSelectElement).options].map((o) => o.value);
     expect(options).toContain('galon');
     expect(options).toContain('roll');
@@ -336,6 +368,7 @@ describe('picking a satuan', () => {
     // The satuan used a moment ago is likelier to be the next one than one used at the start
     // of the walk.
     const r = render(Harness);
+    openForm(r);
     fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'roll' } });
     addItem(r, 'Karpet', '2');
     fireEvent.change(r.getByLabelText('Satuan'), { target: { value: 'kg' } });
@@ -348,6 +381,7 @@ describe('picking a satuan', () => {
   it('lets a satuan nobody listed be typed, and gives a way back', () => {
     // A closed list would send somebody off to rename the thing instead.
     const r = render(Harness);
+    openForm(r);
     fireEvent.change(r.getByLabelText('Satuan'), { target: { value: '\u0000new' } });
     type(r.getByLabelText('Satuan'), 'jerigen');
     expect((r.getByLabelText('Satuan') as HTMLInputElement).value).toBe('jerigen');
@@ -365,6 +399,7 @@ describe('one shape for "add a new one"', () => {
 
   it('offers it in the list on every picker', () => {
     const r = render(Harness);
+    openForm(r);
     for (const field of ['Kategori', 'Satuan', 'Rak / tempat']) {
       const values = [...(r.getByLabelText(field) as HTMLSelectElement).options].map((o) => o.value);
       expect(values, field).toContain(ADD_NEW);
@@ -373,12 +408,14 @@ describe('one shape for "add a new one"', () => {
 
   it('leaves no stray + buttons behind', () => {
     const r = render(Harness);
+    openForm(r);
     expect(r.queryByLabelText('Tambah kategori baru')).toBeNull();
     expect(r.queryByLabelText('Tambah rak baru')).toBeNull();
   });
 
   it('adds a rack from inside the list and selects it', () => {
     const r = render(Harness);
+    openForm(r);
     fireEvent.change(r.getByLabelText('Rak / tempat'), { target: { value: ADD_NEW } });
     type(r.getByLabelText('Kode rak'), 'C9');
     fireEvent.click(r.getByText('Simpan'));
@@ -386,5 +423,58 @@ describe('one shape for "add a new one"', () => {
     const shown = [...(r.getByLabelText('Rak / tempat') as HTMLSelectElement).options]
       .map((o) => o.textContent);
     expect(shown.some((v) => v?.startsWith('C9'))).toBe(true);
+  });
+});
+
+describe('the form is a panel, not a slab under the list', () => {
+  /*
+   * Inline it took most of a screen and never went away, so the thing this page is named for —
+   * the list of what has been found — began below the fold and every added row pushed it
+   * further down. Same move as "Rak baru" on Peta Rak (§91): the list is the context you add
+   * against, so it is the list that stays on screen.
+   */
+  it('is closed until asked for', () => {
+    const r = render(Harness);
+    expect(r.queryByLabelText('Nama barang')).toBeNull();
+  });
+
+  it('STAYS open after adding, because a shelf is many items in a row', () => {
+    // The sticky context (category, unit, kind, rack all carry over) is the difference between
+    // 6 taps and 2. Closing the panel on every save would put those taps straight back.
+    const r = render(Harness);
+    addItem(r, 'Sabun', '3');
+    expect(r.getByLabelText('Nama barang')).toBeTruthy();
+    expect((r.getByLabelText('Nama barang') as HTMLInputElement).value).toBe('');
+  });
+
+  it('says what it just added, since the list may be behind it on a phone', () => {
+    const r = render(Harness);
+    addItem(r, 'Sabun', '3');
+    // Scoped to the note: the name is also in the table and on the phone card behind it.
+    const note = r.getByText(/masuk daftar/);
+    expect(note.textContent).toContain('Sabun');
+  });
+
+  it('drops that note once the row it names is gone', () => {
+    // A confirmation that outlives the fact it states is worse than none.
+    const r = render(Harness);
+    addItem(r, 'Kanebo', '5');
+    fireEvent.click(desk(r).getByLabelText('Hapus Kanebo'));
+    fireEvent.click(desk(r).getByLabelText('Ya, hapus Kanebo'));
+    expect(r.queryByText(/masuk daftar/)).toBeNull();
+  });
+
+  it('CLOSES after an edit, which is finished when it is saved', () => {
+    const r = render(Harness);
+    addItem(r, 'Sapu', '2');
+    fireEvent.click(desk(r).getByLabelText('Ubah Sapu'));
+    fireEvent.click(r.getByText('Simpan perubahan'));
+    expect(r.queryByLabelText('Nama barang')).toBeNull();
+  });
+
+  it('opens from the empty state too, where it is the only thing to do', () => {
+    const r = render(Harness);
+    fireEvent.click(r.queryAllByText('Tambah barang')[1]);
+    expect(r.getByLabelText('Nama barang')).toBeTruthy();
   });
 });
