@@ -56,15 +56,15 @@ describe('reading the register', () => {
       .toBe(Date.parse('2026-09-08T00:00:00Z'));
   });
 
-  it('asks for the detailed tier only when it has a session', async () => {
-    const f = reply({ ok: true, state: { tier: 'detailed' } });
-    await fetchState(URL, 'tok-1', f);
-    expect(String(f.mock.calls[0][0])).toContain('op=stateDetailed');
-    expect(String(f.mock.calls[0][0])).toContain('session=tok-1');
-
+  it('reads the PII-free tier, and puts NO credential in the URL', async () => {
+    // The detailed tier is a POST (`fetchStateAsAdmin`), because a token in a query string is
+    // written into browser history and every log in between. This GET carries nothing to leak.
     const g = reply({ ok: true, state: { tier: 'public' } });
-    await fetchState(URL, undefined, g);
-    expect(String(g.mock.calls[0][0])).toContain('op=state');
+    await fetchState(URL, g);
+    const sent = String(g.mock.calls[0][0]);
+    expect(sent).toContain('op=state');
+    expect(sent).not.toContain('session=');
+    expect(sent).not.toContain('token=');
   });
 });
 
@@ -88,13 +88,13 @@ describe('talking to Apps Script at all', () => {
   it('names the sign-in-page trap when HTML comes back', async () => {
     // `access: ANYONE` instead of ANYONE_ANONYMOUS returns a Google login page with HTTP 200 —
     // a success response full of HTML, which otherwise reads as a bug in our own code.
-    await expect(fetchState(URL, undefined, raw('<!DOCTYPE html><html>...')))
+    await expect(fetchState(URL, raw('<!DOCTYPE html><html>...')))
       .rejects.toMatchObject({ code: 'not-json' });
   });
 
   it('calls a dead network offline rather than letting the throw escape raw', async () => {
     const f = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
-    await expect(fetchState(URL, undefined, f)).rejects.toMatchObject({ code: 'offline' });
+    await expect(fetchState(URL, f)).rejects.toMatchObject({ code: 'offline' });
   });
 });
 

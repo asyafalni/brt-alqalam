@@ -164,19 +164,23 @@ async function call(
   return json;
 }
 
-/** Read the whole register. Without a session this is the PII-free tier. */
+/**
+ * Read the whole register. This is the PII-free tier, and it is the ONLY thing this GET does.
+ *
+ * ⚠️ It used to take an optional session token and put it in the query string to ask for the
+ * detailed tier. Nothing ever called it that way, and it directly contradicted the reason
+ * `fetchStateAsAdmin` below is a POST: a credential in a URL is written into browser history
+ * and into every log between here and Google. A dead parameter that invites exactly the mistake
+ * a neighbouring function was rewritten to avoid is worse than no parameter. A PIN-session
+ * detailed read, if one is ever wanted, belongs on the POST path with the other credentials.
+ */
 export async function fetchState(
   url: string,
-  session?: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<GatewayState> {
-  const q = session
-    ? `${url}?op=stateDetailed&session=${encodeURIComponent(session)}`
-    : `${url}?op=state`;
-
   let res: Response;
   try {
-    res = await fetchImpl(q);
+    res = await fetchImpl(`${url}?op=state`);
   } catch (err) {
     throw new GatewayError('offline', err);
   }
