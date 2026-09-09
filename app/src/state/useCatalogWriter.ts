@@ -12,7 +12,7 @@
 // colleague's work on purpose. Two admins tidying the catalog at once is the normal case during
 // a stock-take, not an edge one.
 
-import { useState } from 'octane';
+import { useRef, useState } from 'octane';
 import { putCatalog, GatewayError } from '../../../data/gateway';
 import type { CatalogTabs } from '../../../data/gateway';
 import {
@@ -73,14 +73,29 @@ export function useCatalogWriter(
   onSaved: () => void,
 ): CatalogWriter {
   const [pending, setPending] = useState<CatalogPatch | null>(null);
-  const [atRev, setAtRev] = useState<number | null>(null);
+  const [ackRev, setAckRev] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  /*
+   * THE REVISION THIS DEVICE HAS ALREADY MOVED THE CATALOG TO.
+   *
+   * `rev` is what the last READ said, and a read is up to a poll behind. Every accepted save
+   * bumps the sheet's revision, so a second save built on `rev` was being sent against a
+   * revision this very device had already superseded — and the gateway, correctly, refused it
+   * as stale. The admin then read "sudah diubah orang lain" about their own edit of four
+   * seconds ago, and lost it. An admin tidying names makes edits faster than a 1.5s round trip,
+   * so this was the normal case, not an edge one.
+   */
+  const wrote = useRef<number | null>(null);
+  /* Serialised, for the same reason: two saves in flight at once would both carry the revision
+     from before either of them, and the second would be refused however this is counted. */
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+
   /* The overlay outlives the reply and dies at the next READ, because the gap between "the
      gateway has it" and "the poll shows it" is the whole reason the overlay exists. Once the
-     revision has moved past the one we wrote at, the register itself is carrying the change. */
-  const visible = atRev !== null && rev > atRev ? null : pending;
+     read reports the revision our write produced, the register itself is carrying the change. */
+  const visible = ackRev !== null && rev >= ackRev ? null : pending;
 
   function write(patch: CatalogPatch) {
     if (!url || !getToken) { setError('Belum masuk sebagai admin.'); return; }
@@ -90,16 +105,23 @@ export function useCatalogWriter(
     setSaving(true);
     setError('');
 
-    getToken()
-      .then((token) => putCatalog(url, token, rev, toTabs(patch)))
-      .then(() => {
+    queue.current = queue.current
+      .then(() => getToken())
+      /* The later of what we last read and what we last wrote. A read that has caught up (or
+         overtaken us, because somebody else saved too) wins; otherwise our own last write does. */
+      .then((token) => putCatalog(url, token, Math.max(rev, wrote.current ?? rev), toTabs(patch)))
+      .then((result) => {
+        wrote.current = result.rev;
         // NOT cleared here — see `visible` above.
-        setAtRev(rev);
+        setAckRev(result.rev);
         onSaved();
       })
       .catch((err: unknown) => {
         setPending(null);
-        setAtRev(null);
+        setAckRev(null);
+        /* Forget our position on a refusal. A `stale_rev` means the sheet is somewhere we did
+           not put it, and the only honest next move is to trust the next read. */
+        wrote.current = null;
         setError(explain(err instanceof GatewayError ? err.code : 'offline'));
       })
       .finally(() => setSaving(false));
