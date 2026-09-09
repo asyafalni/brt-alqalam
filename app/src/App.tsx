@@ -17,6 +17,8 @@ import { RackBoard } from './features/racks/RackBoard';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { ItemDetail } from './features/items/ItemDetail';
 import { AssetBoard } from './features/assets/AssetBoard';
+import { LoanSheet } from './features/movement/LoanSheet';
+import type { LoanTarget } from './features/movement/LoanSheet';
 import { Finder } from './features/search/Finder';
 
 // Split at the route, because these two carry the app's only heavy dependencies and neither is
@@ -213,6 +215,42 @@ export function App() {
       setPinBusy(false);
     }
   }
+  /**
+   * One movement, routed to wherever this device's records actually go.
+   *
+   * Shared by the quantity sheet and the loan sheet, because they are the same act with
+   * different forms in front of them — and two copies of this would be two places for the
+   * offline path, the PIN path and the receipt to drift apart.
+   */
+  function commitTxn(txn: Txn, what: string) {
+    /* A viewer has no device secret and cannot record — so the movement goes nowhere rather
+       than to the local draft, which would be a private number diverging from the shared one
+       under the same heading. The buttons are hidden for that case, so reaching here at all
+       would be a bug. */
+    if (connection && canRecord(connection)) {
+      setPinError('');
+      const entry = {
+        clientTxnId: txn.clientTxnId, type: txn.type, itemId: txn.itemId,
+        assetId: txn.assetId, locationId: txn.locationId, qtyDelta: txn.qtyDelta,
+        recipient: txn.recipient, condition: txn.condition, note: txn.note,
+      };
+      /* An hour-long phone session is already an answer to "who is this?", so asking again is
+         asking somebody to prove something they proved four minutes ago — which is what made
+         the PIN feel like a toll rather than a lock. */
+      const open = liveSession();
+      if (open) void record(open, [entry], what); else setPinFor([entry]);
+    } else if (!connection) {
+      localDraft.setTxns((prev) => [...prev, txn]);
+      /* Confirmed here too, and it says WHERE — the local draft is a legitimate mode (§59
+         stage 1) and the one thing it must never do is read like the register. */
+      say({
+        kind: 'ok',
+        text: `Tercatat: ${what}`,
+        hint: 'Tersimpan di HP ini saja — belum ada gateway.',
+      });
+    }
+  }
+
   useEffect(refreshQueue, [connection?.url]);
 
   /* The catalog comes from the sheet the moment this device is connected. Every screen already
@@ -310,6 +348,9 @@ export function App() {
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
   const [moving, setMoving] = useState<MovementTarget | null>(null);
+  /* Lending a labelled unit out, and closing that loan. Until this existed the whole equipment
+     lifecycle was reachable only from demo data (§60, §73). */
+  const [loan, setLoan] = useState<LoanTarget | null>(null);
 
   const now = useNow();
   const inventory = useInventory(draft, now);
@@ -610,6 +651,7 @@ export function App() {
               now={now}
               onNavigate={navigate}
               onMove={setMoving}
+              onLoan={setLoan}
             />
           )}
           {route.name === 'aset' && (
@@ -628,6 +670,7 @@ export function App() {
                 setAjukanOpen({ type, assetId, requestId: newRequestId() });
               }}
               onOpenCounted={() => navigate({ name: 'board', kind: 'barang-tetap' })}
+              onLoan={setLoan}
             />
           )}
           {route.name === 'pengajuan' && (
@@ -864,38 +907,22 @@ export function App() {
              a PIN — so the entry is held until that PIN is given rather than written first and
              attributed afterwards. Not connected, it is the local log, as during a stock-take. */
           onCommit={(txn) => {
-            /* A viewer has no device secret and cannot record — so the movement goes nowhere
-               rather than to the local draft, which would be a private number diverging from
-               the shared one under the same heading. The buttons are hidden for that case, so
-               reaching here at all would be a bug. */
-            if (connection && canRecord(connection)) {
-              setPinError('');
-              const entry = {
-                clientTxnId: txn.clientTxnId, type: txn.type, itemId: txn.itemId,
-                assetId: txn.assetId, locationId: txn.locationId, qtyDelta: txn.qtyDelta,
-                recipient: txn.recipient, condition: txn.condition, note: txn.note,
-              };
-              /* An hour-long phone session is already an answer to "who is this?", so asking
-                 again is asking somebody to prove something they proved four minutes ago —
-                 which is what made the PIN feel like a toll rather than a lock. */
-              const open = liveSession();
-              const what = `${moving ? moving.item.name : 'barang'} ${txn.qtyDelta > 0 ? '+' : ''}${txn.qtyDelta}`;
-              if (open) void record(open, [entry], what); else setPinFor([entry]);
-            } else if (!connection) {
-              localDraft.setTxns((prev) => [...prev, txn]);
-              /* Confirmed here too, and it says WHERE — the local draft is a legitimate mode
-                 (§59 stage 1) and the one thing it must never do is read like the register. */
-              say({
-                kind: 'ok',
-                text: `Tercatat: ${moving ? moving.item.name : 'barang'}`,
-                hint: 'Tersimpan di HP ini saja — belum ada gateway.',
-              });
-            }
+            commitTxn(txn, `${moving ? moving.item.name : 'barang'} ${txn.qtyDelta > 0 ? '+' : ''}${txn.qtyDelta}`);
             setMoving(null);
           }}
           onClose={() => setMoving(null)}
         />
       </div>
+
+      <LoanSheet
+        destination={connection ? 'gateway' : 'local'}
+        target={loan}
+        onCommit={(txn) => {
+          commitTxn(txn, loan ? loan.label : 'unit');
+          setLoan(null);
+        }}
+        onClose={() => setLoan(null)}
+      />
 
       {/* At the FRAME, above the bottom bar. A movement is recorded from Beranda, from a rack,
           from the scanner and from the item page, so its outcome has to reach whichever screen

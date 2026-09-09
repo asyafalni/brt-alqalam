@@ -318,7 +318,8 @@ describe('what happened to the record', () => {
     fireEvent.click(r.getByText('Simpan'));
 
     const flash = within(r.container.querySelector('[role="status"]')!);
-    expect(flash.getByText('Tercatat: Sabun cuci')).toBeTruthy();
+    // Names the quantity too, the same way the connected receipt does — one commit path now.
+    expect(flash.getByText(/Tercatat: Sabun cuci -1/)).toBeTruthy();
     /* Unconnected, so this is the phone's own draft (§59 stage 1) — a legitimate mode whose one
        job is never to read like the shared register. */
     expect(flash.getByText(/HP ini saja/)).toBeTruthy();

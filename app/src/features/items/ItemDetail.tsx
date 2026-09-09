@@ -20,6 +20,7 @@ import { instancesFor } from '../stocktake/draft';
 import { moveLine, setLine, totalFor, UNPLACED } from '../../../../domain/stock';
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
 import type { MovementTarget } from '../movement/MovementSheet';
+import type { LoanTarget } from '../movement/LoanSheet';
 import { artFor, ItemArt } from './ItemArt';
 import { ItemPhotos } from './ItemPhotos';
 import { createIndexedDbPhotoStore } from '../../../../data/indexedDbPhotos';
@@ -78,12 +79,14 @@ const HISTORY: Column<Txn>[] = [
 ];
 
 export function ItemDetail(
-  { id, draft, inventory, now, onNavigate, onMove }:
+  { id, draft, inventory, now, onNavigate, onMove, onLoan }:
   {
     id: string; draft: Draft; inventory: Inventory; now: number;
     onNavigate: (r: Route) => void;
     /** The tap path to recording a movement, for when scanning is not to hand. */
     onMove: (target: MovementTarget) => void;
+    /** Lends a labelled unit out, or closes its loan. Absent on a device that may only read. */
+    onLoan?: (target: LoanTarget) => void;
   },
 ) {
   const item = draft.items.find((i) => i.itemId === id || i.barcode === id);
@@ -355,19 +358,51 @@ export function ItemDetail(
               card stretched the full width of a tablet, which reads as a mistake. */}
           <ul class="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">
             {instances.map((a) => {
-              const chip = instanceStatusBadge(inventory.derived.instances[a.assetId]?.status ?? 'available');
-              return (
-                <li
-                  key={a.assetId}
-                  class="flex items-stretch gap-2.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 sm:gap-3 sm:p-3"
-                >
+              const d = inventory.derived.instances[a.assetId];
+              const status = d?.status ?? 'available';
+              const chip = instanceStatusBadge(status);
+              /* Lending out and closing a loan are the two things this card is FOR, and until
+                 now it was decoration: the borrowed / broken / lost states existed and nothing
+                 could reach them (§60). Only these two states have a next step — a broken unit
+                 goes through Pengajuan perbaikan, a lost one through a replacement purchase. */
+              const actionable = onLoan && draft.canRecord !== false
+                && (status === 'available' || status === 'out');
+              const Row = (
+                <>
                   {/* The status is the first thing read, before any word of it. */}
                   <span class={`w-1 shrink-0 rounded-full ${chip.rail}`} aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-bold text-slate-900">{a.label}</p>
                     <p class={`${CODE} truncate`}>{a.assetId}</p>
                     <span class={`${PILL} ${chip.chip} mt-2 inline-block`}>{chip.label}</span>
+                    {actionable && (
+                      <span class="mt-2 block text-xs font-semibold text-slate-700 underline underline-offset-2">
+                        {status === 'available' ? 'Pinjamkan' : 'Selesaikan pinjaman'}
+                      </span>
+                    )}
                   </div>
+                </>
+              );
+              const shell = 'flex items-stretch gap-2.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 text-left sm:gap-3 sm:p-3';
+              return (
+                <li key={a.assetId}>
+                  {actionable ? (
+                    <button
+                      type="button"
+                      class={`${shell} w-full hover:border-slate-400`}
+                      onClick={() => onLoan!({
+                        assetId: a.assetId,
+                        label: a.label,
+                        item,
+                        status,
+                        holder: d?.holder,
+                      })}
+                    >
+                      {Row}
+                    </button>
+                  ) : (
+                    <div class={shell}>{Row}</div>
+                  )}
                 </li>
               );
             })}

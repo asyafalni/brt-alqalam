@@ -18,11 +18,12 @@
 // Lumping them into one "problem" bucket would hide that they demand different actions.
 
 import { useMemo, useState } from 'octane';
-import { CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
+import { ArrowDownLeft, CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { FilterField } from '../../components/FilterField';
 import { loanAge, loansByAge } from '../../../../domain/loans';
 import type { LoanLevel } from '../../../../domain/loans';
 import type { RequestType } from '../../../../domain/requests';
+import type { LoanTarget } from '../movement/LoanSheet';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -51,11 +52,13 @@ const TABLE_SHAPE_ACTION =
   `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, now, onOpenItem, onRequest, onOpenCounted }:
+  { draft, inventory, now, onOpenItem, onRequest, onOpenCounted, onLoan }:
   {
     draft: Draft; inventory: Inventory; now: number; onOpenItem: (id: string) => void;
     /** To the stock list, narrowed to barang tetap — where the counted ones actually live. */
     onOpenCounted: () => void;
+    /** Closes a loan. Absent on a device that may only read. */
+    onLoan?: (target: LoanTarget) => void;
     /**
      * The bridge from "this is broken" to somebody doing something about it.
      *
@@ -206,6 +209,15 @@ export function AssetBoard(
         showHolder
         showAge
         now={now}
+        onResolve={onLoan && draft.canRecord !== false
+          ? (d) => onLoan({
+            assetId: d.instance.assetId,
+            label: d.instance.label,
+            item: itemOf(d)!,
+            status: d.status,
+            holder: d.holder,
+          })
+          : undefined}
       />
 
       <Section
@@ -256,7 +268,7 @@ function Section(
   {
     title, subtitle, icon: Icon, rows, empty, emptyHint, itemOf, draft, onOpenItem,
     showHolder, showNote, showAge, now = 0, holderHeader = 'Dipegang', noteFor, onRequest,
-    action,
+    onResolve, action,
   }: {
     title: string; subtitle: string; icon: (p: { class?: string }) => unknown;
     rows: DerivedInstance[]; empty: string; emptyHint: string;
@@ -267,7 +279,16 @@ function Section(
     showAge?: boolean; now?: number;
     noteFor: (d: DerivedInstance) => string | undefined;
     onRequest: (type: RequestType, assetId: string) => void;
-    /** The next step this list offers. "Dipinjam" has none — it resolves by being returned. */
+    /**
+     * Closes a loan: back, back broken, or gone.
+     *
+     * "Dipinjam" used to offer nothing, on the grounds that it "resolves by being returned" —
+     * which was true of the model and false of the app, because nothing could record the
+     * return either (§60). A list that can only ever grow is not a list of open loans, it is a
+     * list of things we have given up on.
+     */
+    onResolve?: (d: DerivedInstance) => void;
+    /** The next step for the OTHER lists, which file a request rather than record a movement. */
     action?: {
       type: RequestType; label: string; short: string;
       icon: (p: { class?: string }) => unknown;
@@ -339,6 +360,22 @@ function Section(
         return <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>;
       },
     },
+    ...(onResolve ? [{
+      key: 'resolve',
+      header: '',
+      mobile: 'meta' as const,
+      align: 'right' as const,
+      cell: (d: DerivedInstance) => (
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+          aria-label={`Selesaikan pinjaman: ${d.instance.label}`}
+          onClick={(e: MouseEvent) => { e.stopPropagation(); onResolve(d); }}
+        >
+          <ArrowDownLeft class="h-4 w-4" /> Selesaikan
+        </button>
+      ),
+    }] : []),
     ...(action ? [{
       key: 'action',
       // Deliberately headerless: a column of buttons needs no word above it, and "Aksi" would
