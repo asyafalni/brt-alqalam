@@ -128,6 +128,19 @@ textarea:focus-visible {
   @apply outline-2 outline-solid outline-offset-2 outline-slate-900;
 }
 
+/* A COMPOSED field — an icon, an input and a clear button sharing one pill — draws the ring on
+   the SHELL, so the input inside must not draw a second one inside the first.
+
+   The rule above is deliberately un-`:where()`d and therefore beats a utility class, which is
+   the whole point of it and is why the search field's own `outline-none` was being ignored:
+   focus put a black rounded box INSIDE the white pill, on top of the pill's own black border
+   and a grey halo. Three indicators for one field, and the innermost one looked like a
+   rendering fault. This overrides it by specificity rather than by `!important`, and only where
+   a shell has taken the job on. */
+.field-shell input:focus-visible {
+  outline: none;
+}
+
 /* ---------------------------------------------------------------------------
    PRINTED LABELS
    Sized in millimetres, because these end up on a physical sticker sheet and a

@@ -48,8 +48,15 @@ export function Navbar(p: Props) {
       {/* Shown on a PHONE too, which it was not: it sat behind `hidden sm:flex`, so the one
           device the gudang actually runs on had no way to search at all — and "where is the
           soap" is the question §0 says this whole register exists to answer. It takes the
-          leftover width there and its fixed sizes only from `sm` up. */}
-      <div class="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-slate-500 bg-white px-4 py-3 transition-colors focus-within:border-slate-900 focus-within:ring-4 focus-within:ring-slate-900/10 sm:w-72 sm:flex-none sm:px-5 md:w-96">
+          leftover width there and its fixed sizes only from `sm` up.
+
+          ONE focus indicator, and it is the same one every other focusable thing in the app
+          gets: a 2px slate outline, offset, around the pill. It used to be three at once —
+          the border going black, a 4px halo, and the input's own global outline drawn INSIDE
+          the pill — which read as harsh and, in the middle, as a fault. The resting border
+          stays `slate-500` because a form field's boundary has to clear 3:1 (§77) whether it
+          is focused or not. */}
+      <div class="field-shell flex min-w-0 flex-1 items-center gap-3 rounded-full border border-slate-500 bg-white px-4 py-3 focus-within:outline-2 focus-within:outline-solid focus-within:outline-offset-2 focus-within:outline-slate-900 sm:w-72 sm:flex-none sm:px-5 md:w-96">
         <Search class="h-4 w-4 shrink-0 text-slate-400" />
         <input
           class="w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
