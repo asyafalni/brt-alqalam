@@ -89,7 +89,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.14.0-phone-identity';
+var GATEWAY_VERSION = '0.16.0-revoke-live';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -99,7 +99,24 @@ var GATEWAY_VERSION = '0.14.0-phone-identity';
  * A session is short-lived on purpose. It exists to cover ONE visit to the gudang: PIN,
  * log what you are taking, Simpan. It is not a login, and nothing should try to keep it.
  */
+/*
+ * TWO LIFETIMES, because the risk is not the same on the two kinds of device.
+ *
+ * §58.5 made a session ONE VISIT — PIN, log, Simpan, ended — specifically so a shared kiosk
+ * could not misattribute: whoever walks up next must not inherit the last person's session.
+ * That reasoning is exactly as strong as it ever was for a tablet in the gudang, and it is
+ * nearly absent on somebody's own phone, which one person carries.
+ *
+ * So an ENROLLED DEVICE keeps the short window, and a PHONE session lives an hour of IDLE time,
+ * refreshed on every use. Somebody working through a shelf types a PIN once; somebody who put
+ * the phone down after lunch types it again.
+ *
+ * ⚠️ The trade, and it is the ordinary "stay signed in" one: for that hour, a borrowed or stolen
+ * phone can record without knowing the PIN. On a personal device that is the same exposure as
+ * every banking app on the same phone, and it is what the hour buys.
+ */
 var SESSION_TTL_MS = 15 * 60 * 1000;
+var SESSION_TTL_PHONE_MS = 60 * 60 * 1000;
 
 /**
  * Open a session with EITHER an enrolled device or a registered phone number.
@@ -186,15 +203,28 @@ function handleOpenSession(body) {
 
   clearFailures(lockKey);
   var token = Utilities.getUuid();
+  var byPhone = lockKey.indexOf('ph:') === 0;
   CacheService.getScriptCache().put(
     'session:' + token,
-    JSON.stringify({ userId: actor.userId, name: actor.name, role: actor.role, lockKey: lockKey }),
-    Math.floor(SESSION_TTL_MS / 1000)
+    JSON.stringify({
+      userId: actor.userId, name: actor.name, role: actor.role, lockKey: lockKey,
+      kind: byPhone ? 'phone' : 'device',
+    }),
+    Math.floor((byPhone ? SESSION_TTL_PHONE_MS : SESSION_TTL_MS) / 1000)
   );
 
   return respond({
     ok: true,
-    session: { token: token, actorUserId: actor.userId, actorName: actor.name, role: actor.role },
+    session: {
+      token: token,
+      actorUserId: actor.userId,
+      actorName: actor.name,
+      role: actor.role,
+      /* Told to the client so it knows whether to keep the token at all. A device session is
+         not worth storing — it is over as soon as the visit is. */
+      expiresInMs: byPhone ? SESSION_TTL_PHONE_MS : SESSION_TTL_MS,
+      kind: byPhone ? 'phone' : 'device',
+    },
   });
 }
 
@@ -205,9 +235,38 @@ function handleCloseSession(body) {
 
 function requireSession(token) {
   if (!token) return { ok: false, error: 'no_session' };
-  var raw = CacheService.getScriptCache().get('session:' + token);
+  var cache = CacheService.getScriptCache();
+  var raw = cache.get('session:' + token);
   if (!raw) return { ok: false, error: 'session_expired' };
   var s = JSON.parse(raw);
+
+  /*
+   * CHECKED AGAINST THE ROSTER, every time.
+   *
+   * Otherwise "we can revoke a stolen phone" is only true once the session expires — up to an
+   * hour of a disabled person still recording, which is exactly the window somebody reaches for
+   * revocation to close. The session is a token in a cache; whether it still means anything is a
+   * fact about the roster, and only the roster can answer it.
+   *
+   * One property read per authenticated request. Cheap next to being wrong about this.
+   */
+  var still = rosterUsers();
+  var live = null;
+  for (var i = 0; i < still.length; i++) {
+    if (still[i].userId === s.userId) live = still[i];
+  }
+  if (!live || live.disabled) {
+    cache.remove('session:' + token);
+    return { ok: false, error: 'session_revoked' };
+  }
+
+  /* SLIDING, not fixed: the hour is idle time, so a person working steadily through a rack is
+     never interrupted and a phone put down after lunch asks again. Only the phone path slides —
+     re-arming a shared tablet's session on every read is precisely what §58.5 forbids. */
+  if (s.kind === 'phone') {
+    cache.put('session:' + token, raw, Math.floor(SESSION_TTL_PHONE_MS / 1000));
+  }
+
   s.ok = true;
   return s;
 }

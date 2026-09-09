@@ -61,9 +61,7 @@ let clerkCache = new Map<string, string>();
 function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
   clerkCalls = [];
   clerkReplies = [];
-  clerkCache = new Map([['session:sesi-marbot', JSON.stringify(
-    { userId: 'USR-marbot', name: 'Budi', role: 'anggota', deviceId: 'DEV-1' },
-  )]]);
+  clerkCache = new Map();
   const store: Record<string, string> = {
     CLERK_JWT_KEY: KEY, CLERK_ISSUER: ISS, PIN_PEPPER: 'test-pepper', ...props,
   };
@@ -119,6 +117,7 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
        handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
        handleSetDeviceRevoked, handleRenameDevice, handleInviteAdmin,
        handleListInvitations, handleRevokeInvitation, handleFinishRequest, handleSuggestPin,
+       requireSession,
        writeTab, txnRow, updateRowById, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
   )(...Object.values(sandbox));
@@ -143,6 +142,20 @@ const freshTabs = (): Record<string, Tab> => ({
 const admin = token({ sub: 'usr_1', role: 'admin', name: 'Alfin' });
 /** The permanent super-admin. Only this role may create or alter another admin. */
 const utama = token({ sub: 'usr_0', role: 'admin_utama', name: 'Bos' });
+
+/**
+ * A real PIN session for a real roster entry.
+ *
+ * There used to be a magic pre-seeded token pointing at a user nobody had registered, and it
+ * stopped working the moment `requireSession` began checking the roster — correctly, because
+ * "we can revoke somebody" is only true if a live session notices. A fixture that could not
+ * survive that check was a fixture describing something the system does not do.
+ */
+function marbotSession(g: Record<string, any>): string {
+  g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+  return g.handleOpenSession({ deviceSecret: 'rahasia-uji', pin: '4321' }).session.token;
+}
+
 
 describe('what an admin may replace', () => {
   it('never lists Transactions — the log is appended, never rewritten', () => {
@@ -383,59 +396,74 @@ const REQ_HEADER = ['requestId', 'type', 'name', 'itemId', 'assetId', 'qty', 'un
   'reason', 'url', 'status', 'requestedBy', 'requestedTs', 'decidedBy', 'decidedTs', 'note'];
 
 describe('filing a request needs a PIN, not an admin', () => {
-  const ok = { session: 'sesi-marbot', name: 'Kain pel', qty: 2, unit: 'buah', reason: 'sudah tipis' };
+  const DEVICE = JSON.stringify([
+    { deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia-uji', revoked: false },
+  ]);
+  const base = { name: 'Kain pel', qty: 2, unit: 'buah', reason: 'sudah tipis' };
+  /** Loads a gateway with one enrolled device and one registered marbot, and signs them in. */
+  const signedIn = (tabs: Record<string, Tab>) => {
+    const g = load(tabs, { DEVICES: DEVICE });
+    return { g, ok: { ...base, session: marbotSession(g) } };
+  };
 
   it('refuses with no session at all', () => {
-    expect(load(freshTabs()).handleSubmitRequest({ ...ok, session: undefined }))
+    const { g, ok } = signedIn(freshTabs());
+    expect(g.handleSubmitRequest({ ...ok, session: undefined }))
       .toMatchObject({ ok: false, error: 'no_session' });
   });
 
   it('accepts an anggota session — no Clerk token anywhere', () => {
     const tabs = freshTabs();
-    const r = load(tabs).handleSubmitRequest(ok);
-    expect(r.ok).toBe(true);
+    const { g, ok } = signedIn(tabs);
+    expect(g.handleSubmitRequest(ok).ok).toBe(true);
     expect(tabs.Requests).toHaveLength(2);
   });
 
   it('takes requestedBy from the SESSION, never from the body', () => {
     const tabs = freshTabs();
-    load(tabs).handleSubmitRequest({ ...ok, requestedBy: 'USR-orang-lain' });
-    expect(tabs.Requests[1][REQ_HEADER.indexOf('requestedBy')]).toBe('USR-marbot');
+    const { g, ok } = signedIn(tabs);
+    const me = g.handleListUsers({ token: admin }).users[0].userId;
+    g.handleSubmitRequest({ ...ok, requestedBy: 'USR-orang-lain' });
+    expect(tabs.Requests[1][REQ_HEADER.indexOf('requestedBy')]).toBe(me);
   });
 
   it('always files as diajukan, whatever the body says', () => {
     const tabs = freshTabs();
-    load(tabs).handleSubmitRequest({ ...ok, status: 'selesai' });
+    const { g, ok } = signedIn(tabs);
+    g.handleSubmitRequest({ ...ok, status: 'selesai' });
     expect(tabs.Requests[1][REQ_HEADER.indexOf('status')]).toBe('diajukan');
   });
 
   it('requires a reason, because a request nobody can judge gets chased instead', () => {
-    expect(load(freshTabs()).handleSubmitRequest({ ...ok, reason: '  ' }))
+    const { g, ok } = signedIn(freshTabs());
+    expect(g.handleSubmitRequest({ ...ok, reason: '  ' }))
       .toMatchObject({ ok: false, error: 'reason_required' });
   });
 
   it('requires a name and a positive quantity', () => {
-    const g = load(freshTabs());
+    const { g, ok } = signedIn(freshTabs());
     expect(g.handleSubmitRequest({ ...ok, name: '' })).toMatchObject({ ok: false, error: 'name_required' });
     expect(g.handleSubmitRequest({ ...ok, qty: 0 })).toMatchObject({ ok: false, error: 'bad_qty' });
   });
 
   it('does not echo the row back — the submitter cannot read this tab', () => {
-    const r = load(freshTabs()).handleSubmitRequest(ok);
-    expect(Object.keys(r).sort()).toEqual(['ok', 'requestId']);
+    const { g, ok } = signedIn(freshTabs());
+    expect(Object.keys(g.handleSubmitRequest(ok)).sort()).toEqual(['ok', 'requestId']);
   });
 
   it('appends, never replaces: an existing request survives', () => {
     const tabs = freshTabs();
     tabs.Requests.push(REQ_HEADER.map((c) => (c === 'requestId' ? 'REQ-lama' : '')));
-    load(tabs).handleSubmitRequest(ok);
+    const { g, ok } = signedIn(tabs);
+    g.handleSubmitRequest(ok);
     expect(tabs.Requests[1][0]).toBe('REQ-lama');
     expect(tabs.Requests).toHaveLength(3);
   });
 
   it('writes an unpriced request blank, not zero', () => {
     const tabs = freshTabs();
-    load(tabs).handleSubmitRequest(ok);
+    const { g, ok } = signedIn(tabs);
+    g.handleSubmitRequest(ok);
     expect(tabs.Requests[1][REQ_HEADER.indexOf('price')]).toBe('');
   });
 });
@@ -460,22 +488,29 @@ describe('an admin can file one too', () => {
 });
 
 describe('the request id, so photos are not orphaned', () => {
-  const ok = { session: 'sesi-marbot', name: 'Kain pel', qty: 1, unit: 'buah', reason: 'tipis' };
+  const DEVICE2 = JSON.stringify([
+    { deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia-uji', revoked: false },
+  ]);
+  const signedIn2 = (tabs: Record<string, Tab>) => {
+    const g = load(tabs, { DEVICES: DEVICE2 });
+    return { g, ok: { name: 'Kain pel', qty: 1, unit: 'buah', reason: 'tipis', session: marbotSession(g) } };
+  };
 
   it("keeps the client's id, which is what its photos are filed under", () => {
-    const tabs = freshTabs();
-    const r = load(tabs).handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
-    expect(r.requestId).toBe('REQ-abc12345');
+    const { g, ok } = signedIn2(freshTabs());
+    expect(g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' }).requestId)
+      .toBe('REQ-abc12345');
   });
 
   it('mints its own when the id is malformed', () => {
-    const r = load(freshTabs()).handleSubmitRequest({ ...ok, requestId: '../../etc' });
-    expect(r.requestId).toMatch(/^REQ-[0-9a-f]{8}$/);
+    const { g, ok } = signedIn2(freshTabs());
+    expect(g.handleSubmitRequest({ ...ok, requestId: '../../etc' }).requestId)
+      .toMatch(/^REQ-[0-9a-f]{8}$/);
   });
 
   it('mints its own rather than colliding with a row that exists', () => {
     const tabs = freshTabs();
-    const g = load(tabs);
+    const { g, ok } = signedIn2(tabs);
     g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
     const second = g.handleSubmitRequest({ ...ok, requestId: 'REQ-abc12345' });
     expect(second.requestId).not.toBe('REQ-abc12345');
@@ -976,5 +1011,85 @@ describe('the phone number on the roster', () => {
     const g = load(freshTabs());
     g.handleSetUserPin({ token: admin, name: 'X', role: 'anggota', type: 'presiden', pin: '3333' });
     expect(g.handleListUsers({ token: admin }).users[0].type).toBe('marbot');
+  });
+});
+
+describe('how long a session lives', () => {
+  function roster() {
+    const g = load(freshTabs(), {
+      DEVICES: JSON.stringify([{ deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia', revoked: false }]),
+    });
+    g.handleSetUserPin({
+      token: admin, name: 'Budi', role: 'anggota', phone: '081234567890', pin: '4321',
+    });
+    return g;
+  }
+
+  it('gives a PHONE session an hour, so a shelf is worked through on one PIN', () => {
+    const s = roster().handleOpenSession({ phone: '081234567890', pin: '4321' }).session;
+    expect(s.kind).toBe('phone');
+    expect(s.expiresInMs).toBe(60 * 60 * 1000);
+  });
+
+  it('keeps a shared TABLET on the short window — §58.5 has not changed there', () => {
+    // Whoever walks up next to a gudang tablet must not inherit the last person's session.
+    const s = roster().handleOpenSession({ deviceSecret: 'rahasia', pin: '4321' }).session;
+    expect(s.kind).toBe('device');
+    expect(s.expiresInMs).toBe(15 * 60 * 1000);
+  });
+
+  it('SLIDES a phone session on use — the hour is idle time, not a stopwatch', () => {
+    const g = roster();
+    const token = g.handleOpenSession({ phone: '081234567890', pin: '4321' }).session.token;
+    const before = clerkCache.get('session:' + token);
+    expect(g.requireSession(token).ok).toBe(true);
+    // Still there, and re-armed rather than counting down from when it was issued.
+    expect(clerkCache.get('session:' + token)).toBe(before);
+  });
+
+  it('does NOT slide a device session', () => {
+    const g = roster();
+    const token = g.handleOpenSession({ deviceSecret: 'rahasia', pin: '4321' }).session.token;
+    expect(g.requireSession(token).kind).toBe('device');
+  });
+
+  it('refuses a token it has never seen', () => {
+    expect(roster().requireSession('tebakan')).toMatchObject({ ok: false, error: 'session_expired' });
+  });
+});
+
+describe('revoking somebody who is already signed in', () => {
+  function live() {
+    const g = load(freshTabs());
+    const budi = g.handleSetUserPin({
+      token: admin, name: 'Budi', role: 'anggota', phone: '081234567890', pin: '4321',
+    });
+    const token = g.handleOpenSession({ phone: '081234567890', pin: '4321' }).session.token;
+    return { g, token, userId: budi.userId };
+  }
+
+  it('ends the live session immediately, not in an hour', () => {
+    // Otherwise "we can revoke a stolen phone" is untrue for up to an hour — which is exactly
+    // the window somebody reaches for revocation to close.
+    const { g, token, userId } = live();
+    expect(g.requireSession(token).ok).toBe(true);
+    g.handleSetUserActive({ token: admin, userId, disabled: true });
+    expect(g.requireSession(token)).toMatchObject({ ok: false, error: 'session_revoked' });
+  });
+
+  it('stops the writes that session was for', () => {
+    const { g, token, userId } = live();
+    g.handleSetUserActive({ token: admin, userId, disabled: true });
+    expect(g.handleSubmitRequest({
+      session: token, name: 'Kain pel', qty: 1, unit: 'buah', reason: 'tipis',
+    })).toMatchObject({ ok: false, error: 'session_revoked' });
+  });
+
+  it('lets them back in when re-enabled', () => {
+    const { g, userId } = live();
+    g.handleSetUserActive({ token: admin, userId, disabled: true });
+    g.handleSetUserActive({ token: admin, userId, disabled: false });
+    // A new PIN, deliberately: the old token was destroyed rather than suspended.
+    expect(g.handleOpenSession({ phone: '081234567890', pin: '4321' }).ok).toBe(true);
   });
 });
