@@ -6,6 +6,7 @@ import { useInventory } from '../../state/useInventory';
 import { createEntry, createLocation } from '../stocktake/draft';
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import type { Item, Location, StockLine } from '../../../../domain/types';
+import type { PurchaseRequest } from '../../../../domain/requests';
 
 const NOW = Date.now();
 
@@ -34,8 +35,14 @@ const build = () => {
 };
 
 function Harness(
-  { query, onOpenItem = () => {}, onOpenRack = () => {} }:
-  { query: string; onOpenItem?: (id: string) => void; onOpenRack?: (id: string) => void },
+  { query, onOpenItem = () => {}, onOpenRack = () => {}, requests = [], onOpenRequests = () => {} }:
+  {
+    query: string;
+    onOpenItem?: (id: string) => void;
+    onOpenRack?: (id: string) => void;
+    requests?: PurchaseRequest[];
+    onOpenRequests?: () => void;
+  },
 ) {
   const draft = useDraft();
   const { items, stock, locations } = build();
@@ -50,8 +57,10 @@ function Harness(
       categories={SEED_CATEGORIES}
       locations={locations}
       inventory={useInventory(draft, NOW)}
+      requests={requests}
       onOpenItem={onOpenItem}
       onOpenRack={onOpenRack}
+      onOpenRequests={onOpenRequests}
       onClear={() => {}}
     />
   );
@@ -62,6 +71,7 @@ afterEach(cleanup);
 /* Scoped to a section, because the heading echoes the query back — searching "A1" puts the
    string on screen three times over, and an unscoped match would pass on the wrong one. */
 const barang = () => within(screen.getByRole('region', { name: 'Barang' }));
+const pengajuan = () => within(screen.getByRole('region', { name: 'Pengajuan' }));
 const rak = () => within(screen.getByRole('region', { name: 'Rak' }));
 
 describe('the navbar search, on screens that are not lists', () => {
@@ -119,5 +129,40 @@ describe('the navbar search, on screens that are not lists', () => {
     render(<Harness query="s" />);
     expect(screen.getByText('Ketik minimal dua huruf.')).toBeTruthy();
     expect(screen.queryByText('Sabun cuci tangan')).toBeNull();
+  });
+});
+
+const request = (over: Partial<PurchaseRequest> = {}): PurchaseRequest => ({
+  requestId: 'REQ-0001', type: 'beli', name: 'Sapu ijuk', qty: 2, unit: 'buah',
+  reason: 'Yang lama patah gagangnya', status: 'diajukan',
+  requestedBy: 'USR-1', requestedTs: 1, ...over,
+});
+
+describe('pengajuan, for the people allowed to read it', () => {
+  it('finds a request by name', () => {
+    render(<Harness query="sapu" requests={[request()]} />);
+    expect(pengajuan().getByText('Sapu ijuk')).toBeTruthy();
+  });
+
+  it('finds it by its REASON, which is the field the screen exists for', () => {
+    // §95: a request is judged on why, so "kenapa kita beli itu" is asked as often as what it
+    // was called — and the reason is the only place that answer lives.
+    render(<Harness query="patah" requests={[request()]} />);
+    expect(pengajuan().getByText('Sapu ijuk')).toBeTruthy();
+  });
+
+  it('is absent entirely for somebody not allowed to see it', () => {
+    // Every row names people — who asked, who decided — so the public tier omits the tab (§39).
+    // An empty list here is the gateway's decision, not a check invented in the browser.
+    render(<Harness query="sapu" requests={[]} />);
+    expect(screen.queryByRole('region', { name: 'Pengajuan' })).toBeNull();
+    expect(screen.getByText('Tidak ada yang cocok.')).toBeTruthy();
+  });
+
+  it('opens the Pengajuan screen when one is picked', () => {
+    let opened = false;
+    render(<Harness query="sapu" requests={[request()]} onOpenRequests={() => { opened = true; }} />);
+    fireEvent.click(pengajuan().getByText('Sapu ijuk'));
+    expect(opened).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ import type { PurchaseRequest } from '../../../../domain/requests';
 import type { Draft } from '../../state/useDraft';
 import { Button, CARD, CARD_FLUSH, CODE, PageHeader, Stat } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
+import { FilterField } from '../../components/FilterField';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 import {
@@ -33,7 +34,22 @@ const emptyInput = (categories: Category[]): DraftInput => ({
 });
 
 export function StockTake(
-  { draft, search, onSearch }: { draft: Draft; search: string; onSearch: (v: string) => void },
+  { draft, canManage = true }:
+  {
+    draft: Draft;
+    /**
+     * Whether this person may EXPORT the whole catalog or EMPTY it.
+     *
+     * Both are whole-register acts. An export is every item, every rack and every count leaving
+     * as files; "Kosongkan" throws the lot away behind one confirmation. Adding and correcting
+     * rows is the daily job and stays open to whoever is doing the walk — these two are not.
+     *
+     * Defaults to true, and on an UNCONNECTED device it stays true: that is the stock-take on
+     * somebody's own phone (§59 stage 1), where there is no roster, nothing shared, and nobody
+     * who could be granted the right instead.
+     */
+    canManage?: boolean;
+  },
 ) {
   const { items, categories, locations, stock, setItems, setCategories, setLocations, setCatalog } = draft;
   const [input, setInput] = useState<DraftInput>(() => emptyInput(categories));
@@ -44,6 +60,9 @@ export function StockTake(
   /** Which shelf of the row is being edited — a thing can be kept on more than one. */
   const [editingAt, setEditingAt] = useState('');
   const [exporting, setExporting] = useState(false);
+  /* The opname list's own filter. It used to be the navbar box, which meant the query stayed
+     with you when you left — narrowing Stok and Histori from a field up in the chrome. */
+  const [search, setSearch] = useState('');
 
   const problems = useMemo(
     () => validate(input, items, editingId ?? undefined),
@@ -147,7 +166,7 @@ export function StockTake(
     draft.reset();
     cancelEdit();
     setConfirmReset(false);
-    onSearch('');
+    setSearch('');
   }
 
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
@@ -308,7 +327,17 @@ export function StockTake(
               </Button>
             </div>
           ) : (
-            <div class="flex items-center gap-2">
+            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <FilterField
+                value={search}
+                onChange={setSearch}
+                label="Saring daftar opname"
+                placeholder="Saring daftar…"
+              />
+              {/* HIDDEN, not disabled. A greyed-out Ekspor invites the tap that explains
+                  nothing, and neither of these is something a marbot was looking for — the
+                  same reasoning that hides Ambil on a device that may only read. */}
+              {canManage && (
               <Button
                 variant="secondary"
                 class="min-h-[44px]"
@@ -318,6 +347,8 @@ export function StockTake(
                 <Download class="h-4 w-4" />
                 <span class="hidden sm:inline">Ekspor</span>
               </Button>
+              )}
+              {canManage && (
               <Button
                 variant="secondary"
                 class="min-h-[44px]"
@@ -328,6 +359,7 @@ export function StockTake(
                 <Trash2 class="h-4 w-4" />
                 <span class="hidden sm:inline">Kosongkan</span>
               </Button>
+              )}
             </div>
           )
         }

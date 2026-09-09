@@ -38,13 +38,6 @@ const History = lazy(() => import('./features/history/History').then((m) => ({ d
 const Manage = lazy(() => import('./features/admin/Manage').then((m) => ({ default: m.Manage })));
 const Report = lazy(() => import('./features/report/Report').then((m) => ({ default: m.Report })));
 
-/**
- * The routes that narrow THEMSELVES as you type. Everywhere else the navbar search opens the
- * finder instead — see `features/search/Finder.tsx` for why a field that works on some screens
- * and silently does nothing on the rest is worse than one that is missing.
- */
-const FILTERS_IN_PLACE = new Set(['opname', 'board', 'racks', 'aset', 'histori']);
-
 /** One wording for a refused sign-in, whether it failed opening the session or appending. */
 function explainPin(code: string): string {
   if (code === 'invalid_pin') return 'PIN salah.';
@@ -279,10 +272,28 @@ export function App() {
     : localDraft;
   const [route, go] = useRoute();
   const [search, setSearch] = useState('');
-  /* Typing is a question, and on a screen with no list to narrow the only place to answer it
-     is in place of that screen. Nothing navigates, so clearing the field puts the person back
-     exactly where they were. */
-  const finding = search.trim() !== '' && !FILTERS_IN_PLACE.has(route.name);
+  /*
+   * The navbar box is a FINDER, on every screen without exception.
+   *
+   * It used to defer to five screens that filtered themselves — which meant one control did
+   * five different things depending on where you stood, and none of them matched its label:
+   * Stok matched a name and a unit, so a rack code found nothing; Peta Rak matched racks and
+   * their contents; Opname something else again. Those screens keep their filter, but as their
+   * OWN field, on the screen, where its scope is visible (`components/FilterField`).
+   *
+   * Nothing navigates to show results, so clearing the box puts the person back exactly where
+   * they were.
+   */
+  const finding = search.trim() !== '';
+
+  /*
+   * The same test the sidebar uses for its two people-naming screens, in one place.
+   *
+   * NOT CONNECTED means the stock-take walk on somebody's own phone (§59 stage 1): there is no
+   * roster, no accounts and nothing shared, so gating anything there would take function away
+   * from the one mode that has no way to grant it back.
+   */
+  const privileged = connection == null || admin != null;
   /* The bell opens the list where you are, rather than navigating you to a screen that has it.
      Notifikasi Stok is a thing to glance at and act on, not a destination, and sending someone
      to Beranda from the middle of a stock-take costs them their place. */
@@ -524,10 +535,15 @@ export function App() {
               categories={draft.categories}
               locations={draft.locations}
               inventory={inventory}
+              /* Requests name people — who asked, who decided — so the public tier omits them
+                 entirely (§39). Handing the finder an empty list for everybody else is not a
+                 permission check pretending to be one: the gateway already withheld the rows. */
+              requests={privileged ? draft.requests : []}
               /* `navigate` drops the query: picking a result answered the question, and
                  carrying it onward would leave a filter running that nobody set there. */
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onOpenRack={(id) => navigate({ name: 'racks', id })}
+              onOpenRequests={() => navigate({ name: 'pengajuan' })}
               onClear={() => setSearch('')}
             />
           ) : (
@@ -543,7 +559,7 @@ export function App() {
             />
           )}
           {route.name === 'opname' && (
-            <StockTake draft={draft} search={search} onSearch={setSearch} />
+            <StockTake draft={draft} canManage={privileged} />
           )}
           {route.name === 'board' && (
             <Board
@@ -551,7 +567,6 @@ export function App() {
               categories={draft.categories}
               locations={draft.locations}
               inventory={inventory}
-              search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onOpenRack={(id) => navigate({ name: 'racks', id })}
               filter={route.filter}
@@ -573,7 +588,6 @@ export function App() {
             <RackBoard
               draft={draft}
               inventory={inventory}
-              search={search}
               now={now}
               openRack={route.id}
               onMove={setMoving}
@@ -594,7 +608,6 @@ export function App() {
             <AssetBoard
               draft={draft}
               inventory={inventory}
-              search={search}
               onOpenItem={(id) => navigate({ name: 'item', id })}
               onRequest={(type, assetId) => {
                 /* An admin goes to the Pengajuan screen, where the new request lands in the
@@ -634,8 +647,7 @@ export function App() {
                 items={draft.items}
                 locations={draft.locations}
                 stock={draft.stock}
-                search={search}
-              />
+                />
             </Suspense>
           )}
           {route.name === 'kelola' && admin && (

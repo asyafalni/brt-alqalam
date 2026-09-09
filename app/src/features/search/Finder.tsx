@@ -10,12 +10,14 @@
 // It finds BOTH barang and rak, because "where is the soap" and "what is on A1" are the same
 // question asked from opposite ends, and §0's premise is that neither is answerable today.
 
-import { MapPin, Package, Search, X } from '@octanejs/lucide';
+import { MapPin, Package, Search, ShoppingCart, X } from '@octanejs/lucide';
 import type { Category, Item, Location } from '../../../../domain/types';
+import type { PurchaseRequest } from '../../../../domain/requests';
 import type { Inventory } from '../../state/useInventory';
 import { ItemArt, artFor } from '../items/ItemArt';
 import { RackArt, rackArtFor } from '../racks/RackArt';
 import { CARD, CODE } from '../../components/ui';
+import { REQUEST_STATUS_LABEL } from '../../components/format';
 
 /**
  * Below two letters this is not a search, it is the catalog in a different order. One letter
@@ -34,8 +36,18 @@ export interface FinderProps {
   categories: Category[];
   locations: Location[];
   inventory: Inventory;
+  /**
+   * Requests, and ONLY for somebody allowed to read them.
+   *
+   * Every row names a person — who asked, who decided — which is why the public tier omits the
+   * tab entirely (§39). Passing an empty list for everybody else is not a permission check
+   * pretending to be one: the gateway already withheld the data, and this is the screen
+   * declining to invent a section for rows it does not have.
+   */
+  requests?: PurchaseRequest[];
   onOpenItem: (itemId: string) => void;
   onOpenRack: (locationId: string) => void;
+  onOpenRequests: () => void;
   onClear: () => void;
 }
 
@@ -64,9 +76,15 @@ export function Finder(p: FinderProps) {
     ))
     .slice(0, LIMIT);
 
+  /* Name and reason both. "Kenapa kita beli itu" is asked at least as often as "what was it
+     called", and the reason is the field this screen exists for (§95). */
+  const foundRequests = (p.requests ?? [])
+    .filter((r) => norm(r.name).includes(q) || norm(r.reason).includes(q))
+    .slice(0, LIMIT);
+
   const categoryName = (id: string) => p.categories.find((c) => c.categoryId === id)?.name ?? '';
 
-  if (foundItems.length === 0 && foundRacks.length === 0) {
+  if (foundItems.length === 0 && foundRacks.length === 0 && foundRequests.length === 0) {
     return (
       <Frame query={p.query} onClear={p.onClear}>
         <div class="py-8 text-center">
@@ -120,6 +138,35 @@ export function Finder(p: FinderProps) {
                   </li>
                 );
               })}
+            </ul>
+          </section>
+        )}
+
+        {foundRequests.length > 0 && (
+          <section aria-label="Pengajuan">
+            <Heading
+              icon={<ShoppingCart class="h-3.5 w-3.5" />}
+              label="Pengajuan"
+              n={foundRequests.length}
+            />
+            <ul class="space-y-2">
+              {foundRequests.map((r) => (
+                <li key={r.requestId}>
+                  <button
+                    type="button"
+                    class={`${CARD} flex w-full items-center gap-3 p-3 text-left transition-colors hover:border-slate-400`}
+                    onClick={p.onOpenRequests}
+                  >
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-semibold text-slate-900">{r.name}</span>
+                      {/* The reason, not the price: a request is judged on why, and the number
+                          means nothing without it (§95). */}
+                      <span class="block truncate text-xs text-slate-600">{r.reason}</span>
+                    </span>
+                    <span class={`${CODE} shrink-0`}>{REQUEST_STATUS_LABEL[r.status]}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </section>
         )}

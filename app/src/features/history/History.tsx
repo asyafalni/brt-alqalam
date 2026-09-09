@@ -17,6 +17,7 @@ import { keteranganLabel } from '../../../../domain/keterangan';
 import { lineAt, UNPLACED } from '../../../../domain/stock';
 import type { Item, Location, StockLine, Txn } from '../../../../domain/types';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Select, Stat } from '../../components/ui';
+import { FilterField } from '../../components/FilterField';
 import { DataTable } from '../../components/DataTable';
 import type { Column } from '../../components/DataTable';
 
@@ -68,10 +69,13 @@ export function historyRows(
 }
 
 export function History(
-  { txns, items, locations, stock, search }:
-  { txns: readonly Txn[]; items: Item[]; locations: Location[]; stock: StockLine[]; search: string },
+  { txns, items, locations, stock }:
+  { txns: readonly Txn[]; items: Item[]; locations: Location[]; stock: StockLine[] },
 ) {
   const [type, setType] = useState('');
+  /* This screen's own. It sat in the navbar, which meant a query typed on Opname silently
+     narrowed the log when you arrived here — with the only clue up in the chrome. */
+  const [search, setSearch] = useState('');
 
   const rackOf = (id?: string) => {
     if (!id) return 'Belum ditempatkan';
@@ -185,6 +189,14 @@ export function History(
       <PageHeader
         title="Histori Data"
         subtitle="Setiap perubahan stok, berurutan. Ini catatan aslinya — angka di layar lain dihitung dari sini."
+        action={(
+          <FilterField
+            value={search}
+            onChange={setSearch}
+            label="Saring riwayat"
+            placeholder="Saring riwayat…"
+          />
+        )}
       />
 
       <div class="grid grid-cols-2 gap-2 sm:gap-4">

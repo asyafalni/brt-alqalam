@@ -17,8 +17,9 @@
 //
 // Lumping them into one "problem" bucket would hide that they demand different actions.
 
-import { useMemo } from 'octane';
+import { useMemo, useState } from 'octane';
 import { CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
+import { FilterField } from '../../components/FilterField';
 import type { RequestType } from '../../../../domain/requests';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
@@ -48,9 +49,9 @@ const TABLE_SHAPE_ACTION =
   `${TABLE_SHAPE} [&_th:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:w-px [&_td:nth-last-child(2)]:whitespace-nowrap`;
 
 export function AssetBoard(
-  { draft, inventory, search, onOpenItem, onRequest, onOpenCounted }:
+  { draft, inventory, onOpenItem, onRequest, onOpenCounted }:
   {
-    draft: Draft; inventory: Inventory; search: string; onOpenItem: (id: string) => void;
+    draft: Draft; inventory: Inventory; onOpenItem: (id: string) => void;
     /** To the stock list, narrowed to barang tetap — where the counted ones actually live. */
     onOpenCounted: () => void;
     /**
@@ -70,6 +71,8 @@ export function AssetBoard(
   );
   const itemOf = (i: DerivedInstance) => draft.items.find((x) => x.itemId === i.instance.itemId);
 
+  /* This screen's own — see components/FilterField for why it is not the navbar's box. */
+  const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
   const matches = (d: DerivedInstance) =>
     q === '' || `${d.instance.label} ${d.instance.assetId} ${d.holder ?? ''}`.toLowerCase().includes(q);
@@ -130,6 +133,14 @@ export function AssetBoard(
       <PageHeader
         title="Aset"
         subtitle="Barang tetap yang dilabeli satu per satu — siapa pegang, mana yang rusak, mana yang hilang."
+        action={(
+          <FilterField
+            value={search}
+            onChange={setSearch}
+            label="Saring daftar aset"
+            placeholder="Saring aset…"
+          />
+        )}
       />
 
       {/* The answer to "kenapa terpal saya tidak ada di sini?", stated where the question is

@@ -23,7 +23,6 @@ function Harness() {
     <RackBoard
       draft={draft}
       inventory={useInventory(draft, NOW)}
-      search=""
       now={NOW}
       onOpenItem={() => {}}
       onMove={() => {}}

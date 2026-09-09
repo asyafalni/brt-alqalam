@@ -6,11 +6,10 @@ import { useDraft } from '../../state/useDraft';
 import { toItemsCsv, toInstancesCsv, toStockCsv } from './draft';
 import { parseItems, parseInstances, parseStock } from '../../../../data/parse';
 
-// The draft and the search box are owned above the screen (App / Navbar), so tests
-// supply them the same way.
+// The draft is owned above the screen (App), so tests supply it the same way. The filter is
+// NOT: it lives on this screen and is driven through its own field, like a person would.
 function Harness() {
-  const [search, setSearch] = useState('');
-  return <StockTake draft={useDraft()} search={search} onSearch={setSearch} />;
+  return <StockTake draft={useDraft()} />;
 }
 
 // Octane uses NATIVE events — `change` fires on blur, so typing is `input`.

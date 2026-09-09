@@ -7,7 +7,7 @@
 // only by scrolling sideways. DataTable renders a table on a desk and stacked cards on a phone
 // from the same column definitions, so the two shapes cannot drift apart.
 
-import { useMemo } from 'octane';
+import { useMemo, useState } from 'octane';
 import { ArrowUpDown, MapPin, Package, TriangleAlert, X } from '@octanejs/lucide';
 import type { Category, DerivedItem, Item, Location } from '../../../../domain/types';
 import type { BoardFilter, BoardKind, BoardSort } from '../../state/route';
@@ -15,16 +15,16 @@ import { BOARD_FILTERS, BOARD_KINDS } from '../../state/route';
 import type { Inventory } from '../../state/useInventory';
 import { CARD, CARD_FLUSH, CODE, PageHeader, Select, Stat } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
+import { FilterField } from '../../components/FilterField';
 import type { Column } from '../../components/DataTable';
 import { itemStatusBadge, PILL } from '../scan/resolve';
 import { artFor, ItemArt } from '../items/ItemArt';
 import { FILTER_LABEL, KIND_LABEL, SORT_LABEL, matchesFilter, matchesKind, sortRows } from './filters';
 
 export function Board(
-  { items, categories, locations, inventory, search, filter = 'semua', category = '',
+  { items, categories, locations, inventory, filter = 'semua', category = '',
     kind = 'semua', sort = 'nama', onOpenItem, onOpenRack, onView }:
   { items: Item[]; categories: Category[]; locations: Location[]; inventory: Inventory;
-    search: string;
     filter?: BoardFilter; category?: string; kind?: BoardKind; sort?: BoardSort;
     onOpenItem: (itemId: string) => void; onOpenRack: (locationId: string) => void;
     /** Changing a control changes the URL, so the view somebody is looking at is linkable. */
@@ -35,6 +35,10 @@ export function Board(
   const { derived, notifications, offline } = inventory;
   const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.name ?? id;
 
+  /* Owned HERE, not in the navbar. It narrows this table and nothing else, so it lives on
+     this screen, empties when you leave, and cannot silently follow you to another one. The
+     navbar box is a finder, which is a different job (see components/FilterField). */
+  const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
 
   /** Everything the search matches, before the filter — the counts on the chips read from it. */
@@ -199,6 +203,14 @@ export function Board(
       <PageHeader
         title="Stok Sekarang"
         subtitle="Dihitung dari stok awal ditambah seluruh riwayat — bukan angka yang disimpan."
+        action={(
+          <FilterField
+            value={search}
+            onChange={setSearch}
+            label="Saring daftar stok"
+            placeholder="Saring daftar…"
+          />
+        )}
       />
 
       {/* The old copy claimed the log was empty, which stopped being true the moment demo

@@ -56,7 +56,6 @@ function board(
         items={items}
         categories={SEED_CATEGORIES}
         locations={locations}
-        search={search}
         onOpenItem={onOpenItem}
         onOpenRack={onOpenRack}
         filter={view.filter}
@@ -74,7 +73,13 @@ function board(
       />
     );
   };
-  return render(H);
+  const r = render(H);
+  /* The filter lives ON the screen now, not in the navbar, so the tests drive it the way a
+     person does. Octane uses native events — `change` fires on blur, so typing is `input`. */
+  if (search !== '') {
+    fireEvent.input(r.getByLabelText('Saring daftar stok'), { target: { value: search } });
+  }
+  return r;
 }
 
 // One list, two shapes (components/DataTable): a real table on a desk, stacked cards below

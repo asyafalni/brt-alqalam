@@ -22,7 +22,6 @@ function Harness() {
     <AssetBoard
       draft={draft}
       inventory={useInventory(draft, NOW)}
-      search=""
       onOpenItem={opened}
       onRequest={requested}
       onOpenCounted={counted}

@@ -25,8 +25,9 @@ import type { Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, ERROR_TEXT, FIELD, LABEL, PageHeader, Select, Stat } from '../../components/ui';
-import { rupiah } from '../../components/format';
+import { REQUEST_STATUS_LABEL, rupiah } from '../../components/format';
 import { Sheet } from '../../components/Sheet';
+import { FilterField } from '../../components/FilterField';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
@@ -38,17 +39,17 @@ import { discardPhotos, RequestThumb } from './RequestPhotos';
 
 const STATUS: Record<RequestStatus, { label: string; chip: string; rail: string }> = {
   diajukan: {
-    label: 'Diajukan',
+    label: REQUEST_STATUS_LABEL.diajukan,
     chip: 'bg-amber-50 text-amber-700 border border-amber-200',
     rail: 'bg-amber-500',
   },
   selesai: {
-    label: 'Selesai',
+    label: REQUEST_STATUS_LABEL.selesai,
     chip: 'bg-green-50 text-green-700 border border-green-200',
     rail: 'bg-green-500',
   },
   dibatalkan: {
-    label: 'Dibatalkan',
+    label: REQUEST_STATUS_LABEL.dibatalkan,
     chip: 'bg-slate-100 text-slate-600 border border-slate-300',
     rail: 'bg-slate-400',
   },
@@ -125,7 +126,16 @@ export function RequestBoard(
      changes once in a while. */
   const [photoVersion, setPhotoVersion] = useState(0);
 
-  const rows = useMemo(() => sortRequests(requests), [requests]);
+  /* This screen's own filter, like every other list here. Matches the REASON as well as the
+     name: "kenapa kita beli itu" is asked as often as "apa namanya", and the reason is the
+     field the whole screen exists for (§95). */
+  const [search, setSearch] = useState('');
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const all = sortRequests(requests);
+    if (q === '') return all;
+    return all.filter((r) => `${r.name} ${r.reason}`.toLowerCase().includes(q));
+  }, [requests, search]);
   const open = useMemo(() => openRequests(requests), [requests]);
   const money = useMemo(() => openTotal(requests), [requests]);
 
@@ -365,9 +375,17 @@ export function RequestBoard(
         title="Pengajuan"
         subtitle="Yang diminta untuk dibeli atau diperbaiki — beserta alasan, perkiraan biaya dan tautannya."
         action={
-          <Button onClick={() => setAdding(true)}>
-            <Plus class="h-4 w-4" /> Ajukan
-          </Button>
+          <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <FilterField
+              value={search}
+              onChange={setSearch}
+              label="Saring pengajuan"
+              placeholder="Saring pengajuan…"
+            />
+            <Button onClick={() => setAdding(true)}>
+              <Plus class="h-4 w-4" /> Ajukan
+            </Button>
+          </div>
         }
       />
 

@@ -21,6 +21,7 @@ import type { Category, Item, Location } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
 import { Button, CARD, CODE, FIELD, LABEL, PageHeader, Select, Stat } from '../../components/ui';
+import { FilterField } from '../../components/FilterField';
 import {
   applyCount, archiveLocation, blocksArchive, blocksDelete, createLocation, deleteLocation,
   editLocation, markCounted, racksInZone, renameZone, restoreLocation, zonesOf,
@@ -60,8 +61,8 @@ const ZONE_NOTE: Record<LocationStatus, string> = {
 };
 
 export function RackBoard(
-  { draft, inventory, search, now, openRack, onOpenItem, onMove }:
-  { draft: Draft; inventory: Inventory; search: string; now: number; openRack?: string;
+  { draft, inventory, now, openRack, onOpenItem, onMove }:
+  { draft: Draft; inventory: Inventory; now: number; openRack?: string;
     onOpenItem: (id: string) => void;
     /** Standing at the shelf is the best moment to record taking something off it. */
     onMove: (target: MovementTarget) => void },
@@ -118,6 +119,8 @@ export function RackBoard(
     ? contentsOf(draft.stock, items, selectedRack.location.locationId).map((r) => r.item)
     : [];
 
+  /* This screen's own, like every other list here: it narrows the map and leaves with you. */
+  const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
   const matchesSearch = (rack: LocationSummary) =>
     q === '' ||
@@ -131,9 +134,17 @@ export function RackBoard(
         title="Peta Rak"
         subtitle="Setiap kotak satu rak. Warnanya mengikuti isi yang paling perlu diurus."
         action={
-          <Button onClick={() => { setSelected(null); setCounting(null); setEditing('new'); }}>
-            <Plus class="h-4 w-4" /> Rak baru
-          </Button>
+          <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <FilterField
+              value={search}
+              onChange={setSearch}
+              label="Saring peta rak"
+              placeholder="Saring rak…"
+            />
+            <Button onClick={() => { setSelected(null); setCounting(null); setEditing('new'); }}>
+              <Plus class="h-4 w-4" /> Rak baru
+            </Button>
+          </div>
         }
       />
 

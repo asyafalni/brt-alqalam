@@ -188,31 +188,50 @@ describe('the board renders derived state, not stored numbers', () => {
   });
 });
 
-describe('the navbar search filters the screen you are on', () => {
+describe('two boxes, two jobs', () => {
   const type = (el: HTMLElement, value: string) =>
     fireEvent.input(el, { target: { value } });
 
-  it('filters the opname list, and says so when nothing matches', () => {
-    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
-    at('#/opname');
-    const r = render(App);
-
-    type(r.getByLabelText('Cari barang atau rak'), 'sabun');
-    expect(desk(r).getByText('Sabun cuci')).toBeTruthy();
-    expect(r.queryByText('Pisau dapur')).toBeNull();
-
-    type(r.getByLabelText('Cari barang atau rak'), 'zzz');
-    expect(r.getByText(/Tidak ada yang cocok/)).toBeTruthy();
-  });
-
-  it('filters the stock board too', () => {
+  /*
+   * The navbar box used to defer to five screens that filtered themselves, so one control did
+   * five different things depending on where you stood — and none of them matched its label.
+   * On Stok it matched a name and a unit, so a rack code found nothing. It also LEAKED: a query
+   * typed on Opname silently narrowed Stok when you got there, from a field up in the chrome.
+   *
+   * It is a finder now, everywhere and without exception. The lists keep their filter as their
+   * own field, on the screen, where its scope is visible.
+   */
+  it('finds from the navbar even on a screen that has its own filter', () => {
     seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
     at('#/board');
     const r = render(App);
 
     type(r.getByLabelText('Cari barang atau rak'), 'pisau');
+    expect(r.getByText(/Hasil untuk/)).toBeTruthy();
+  });
+
+  it('narrows the list in place from the screen\'s OWN field', () => {
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/board');
+    const r = render(App);
+
+    type(r.getByLabelText('Saring daftar stok'), 'pisau');
     expect(desk(r).getByText('Pisau dapur')).toBeTruthy();
     expect(r.queryByText('Sabun cuci')).toBeNull();
+    // Still the stock table — filtering never navigates.
+    expect(r.queryByText(/Hasil untuk/)).toBeNull();
+  });
+
+  it('keeps a screen filter OUT of the navbar box, so it cannot travel', () => {
+    // The leak was structural: one piece of state behind two meanings. Filtering Opname wrote
+    // into the navbar field, and the query then narrowed Stok and Histori on arrival.
+    seed(input({ name: 'Sabun cuci' }), input({ name: 'Pisau dapur' }));
+    at('#/opname');
+    const r = render(App);
+
+    type(r.getByLabelText('Saring daftar opname'), 'sabun');
+    expect(r.queryByText('Pisau dapur')).toBeNull();
+    expect((r.getByLabelText('Cari barang atau rak') as HTMLInputElement).value).toBe('');
   });
 
   /*
