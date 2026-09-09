@@ -117,6 +117,7 @@ function load(tabs: Record<string, Tab>, props: Record<string, string> = {}) {
        handleSetUserPin, handleSetUserActive, handleSubmitRequest, handleOpenSession, handleListDevices, handleEnrollDevice,
        handleSetDeviceRevoked, handleRenameDevice, handleInviteAdmin,
        handleListInvitations, handleRevokeInvitation, handleFinishRequest, handleSuggestPin,
+       handleSetUserDetails,
        requireSession,
        writeTab, txnRow, updateRowById, catalogRev,
        WRITABLE_TABS, TXN_COLUMNS, REQUIRED_TABS };`,
@@ -1091,5 +1092,62 @@ describe('revoking somebody who is already signed in', () => {
     g.handleSetUserActive({ token: admin, userId, disabled: false });
     // A new PIN, deliberately: the old token was destroyed rather than suspended.
     expect(g.handleOpenSession({ phone: '081234567890', pin: '4321' }).ok).toBe(true);
+  });
+});
+
+describe('editing somebody who registered before phones existed', () => {
+  function existing() {
+    const g = load(freshTabs(), {
+      DEVICES: JSON.stringify([{ deviceId: 'DEV-1', label: 'Kios', secret: 'rahasia', revoked: false }]),
+    });
+    const budi = g.handleSetUserPin({ token: admin, name: 'Budi', role: 'anggota', pin: '4321' });
+    return { g, userId: budi.userId };
+  }
+
+  it('adds a phone number WITHOUT reissuing the PIN', () => {
+    // The old form always wrote a new hash, so adding a number meant telling somebody a new PIN
+    // for no reason. Two different acts had one door.
+    const { g, userId } = existing();
+    expect(g.handleSetUserDetails({
+      token: admin, userId, name: 'Budi', role: 'anggota', type: 'marbot', phone: '081234567890',
+    }).ok).toBe(true);
+
+    // The PIN they were given still works.
+    expect(g.handleOpenSession({ deviceSecret: 'rahasia', pin: '4321' }).ok).toBe(true);
+    // And now the number does too.
+    expect(g.handleOpenSession({ phone: '081234567890', pin: '4321' }).session.actorName).toBe('Budi');
+  });
+
+  it('corrects a name and a type without touching anything else', () => {
+    const { g, userId } = existing();
+    g.handleSetUserDetails({
+      token: admin, userId, name: 'Budi Santoso', role: 'anggota', type: 'security', phone: '',
+    });
+    const u = g.handleListUsers({ token: admin }).users[0];
+    expect(u).toMatchObject({ name: 'Budi Santoso', type: 'security' });
+    expect(g.handleOpenSession({ deviceSecret: 'rahasia', pin: '4321' }).ok).toBe(true);
+  });
+
+  it('refuses a number somebody else holds', () => {
+    const { g, userId } = existing();
+    g.handleSetUserPin({ token: admin, name: 'Sari', role: 'anggota', phone: '081299998888', pin: '1111' });
+    expect(g.handleSetUserDetails({
+      token: admin, userId, name: 'Budi', role: 'anggota', type: 'marbot', phone: '081299998888',
+    })).toMatchObject({ ok: false, error: 'phone_taken' });
+  });
+
+  it('will not let an ordinary admin promote somebody this way either', () => {
+    // The edit form carries `role`, so it is a second door onto the same decision.
+    const { g, userId } = existing();
+    expect(g.handleSetUserDetails({
+      token: token({ sub: 'usr_p', role: 'admin', name: 'Admin Biasa' }),
+      userId, name: 'Budi', role: 'admin', type: 'marbot', phone: '',
+    })).toMatchObject({ ok: false, error: 'needs_admin_utama' });
+  });
+
+  it('refuses an id that is not there', () => {
+    expect(existing().g.handleSetUserDetails({
+      token: admin, userId: 'USR-nope', name: 'X', role: 'anggota', type: 'marbot', phone: '',
+    })).toMatchObject({ ok: false, error: 'no_such_user' });
   });
 });

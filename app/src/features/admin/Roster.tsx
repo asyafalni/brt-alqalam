@@ -11,9 +11,11 @@
 // so the screen says it out loud rather than letting an admin discover it by needing it.
 
 import { useEffect, useState } from 'octane';
-import { Dices, KeyRound, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus } from '@octanejs/lucide';
 import {
-  GatewayError, listRoster, setRosterActive, setRosterPin, suggestPin,
+  Dices, KeyRound, Pencil, Plus, RotateCcw, ShieldCheck, UserMinus, UserPlus,
+} from '@octanejs/lucide';
+import {
+  GatewayError, listRoster, setRosterActive, setRosterPin, suggestPin, updateRosterUser,
 } from '../../../../data/gateway';
 import type { MemberType, RosterRole, RosterUser } from '../../../../data/gateway';
 import { Button, ERROR_TEXT, FIELD, LABEL, Select } from '../../components/ui';
@@ -75,6 +77,10 @@ export function Roster(
   const [busy, setBusy] = useState(false);
 
   const [editing, setEditing] = useState<RosterUser | 'new' | null>(null);
+  /* Two different acts, and they used to share one door: the only way to correct a name or add
+     a phone number was the form that always writes a new PIN — so fixing a typo meant telling
+     somebody a new PIN for no reason. */
+  const [mode, setMode] = useState<'new' | 'edit' | 'pin'>('new');
   const [name, setName] = useState('');
   const [role, setRole] = useState<RosterRole>('anggota');
   const [type, setType] = useState<MemberType>('marbot');
@@ -104,7 +110,8 @@ export function Roster(
 
   useEffect(() => { void run((t) => listRoster(url, t)); }, [url]);
 
-  function open(user: RosterUser | 'new') {
+  function open(user: RosterUser | 'new', how: 'new' | 'edit' | 'pin' = 'new') {
+    setMode(how);
     setEditing(user);
     setIssued(null);
     setError('');
@@ -114,9 +121,9 @@ export function Roster(
     setPhone(user === 'new' ? '' : user.phone);
     setTabletOnly(user !== 'new' && !user.phone);
     setPin('');
-    /* Filled in before the admin can type a taken one. Uniqueness by construction rather than
-       by refusal — the old flow let them choose, then said no. Still overwritable. */
-    void fresh();
+    /* Only when a PIN is actually being issued. Suggesting one on an edit would imply it is
+       about to change, which is exactly the confusion this split removes. */
+    if (how !== 'edit') void fresh();
   }
 
   async function fresh() {
@@ -132,6 +139,19 @@ export function Roster(
     e.preventDefault();
     const target = editing;
     if (!target) return;
+
+    if (mode === 'edit' && target !== 'new') {
+      const done = await run((t) => updateRosterUser(url, t, {
+        userId: target.userId,
+        name: name.trim(),
+        role,
+        type,
+        phone: tabletOnly ? '' : phone.trim(),
+      }));
+      if (done) setEditing(null);
+      return;
+    }
+
     const ok = await run((t) => setRosterPin(url, t, {
       userId: target === 'new' ? undefined : target.userId,
       name: name.trim(),
@@ -256,6 +276,7 @@ export function Roster(
             )}
           </div>
 
+          {mode !== 'edit' && (
           <div>
             <label class={LABEL} for="roster-pin">PIN baru (4–8 angka)</label>
             <div class="flex items-center gap-2">
@@ -282,6 +303,7 @@ export function Roster(
               Sudah dipilihkan yang belum dipakai siapa pun. Boleh diganti.
             </p>
           </div>
+          )}
 
           {error && <p class={ERROR_TEXT} role="alert">{error}</p>}
 
@@ -289,10 +311,14 @@ export function Roster(
             <Button
               type="submit"
               size="panel"
-              disabled={busy || !name.trim() || pin.length < 4
+              disabled={busy || !name.trim()
+                || (mode !== 'edit' && pin.length < 4)
                 || (!tabletOnly && normalisePhone(phone).length < 8)}
             >
-              {busy ? 'Menyimpan…' : editing === 'new' ? 'Buat' : 'Ganti PIN'}
+              {busy ? 'Menyimpan…'
+                : mode === 'new' ? 'Buat'
+                : mode === 'edit' ? 'Simpan'
+                : 'Ganti PIN'}
             </Button>
             <button
               type="button"
@@ -332,6 +358,13 @@ export function Roster(
                   {TYPE_LABEL[u.type] ?? u.type}
                   {u.role !== 'anggota' && ` · ${ROLE_LABEL[u.role] ?? u.role}`}
                 </span>
+                {/* The rows registered before phones existed. Without a number this person can
+                    only record from the shared tablet, and nothing else on screen would say so. */}
+                {!u.phone && !u.disabled && (
+                  <span class="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                    tanpa HP
+                  </span>
+                )}
               </div>
 
               {/* Icons, not words. "Ganti PIN" as text took a third of the row and pushed the
@@ -339,9 +372,19 @@ export function Roster(
               <button
                 type="button"
                 class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                aria-label={`Ubah data ${u.name}`}
+                title="Ubah nama, jenis, nomor HP"
+                onClick={() => open(u, 'edit')}
+              >
+                <Pencil class="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900"
                 aria-label={`Ganti PIN ${u.name}`}
                 title="Ganti PIN"
-                onClick={() => open(u)}
+                onClick={() => open(u, 'pin')}
               >
                 <KeyRound class="h-4 w-4" />
               </button>

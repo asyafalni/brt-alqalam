@@ -67,6 +67,7 @@ function doPost(e) {
       case 'setUserPin': return handleSetUserPin(body);
       case 'setUserActive': return handleSetUserActive(body);
       case 'suggestPin': return handleSuggestPin(body);
+      case 'setUserDetails': return handleSetUserDetails(body);
       case 'listDevices': return handleListDevices(body);
       case 'enrollDevice': return handleEnrollDevice(body);
       case 'setDeviceRevoked': return handleSetDeviceRevoked(body);
@@ -89,7 +90,7 @@ function doPost(e) {
  * file in the editor does not change what `/exec` serves, and two rounds were spent proving a
  * fix that was never live. A version nobody can read is a version nobody can check.
  */
-var GATEWAY_VERSION = '0.16.0-revoke-live';
+var GATEWAY_VERSION = '0.17.0-edit-member';
 
 // ---------------------------------------------------------------------------
 // Sessions — one visit, not a time window (design doc Part XVI §58.5).
@@ -782,4 +783,24 @@ function handleSuggestPin(body) {
   var pin = rosterFreePin();
   if (!pin) return fail('no_free_pin');
   return respond({ ok: true, pin: pin });
+}
+
+
+/**
+ * Edit a member's name, role, type or phone — leaving their PIN alone.
+ *
+ * Same `admin_utama` rule as issuing a PIN, and for the same reason: an ordinary admin must not
+ * be able to promote a colleague, and `role` is editable here too.
+ */
+function handleSetUserDetails(body) {
+  var who = requireAdmin(body.token);
+  if (!who.ok) return fail(who.error);
+
+  var elevating = body.role === 'admin' || body.role === 'admin_utama';
+  if (elevating && who.role !== 'admin_utama') return fail('needs_admin_utama');
+  if (who.role !== 'admin_utama' && rosterIsAdmin(body.userId)) return fail('needs_admin_utama');
+
+  var result = rosterUpdate(body.userId, body.name, body.role, body.type, body.phone);
+  if (!result.ok) return fail(result.error);
+  return respond({ ok: true, users: rosterList() });
 }

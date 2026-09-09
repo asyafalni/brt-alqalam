@@ -681,3 +681,19 @@ export async function openSessionByPhone(
   if (!s?.token) throw new GatewayError('no-session-returned', json);
   return { session: s };
 }
+
+/**
+ * Change somebody's details without touching their PIN.
+ *
+ * `setRosterPin` always writes a new hash, so it was the wrong door for "add the phone number
+ * of somebody who registered before phones existed" — that meant reissuing a PIN and telling
+ * them a new one for no reason. Two acts, two doors.
+ */
+export async function updateRosterUser(
+  url: string,
+  token: string,
+  user: { userId: string; name: string; role: RosterRole; type: MemberType; phone: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<RosterUser[]> {
+  return readUsers(await call(url, { op: 'setUserDetails', token, ...user }, fetchImpl));
+}

@@ -206,3 +206,41 @@ function rosterFreePin() {
   }
   return '';
 }
+
+
+/**
+ * Change somebody's details WITHOUT touching their PIN.
+ *
+ * The only way to edit a row used to be `rosterSetPin`, which always writes a new hash — so
+ * adding a phone number to somebody registered before phones existed meant reissuing their PIN
+ * and telling them a new one for no reason. Two different acts had one door.
+ *
+ * The PIN is not readable, so it cannot be "kept" by passing it back in; the row is edited
+ * around it instead, leaving `salt` and `pinHash` exactly as they were.
+ */
+function rosterUpdate(userId, name, role, type, phone) {
+  name = String(name || '').trim();
+  if (!userId) return { ok: false, error: 'no_such_user' };
+  if (!name) return { ok: false, error: 'name_required' };
+  if (ROSTER_ROLES.indexOf(role) === -1) return { ok: false, error: 'bad_role' };
+  type = ROSTER_TYPES.indexOf(type) === -1 ? 'marbot' : type;
+
+  var digits = normalisePhone(phone);
+  if (phone && digits.length < 8) return { ok: false, error: 'bad_phone' };
+  if (digits) {
+    var holder = rosterByPhone(digits);
+    if (holder && holder.userId !== userId) return { ok: false, error: 'phone_taken' };
+  }
+
+  var users = rosterUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].userId !== userId) continue;
+    users[i].name = name;
+    users[i].role = role;
+    users[i].type = type;
+    users[i].phone = digits;
+    rosterSave(users);
+    return { ok: true };
+  }
+  return { ok: false, error: 'no_such_user' };
+}
