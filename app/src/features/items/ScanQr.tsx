@@ -11,29 +11,35 @@
 
 import { qrSvg } from '../labels/qr';
 
-export function ScanQr(
-  { url, caption, size = 76 }: { url: string; caption: string; size?: number },
-) {
+/**
+ * One size for both callers, so the two codes on this page are the same object.
+ *
+ * Sized in CLASSES rather than a number, because it has to shrink on a phone: at 360px the
+ * identity card is already carrying a drawing, a status pill and a quantity, and a fixed 76px
+ * square pushes the name into two lines.
+ */
+const SIZE = 'h-14 w-14 sm:h-[4.75rem] sm:w-[4.75rem]';
+
+export function ScanQr({ url, caption }: { url: string; caption: string }) {
   const qr = qrSvg(url, 'M');
   const span = qr.modules + qr.quietZone * 2;
 
   return (
-    <figure class="m-0 shrink-0 text-center">
-      <svg
-        viewBox={`0 0 ${span} ${span}`}
-        width={size}
-        height={size}
-        class="rounded-md bg-white"
-        role="img"
-        aria-label={`Kode QR ${caption}`}
-        shape-rendering="crispEdges"
-      >
-        <rect width={span} height={span} fill="#fff" />
-        <path d={qr.d} fill="#0f172a" transform={`translate(${qr.quietZone} ${qr.quietZone})`} />
-      </svg>
-      {/* Said out loud, because a bare QR on a screen is a thing people photograph without
-          knowing what it does. */}
-      <figcaption class="mt-1 text-[10px] leading-tight text-slate-500">Pindai untuk buka</figcaption>
-    </figure>
+    <svg
+      viewBox={`0 0 ${span} ${span}`}
+      class={`shrink-0 rounded-md bg-white ${SIZE}`}
+      /* No caption. A QR on a screen is one of the few things that explains itself, and two
+         "Pindai untuk buka" labels on one page is a sentence read twice for nothing. The
+         accessible name still says what it is, for anybody who cannot see the square. */
+      role="img"
+      aria-label={`Kode QR ${caption}`}
+      shape-rendering="crispEdges"
+    >
+      <rect width={span} height={span} fill="#fff" />
+      <path d={qr.d} fill="#0f172a" transform={`translate(${qr.quietZone} ${qr.quietZone})`} />
+    </svg>
   );
 }
+
+/** The same footprint while the chunk loads, so nothing on the card jumps. */
+export const QR_BOX = SIZE;

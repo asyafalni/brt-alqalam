@@ -26,6 +26,9 @@ import { scanUrl } from '../labels/labels';
 /* Lazy, so the ~43kB QR encoder stays out of the file a marbot downloads to record a
    withdrawal. Its fallback is a box the same size, so nothing on the card jumps. */
 const ScanQr = lazy(() => import('./ScanQr').then((m) => ({ default: m.ScanQr })));
+/* The placeholder has to be the same footprint, so the card does not jump when the
+   chunk lands — and the size has to be shared, or the two drift apart. */
+const QR_BOX = 'h-14 w-14 sm:h-[4.75rem] sm:w-[4.75rem]';
 import type { InspectTarget } from '../movement/InspectSheet';
 import { inspection, lastInspected } from '../../../../domain/inspect';
 import { artFor, ItemArt } from './ItemArt';
@@ -289,7 +292,7 @@ export function ItemDetail(
                 sheet for PRINTING stickers, which is a desk job; what somebody standing here
                 actually wants is to point another phone at this one and land on this item —
                 the trip §96 proved works. Printing a sheet is still in the menu. */}
-            <Suspense fallback={<div class="hidden h-[76px] w-[76px] shrink-0 sm:block" />}>
+            <Suspense fallback={<div class={`shrink-0 ${QR_BOX}`} />}>
               <ScanQr
                 url={scanUrl(location.origin + location.pathname, 'item', item.itemId)}
                 caption={item.name}
@@ -375,11 +378,10 @@ export function ItemDetail(
                     {/* PER ROW, not one for the card. An item kept on two racks has two shelf
                         codes, and a single QR would have to pick one — sending whoever scanned
                         it to whichever happens to be listed first. */}
-                    <Suspense fallback={<div class="h-14 w-14 shrink-0" />}>
+                    <Suspense fallback={<div class={`shrink-0 ${QR_BOX}`} />}>
                       <ScanQr
                         url={scanUrl(location.origin + location.pathname, 'location', shelf.location.locationId)}
                         caption={`Rak ${shelf.location.code}`}
-                        size={56}
                       />
                     </Suspense>
                   </button>
