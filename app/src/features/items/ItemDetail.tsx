@@ -3,7 +3,7 @@
 // Reached by tapping a row anywhere, or by scanning its label — the same screen either way,
 // because "what is this and what has happened to it" is one question however you arrived at it.
 
-import { useMemo, useState } from 'octane';
+import { lazy, Suspense, useMemo, useState } from 'octane';
 import {
   ArrowDownLeft, ArrowLeft, ArrowUpRight, Eye, History, MapPin, Package, Pencil, QrCode,
   ShoppingCart,
@@ -22,6 +22,10 @@ import { moveLine, setLine, totalFor, UNPLACED } from '../../../../domain/stock'
 import { instanceStatusBadge, itemStatusBadge, PILL } from '../scan/resolve';
 import type { MovementTarget } from '../movement/MovementSheet';
 import type { LoanTarget } from '../movement/LoanSheet';
+import { scanUrl } from '../labels/labels';
+/* Lazy, so the ~43kB QR encoder stays out of the file a marbot downloads to record a
+   withdrawal. Its fallback is a box the same size, so nothing on the card jumps. */
+const ScanQr = lazy(() => import('./ScanQr').then((m) => ({ default: m.ScanQr })));
 import type { InspectTarget } from '../movement/InspectSheet';
 import { inspection, lastInspected } from '../../../../domain/inspect';
 import { artFor, ItemArt } from './ItemArt';
@@ -249,9 +253,6 @@ export function ItemDetail(
                 <ShoppingCart class="h-4 w-4" /> Ajukan
               </Button>
             )}
-            <Button variant="secondary" onClick={() => onNavigate({ name: 'label' })}>
-              <QrCode class="h-4 w-4" /> Label
-            </Button>
           </div>
         }
       />
@@ -283,6 +284,17 @@ export function ItemDetail(
               </div>
               <p class={`${CODE} truncate`}>{item.barcode}</p>
             </div>
+
+            {/* Top-right, where the Label shortcut used to send people. That button led to a
+                sheet for PRINTING stickers, which is a desk job; what somebody standing here
+                actually wants is to point another phone at this one and land on this item —
+                the trip §96 proved works. Printing a sheet is still in the menu. */}
+            <Suspense fallback={<div class="hidden h-[76px] w-[76px] shrink-0 sm:block" />}>
+              <ScanQr
+                url={scanUrl(location.origin + location.pathname, 'item', item.itemId)}
+                caption={item.name}
+              />
+            </Suspense>
           </div>
 
           <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
@@ -340,7 +352,7 @@ export function ItemDetail(
                   ) : (
                   <button
                     type="button"
-                    class="flex w-full items-baseline gap-3 px-[var(--card-pad)] py-2 text-left hover:bg-slate-50"
+                    class="flex w-full items-center gap-3 px-[var(--card-pad)] py-2 text-left hover:bg-slate-50"
                     aria-label={`Buka Rak ${shelf.location.code}`}
                     onClick={() => onNavigate({ name: 'racks', id: shelf.location!.locationId })}
                   >
@@ -360,6 +372,16 @@ export function ItemDetail(
                         <span class="ml-1 text-xs font-normal text-slate-500">{item.unit}</span>
                       </span>
                     )}
+                    {/* PER ROW, not one for the card. An item kept on two racks has two shelf
+                        codes, and a single QR would have to pick one — sending whoever scanned
+                        it to whichever happens to be listed first. */}
+                    <Suspense fallback={<div class="h-14 w-14 shrink-0" />}>
+                      <ScanQr
+                        url={scanUrl(location.origin + location.pathname, 'location', shelf.location.locationId)}
+                        caption={`Rak ${shelf.location.code}`}
+                        size={56}
+                      />
+                    </Suspense>
                   </button>
                   )}
                 </li>
