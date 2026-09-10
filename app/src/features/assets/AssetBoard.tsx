@@ -18,7 +18,7 @@
 // Lumping them into one "problem" bucket would hide that they demand different actions.
 
 import { useMemo, useState } from 'octane';
-import { ArrowDownLeft, CircleCheck, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
+import { ArrowDownLeft, CircleCheck, Eye, Package, ShoppingCart, TriangleAlert, Wrench } from '@octanejs/lucide';
 import { FilterField } from '../../components/FilterField';
 import { loanAge, loansByAge } from '../../../../domain/loans';
 import type { LoanLevel } from '../../../../domain/loans';
@@ -270,8 +270,14 @@ export function AssetBoard(
           is a rotation nobody has got to yet — background work, not an agenda. */}
       {onInspect && draft.canRecord !== false && stale.length > 0 && (
         <section class={CARD}>
-          <div class="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 class="font-bold text-slate-900">Perlu diperiksa</h2>
+          {/* An icon, like the three sections above it. `Eye` and not `ClipboardCheck`: that one
+              already means the RACK rotation, and two different rotations wearing one glyph is
+              two things somebody has to tell apart by reading. */}
+          <div class="mb-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <Eye class="h-5 w-5 shrink-0 text-slate-400" />
+              <h2 class="font-bold text-slate-900">Perlu diperiksa</h2>
+            </div>
             <span class="text-sm tabular-nums text-slate-600">{stale.length} unit</span>
           </div>
           <p class="mb-3 max-w-prose text-sm leading-relaxed text-slate-600">
@@ -297,7 +303,7 @@ export function AssetBoard(
                 </span>
                 <button
                   type="button"
-                  class="min-h-11 shrink-0 rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+                  class="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
                   onClick={() => onInspect({
                     assetId: d.instance.assetId,
                     label: d.instance.label,
@@ -305,7 +311,7 @@ export function AssetBoard(
                     lastTs: seen.ts,
                   })}
                 >
-                  Periksa
+                  <Eye class="h-4 w-4" /> Periksa
                 </button>
               </li>
             ))}

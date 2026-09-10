@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'octane';
 import {
-  ArrowDownLeft, ArrowLeft, ArrowUpRight, History, MapPin, Package, Pencil, QrCode,
+  ArrowDownLeft, ArrowLeft, ArrowUpRight, Eye, History, MapPin, Package, Pencil, QrCode,
 } from '@octanejs/lucide';
 import { keteranganLabel } from '../../../../domain/keterangan';
 import type { Location, Txn } from '../../../../domain/types';
@@ -438,12 +438,12 @@ export function ItemDetail(
                   {onInspect && draft.canRecord !== false && status === 'available' && (
                     <button
                       type="button"
-                      class="mt-1.5 w-full rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900"
+                      class="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900"
                       onClick={() => onInspect({
                         assetId: a.assetId, label: a.label, item, lastTs: checks.get(a.assetId) ?? null,
                       })}
                     >
-                      Periksa
+                      <Eye class="h-3.5 w-3.5" /> Periksa
                     </button>
                   )}
                 </li>
