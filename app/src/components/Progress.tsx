@@ -70,7 +70,7 @@ export function RegisterLoading(
         aria-hidden="true"
       />
       <p class="mt-4 text-sm font-semibold text-slate-700">Memuat register…</p>
-      <p class="mt-1 text-sm text-slate-500">Membaca katalog dan stok dari spreadsheet.</p>
+      <p class="mt-1 text-sm text-slate-600">Membaca katalog dan stok dari spreadsheet.</p>
     </div>
   );
 }

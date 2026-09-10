@@ -226,7 +226,7 @@ export function RequestPhotos({ requestId, name }: { requestId: string; name: st
         <p role="alert" class="mt-2 text-xs text-red-700">{error}</p>
       )}
 
-      <p class="mt-3 text-xs leading-relaxed text-slate-400">
+      <p class="mt-3 text-xs leading-relaxed text-slate-500">
         Maksimal {MAX_PHOTOS_PER_ITEM} foto. Tersimpan di perangkat ini saja, belum ikut
         tersinkron.
       </p>

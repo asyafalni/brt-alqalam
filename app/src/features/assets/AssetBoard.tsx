@@ -188,13 +188,23 @@ export function AssetBoard(
         </p>
       )}
 
-      <div class="grid grid-cols-3 gap-2 sm:gap-4">
+      {/* Two across on a phone rather than four squeezed into one row — a fourth tile at 90px
+          wraps its label onto three lines. */}
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
         <Stat value={activeBase} label="Masih dimiliki" />
-        <Stat value={groups.out.length} label="Dipinjam" tint="bg-sky-50 text-sky-600" />
+        <Stat value={groups.out.length} label="Dipinjam" tint="bg-sky-50 text-sky-700" />
         <Stat
           value={problems}
           label="Rusak / hilang"
-          tint={problems > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-100 text-slate-400'}
+          tint={problems > 0 ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-600'}
+        />
+        {/* The fourth number on this screen, and the only one nobody would go looking for:
+            broken and lost are reported by a person, while a unit whose condition has not been
+            confirmed for six months is reported by nobody. */}
+        <Stat
+          value={stale.length}
+          label="Perlu diperiksa"
+          tint={stale.length > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}
         />
       </div>
 
@@ -519,7 +529,7 @@ function Section(
                 <CircleCheck class="h-5 w-5 text-green-600" />
               </div>
               <p class="text-sm font-semibold text-slate-600">{empty}</p>
-              <p class="max-w-xs text-pretty text-xs leading-relaxed text-slate-400">{emptyHint}</p>
+              <p class="max-w-xs text-pretty text-xs leading-relaxed text-slate-500">{emptyHint}</p>
             </div>
           )}
         />

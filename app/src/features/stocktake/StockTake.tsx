@@ -273,7 +273,7 @@ export function StockTake(
       cell: ({ item: i, line }) => (
         <span class="flex items-baseline gap-2 whitespace-nowrap">
           <span class="max-w-[12rem] truncate text-sm text-slate-500">{categoryName(i.categoryId)}</span>
-          <span class="text-[10px] uppercase tracking-wider text-slate-400">
+          <span class="text-[10px] uppercase tracking-wider text-slate-500">
             {i.kind === 'consumable' ? 'bisa habis' : 'barang tetap'}
           </span>
         </span>
@@ -287,7 +287,7 @@ export function StockTake(
         const code = rackCode(line.locationId);
         return code
           ? <span class="whitespace-nowrap text-sm font-medium text-slate-600">{code}</span>
-          : <span class="whitespace-nowrap text-sm italic text-slate-400">belum ditempatkan</span>;
+          : <span class="whitespace-nowrap text-sm italic text-slate-500">belum ditempatkan</span>;
       },
     },
     {
@@ -307,7 +307,7 @@ export function StockTake(
       cell: ({ item: i, line }) => (
         <div class="whitespace-nowrap text-right">
           <span class="text-sm font-bold tabular-nums text-slate-900">{line.initialStock}</span>{' '}
-          <span class="text-xs text-slate-400">{i.unit}</span>
+          <span class="text-xs text-slate-500">{i.unit}</span>
           {i.minStock != null && <p class="text-[10px] text-slate-500">min {i.minStock}</p>}
         </div>
       ),
@@ -512,7 +512,7 @@ export function StockTake(
               <span class="ml-2 font-normal text-slate-500">· hasil cari "{search}"</span>
             )}
           </h2>
-          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {visible.length} baris
           </span>
         </div>
@@ -530,7 +530,7 @@ export function StockTake(
               {items.length === 0 ? (
                 <>
                   <p class="text-base font-bold text-slate-600">Belum ada barang</p>
-                  <p class="mx-auto mt-1 max-w-sm text-sm text-slate-400">
+                  <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">
                     Mulai dari rak paling dekat pintu.
                   </p>
                   {/* Offered HERE as well as in the header: on an empty page the header button
@@ -543,13 +543,13 @@ export function StockTake(
                   </div>
                   <div class="mt-5">
                     <Button variant="secondary" size="touch" onClick={draft.loadDemo}>Muat contoh data</Button>
-                    <p class="mt-2 text-xs text-slate-400">
+                    <p class="mt-2 text-xs text-slate-500">
                       Untuk mencoba tampilan. Kosongkan lagi sebelum opname sungguhan.
                     </p>
                   </div>
                 </>
               ) : (
-                <p class="italic text-slate-400">Tidak ada yang cocok dengan "{search}".</p>
+                <p class="italic text-slate-500">Tidak ada yang cocok dengan "{search}".</p>
               )}
             </div>
           )}
@@ -611,7 +611,7 @@ function ExportPanel(
           </li>
         ))}
       </ul>
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      <p class="mt-4 text-xs leading-relaxed text-slate-500">
         Diunduh satu per satu, bukan sekaligus — browser memblokir beberapa unduhan yang
         dipicu dari satu ketukan, dan memblokirnya tanpa pemberitahuan.
       </p>

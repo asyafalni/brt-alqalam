@@ -43,7 +43,7 @@ export function BottomNav(
               aria-label={tab.name}
               class={
                 'relative flex min-h-touch flex-1 flex-col items-center justify-center gap-0.5 py-2 ' +
-                'transition-colors ' + (active ? 'text-slate-900' : 'text-slate-400')
+                'transition-colors ' + (active ? 'text-slate-900' : 'text-slate-500')
               }
               onClick={() => onNavigate(tab.route)}
             >

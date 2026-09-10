@@ -103,7 +103,7 @@ export const LABEL = 'block text-sm font-medium text-slate-700 mb-1.5';
 export const FIELD =
   'w-full px-4 rounded-lg border border-slate-500 bg-white text-slate-900 transition-all ' +
   'duration-200 focus:ring-2 focus:ring-slate-900/40 focus:border-slate-900 ' +
-  'placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
+  'placeholder:text-slate-500 disabled:bg-slate-50 disabled:text-slate-500 min-h-touch';
 export const FIELD_ERROR = 'border-red-500 bg-red-50/20';
 
 /**

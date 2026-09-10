@@ -110,7 +110,7 @@ export function ItemPhotos(
     <section class={CARD}>
       <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">Foto barang</h2>
-        <span class="text-xs tabular-nums text-slate-400">
+        <span class="text-xs tabular-nums text-slate-500">
           {photos.length}/{MAX_PHOTOS_PER_ITEM}
           {photos.length > 0 && ` · ${kb(photoBudget(photos))}`}
         </span>
@@ -132,7 +132,7 @@ export function ItemPhotos(
         <div class="rounded-lg border border-dashed border-slate-400 px-4 py-8 text-center">
           <Camera class="mx-auto mb-2 h-8 w-8 text-slate-300" />
           <p class="text-sm text-slate-500">Belum ada foto.</p>
-          <p class="mx-auto mt-1 max-w-xs text-xs text-slate-400">
+          <p class="mx-auto mt-1 max-w-xs text-xs text-slate-500">
             Satu foto menjawab “yang mana?” lebih cepat daripada nama dan kode rak.
           </p>
           <Button class="mt-4" variant="secondary" onClick={() => input.current?.click()}>
@@ -180,7 +180,7 @@ export function ItemPhotos(
         </p>
       )}
 
-      <p class="mt-3 text-xs leading-relaxed text-slate-400">
+      <p class="mt-3 text-xs leading-relaxed text-slate-500">
         Foto disimpan di perangkat ini saja, belum ikut tersinkron — jadi tidak terlihat dari HP
         lain sampai gateway terpasang.
       </p>

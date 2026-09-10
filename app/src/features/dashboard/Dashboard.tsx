@@ -28,11 +28,13 @@ import { openRequests, openTotal } from '../../../../domain/requests';
 const PAGE = 6;
 
 export function Dashboard(
-  { draft, inventory, now, onNavigate, onAjukan, canReview = true }:
+  { draft, inventory, now, onNavigate, onAjukan, onRestock, canReview = true }:
   {
     draft: Draft; inventory: Inventory; now: number; onNavigate: (r: Route) => void;
     /** Opens the request FORM. Available to everybody, unlike the list. */
     onAjukan?: () => void;
+    /** The same form, prefilled for one item that has run low. */
+    onRestock?: (itemId: string) => void;
     /** False when this device may file requests but not read them back. */
     canReview?: boolean;
   },
@@ -139,7 +141,7 @@ export function Dashboard(
         <div class={`${CARD} py-20 text-center`}>
           <Package class="mx-auto mb-3 h-10 w-10 text-slate-300" />
           <p class="mb-1 font-semibold text-slate-700">Belum ada data.</p>
-          <p class="mb-5 text-sm italic text-slate-400">Mulai dari Opname Gudang.</p>
+          <p class="mb-5 text-sm italic text-slate-500">Mulai dari Opname Gudang.</p>
           <div class="flex flex-wrap justify-center gap-2">
             <Button size="touch" onClick={() => onNavigate({ name: 'opname' })}>Buka Opname Gudang</Button>
             {/* Also offered here, because this is now the first screen anyone sees — sending
@@ -286,12 +288,12 @@ export function Dashboard(
               <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <TriangleAlert class="h-5 w-5 shrink-0 text-amber-500" />
                 <h2 class="font-bold text-slate-900">Perlu dibeli lagi</h2>
-                <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
+                <span class="rounded-full bg-amber-700 px-2 py-0.5 text-[10px] font-bold text-white ring-4 ring-amber-50">
                   {inventory.notifications.length}
                 </span>
                 {/* His word for this screen, kept beside ours. The spec calls it Notifikasi
                     Stok; "Perlu dibeli lagi" says what to do about it (Part XVII). */}
-                <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Notifikasi Stok
                 </span>
               </div>
@@ -310,6 +312,10 @@ export function Dashboard(
                   categoryNameOf={categoryNameOf}
                   now={now}
                   onOpenItem={(id) => onNavigate({ name: 'item', id })}
+                  /* The bar above this list counts how many of these have been asked for. With
+                     no way to ask from here it could never move off zero — a progress bar over
+                     a list you cannot act on is a progress bar that measures nothing. */
+                  onRestock={onRestock}
                 />
               </LazyList>
             </section>
@@ -362,7 +368,7 @@ export function Dashboard(
                         <p class="truncate text-sm font-bold text-slate-900">
                           Rak {d.location.code}
                         </p>
-                        <p class="truncate text-xs text-slate-400">
+                        <p class="truncate text-xs text-slate-500">
                           {d.location.name || d.location.zone}
                         </p>
                       </div>
@@ -444,12 +450,22 @@ export function Dashboard(
 // Literal class strings — Tailwind never sees an interpolated one. The families match the
 // status language exactly: rusak is orange, hilang is a deeper rose, because they are
 // different outcomes needing different actions and must never read as the same thing.
+/*
+ * The BORDERS are `-600`, not `-200`, and each stays in its own hue.
+ *
+ * A chip is a control, so WCAG 1.4.11 wants 3:1 on its edge, and `-200` on a `-50` fill measures
+ * 1.00–1.09 — a hairline nobody can see. `-600` was not enough either: amber came back at 2.64
+ * and orange at 2.36, which is why this is `-700` and why it was measured twice. §77 already moved every other control boundary to
+ * `slate-500` for this reason; the difference here is that flattening these to grey would put a
+ * neutral ring around five pills whose whole job is to be told apart by colour. Darkening each
+ * within its own hue clears the ratio and leaves the status language exactly where it was.
+ */
 const CHIP_TONE = {
-  red: { chip: 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100', dot: 'bg-red-500' },
-  amber: { chip: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100', dot: 'bg-amber-500' },
-  orange: { chip: 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100', dot: 'bg-orange-500' },
-  rose: { chip: 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100', dot: 'bg-rose-500' },
-  slate: { chip: 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50', dot: 'bg-slate-400' },
+  red: { chip: 'bg-red-50 text-red-800 border-red-700 hover:bg-red-100', dot: 'bg-red-500' },
+  amber: { chip: 'bg-amber-50 text-amber-800 border-amber-700 hover:bg-amber-100', dot: 'bg-amber-500' },
+  orange: { chip: 'bg-orange-50 text-orange-800 border-orange-700 hover:bg-orange-100', dot: 'bg-orange-500' },
+  rose: { chip: 'bg-rose-50 text-rose-900 border-rose-700 hover:bg-rose-100', dot: 'bg-rose-500' },
+  slate: { chip: 'bg-white text-slate-700 border-slate-500 hover:bg-slate-50', dot: 'bg-slate-400' },
 } as const;
 
 /**
@@ -515,12 +531,19 @@ function Chip(
   );
 }
 
+/*
+ * `-700` on a `-50` ground, not `-600`.
+ *
+ * Measured, not chosen: at `-600` these came out at 3.08 (amber), 3.09 (green) and 4.36 (red),
+ * and the number is 16px bold — short of the 18.66px that would let 3:1 apply, so it needs 4.5.
+ * `-700` clears it on every tint without touching the hue, so the status language is unchanged.
+ */
 const TONE = {
   ink: 'bg-slate-900 text-slate-50',
-  zero: 'bg-slate-100 text-slate-400',
-  green: 'bg-green-50 text-green-600',
-  amber: 'bg-amber-50 text-amber-600',
-  red: 'bg-red-50 text-red-600',
+  zero: 'bg-slate-100 text-slate-600',
+  green: 'bg-green-50 text-green-700',
+  amber: 'bg-amber-50 text-amber-700',
+  red: 'bg-red-50 text-red-700',
 } as const;
 
 function Kpi(
@@ -554,7 +577,10 @@ function Action(
   return (
     <button
       type="button"
-      class={`${CARD} flex w-full items-start gap-3 text-left transition-colors hover:bg-slate-50`}
+      /* `border-slate-500`, overriding CARD's `slate-200`. §77 set card outlines deliberately
+         low because a card is not a control — but this card IS one, and 1.4.11 wants 3:1 on the
+         edge of something you press. Measured at 1.34 before. */
+      class={`${CARD} flex w-full items-start gap-3 border-slate-500 text-left transition-colors hover:bg-slate-50`}
       onClick={onClick}
     >
       <Icon class="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />

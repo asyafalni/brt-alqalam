@@ -73,7 +73,7 @@ export function RackContents(
     <div>
       <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
         {here.length === 0 && (
-          <li class="px-[var(--card-pad)] py-6 text-center italic text-slate-400">
+          <li class="px-[var(--card-pad)] py-6 text-center italic text-slate-500">
             Belum ada barang yang disimpan di rak ini.
           </li>
         )}
@@ -171,7 +171,7 @@ export function RackContents(
                 />
                 {/* Zero is a real answer, not an empty field: "we keep it here and there is
                     none left" is exactly the state a shopping list is made from. */}
-                <p class="mt-1 text-xs text-slate-400">
+                <p class="mt-1 text-xs text-slate-500">
                   Boleh 0 — artinya barang ini memang disimpan di sini, tapi sedang habis.
                 </p>
               </div>
@@ -190,7 +190,7 @@ export function RackContents(
         <Button size="touch" variant="secondary" onClick={onDone}>Selesai</Button>
       </div>
 
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      <p class="mt-4 text-xs leading-relaxed text-slate-500">
         Menghapus dari rak tidak menghapus barangnya dari katalog — hanya mencatat bahwa
         barang itu tidak disimpan di sini lagi.
       </p>

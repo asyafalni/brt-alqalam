@@ -68,7 +68,7 @@ export function CountSheet(p: Props) {
       </div>
 
       {p.contents.length === 0 ? (
-        <p class="py-8 text-center italic text-slate-400">Rak ini kosong — tidak ada yang dihitung.</p>
+        <p class="py-8 text-center italic text-slate-500">Rak ini kosong — tidak ada yang dihitung.</p>
       ) : (
         <>
           <div class="mb-3 flex flex-wrap items-center gap-3">

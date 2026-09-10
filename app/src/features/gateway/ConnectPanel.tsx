@@ -186,7 +186,7 @@ export function ConnectPanel(
             Hanya Admin Utama yang bisa memutus sambungan perangkat ini.
           </p>
         )}
-        <p class="mt-2.5 text-[11px] leading-relaxed text-slate-400">
+        <p class="mt-2.5 text-[11px] leading-relaxed text-slate-500">
           Tablet hilang? Cabut dengan revokeDevice() di Apps Script.
         </p>
       </div>
@@ -214,7 +214,7 @@ export function ConnectPanel(
         autocomplete="off"
         onInput={(e: Event) => setUrl((e.target as HTMLInputElement).value)}
       />
-      <p class="mt-1.5 text-xs text-slate-400">
+      <p class="mt-1.5 text-xs text-slate-500">
         Dari Apps Script: Deploy → Manage deployments. Harus yang berakhiran <b>/exec</b>.
       </p>
 
@@ -262,7 +262,7 @@ export function ConnectPanel(
       {/* Said out loud because it was decided out loud: this is the trade the design already
           assumed, and §65.2's answer to it is that revoking is one deleted row. */}
       {secret.trim() !== '' && (
-        <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        <p class="mt-4 text-xs leading-relaxed text-slate-500">
           Kode perangkat disimpan di perangkat ini saja. Artinya siapa pun yang memegang tablet
           ini bisa membuka layar PIN — jadi tempatkan tabletnya sebagaimana Anda menempatkan
           kunci gudang.

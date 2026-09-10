@@ -70,7 +70,7 @@ const HISTORY: Column<Txn>[] = [
     cell: (t) => (
       <span
         class={`text-sm font-bold tabular-nums ${
-          t.qtyDelta < 0 ? 'text-red-600' : t.qtyDelta > 0 ? 'text-green-600' : 'text-slate-400'
+          t.qtyDelta < 0 ? 'text-red-600' : t.qtyDelta > 0 ? 'text-green-600' : 'text-slate-500'
         }`}
       >
         {t.qtyDelta > 0 ? '+' : ''}{t.qtyDelta || '—'}
@@ -113,7 +113,7 @@ export function ItemDetail(
         <div class={`${CARD} border-red-100 py-16 text-center`} role="alert">
           <h1 class="mb-2 text-2xl font-bold text-slate-900">Barang tidak ditemukan</h1>
           <p class="mb-1 text-slate-500">Tidak ada barang dengan kode ini di katalog.</p>
-          <p class="mb-5 font-mono text-sm text-slate-400">{id}</p>
+          <p class="mb-5 font-mono text-sm text-slate-500">{id}</p>
           <Button size="touch" onClick={() => onNavigate({ name: 'board' })}>Lihat semua stok</Button>
         </div>
       </div>
@@ -253,7 +253,7 @@ export function ItemDetail(
                 <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>
                 <span class="text-2xl font-bold tabular-nums text-slate-900">
                   {derived?.qty ?? 0}{' '}
-                  <span class="text-base font-normal text-slate-400">{item.unit}</span>
+                  <span class="text-base font-normal text-slate-500">{item.unit}</span>
                 </span>
                 {/* The headline is what can be picked up now. A labelled item with units out
                     or broken owns more than that, and hiding the difference is what made the
@@ -286,7 +286,7 @@ export function ItemDetail(
             <MapPin class="h-4 w-4 shrink-0 text-slate-400" />
             <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Letak</span>
             {shelves.length > 1 && (
-              <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span class="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 {shelves.length} rak
               </span>
             )}
@@ -340,7 +340,7 @@ export function ItemDetail(
                     {shelves.length > 1 && (
                       <span class="shrink-0 text-sm font-bold tabular-nums text-slate-900">
                         {shelf.qty}
-                        <span class="ml-1 text-xs font-normal text-slate-400">{item.unit}</span>
+                        <span class="ml-1 text-xs font-normal text-slate-500">{item.unit}</span>
                       </span>
                     )}
                   </button>
@@ -462,7 +462,7 @@ export function ItemDetail(
           <History class="h-4 w-4 shrink-0 text-slate-400" />
           <h2 class="text-sm font-bold text-slate-900">Riwayat</h2>
           {history.length > 0 && (
-            <span class="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span class="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {history.length} catatan
             </span>
           )}
@@ -475,7 +475,7 @@ export function ItemDetail(
           empty={
             <div class="px-6 py-12 text-center">
               <Package class="mx-auto mb-3 h-8 w-8 text-slate-300 opacity-40" />
-              <p class="mx-auto max-w-sm text-sm italic text-slate-400">
+              <p class="mx-auto max-w-sm text-sm italic text-slate-500">
                 {inventory.offline
                   ? 'Riwayat transaksi tersimpan di gateway, yang belum terpasang.'
                   : 'Belum ada transaksi untuk barang ini.'}
@@ -565,7 +565,7 @@ function PlaceForm(
         </button>
       </div>
 
-      <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      <p class="mt-4 text-xs leading-relaxed text-slate-500">
         Jumlah yang sudah tercatat ikut pindah ke rak ini. Kalau ternyata tersebar di beberapa
         rak, sesuaikan lewat Cek rak.
       </p>
@@ -576,7 +576,7 @@ function PlaceForm(
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div class="min-w-0">
-      <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</dt>
+      <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
       <dd class="truncate text-sm font-semibold text-slate-900">{value}</dd>
     </div>
   );

@@ -42,7 +42,7 @@ export function ScanResult(p: Props) {
               ? 'Belum ada barang yang dicatat di perangkat ini.'
               : 'Label ini tidak ada di katalog. Mungkin dicetak dari daftar yang berbeda.'}
           </p>
-          <p class="mb-5 font-mono text-sm text-slate-400">{resolution.id}</p>
+          <p class="mb-5 font-mono text-sm text-slate-500">{resolution.id}</p>
           <Button size="touch" onClick={p.onBack}>Buka Opname Gudang</Button>
         </div>
       </div>
@@ -72,7 +72,7 @@ export function ScanResult(p: Props) {
 
         <div class={CARD}>
           {contents.length === 0 ? (
-            <p class="py-6 text-center italic text-slate-400">Rak ini kosong.</p>
+            <p class="py-6 text-center italic text-slate-500">Rak ini kosong.</p>
           ) : (
             <ul class="divide-y divide-slate-100">
               {contents.map((i) => {
@@ -85,7 +85,7 @@ export function ScanResult(p: Props) {
                     <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
                       {/* What is on this rack, not the item's total across the gudang. */}
                       {d?.byLocation[p.id] ?? 0}{' '}
-                      <span class="text-xs font-normal text-slate-400">{i.unit}</span>
+                      <span class="text-xs font-normal text-slate-500">{i.unit}</span>
                     </span>
                     {/* The point of scanning a shelf: you are standing at it, holding the thing.
                         Anything further than one tap from here loses to just walking away. */}
@@ -128,7 +128,7 @@ export function ScanResult(p: Props) {
           {!instance && (
             <span class="text-2xl font-bold tabular-nums text-slate-900">
               {resolution.qty}{' '}
-              <span class="text-base font-normal text-slate-400">{item.unit}</span>
+              <span class="text-base font-normal text-slate-500">{item.unit}</span>
             </span>
           )}
         </div>

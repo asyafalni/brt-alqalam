@@ -332,7 +332,7 @@ export function App() {
   /* Filing a request is open to everybody; reading the list is not (§39). So the form is a
      panel anybody can open, and the list stays a screen only an admin has. */
   const [ajukanOpen, setAjukanOpen] = useState<
-    { type: 'beli' | 'perbaikan'; assetId?: string; requestId: string } | null
+    { type: 'beli' | 'perbaikan'; assetId?: string; itemId?: string; requestId: string } | null
   >(null);
   /* Also at the frame: a movement is started from a scan, from an item, or from a rack, and
      hoisting it means one implementation instead of three that drift. */
@@ -600,6 +600,10 @@ export function App() {
               now={now}
               canReview={!connection || admin != null}
               onAjukan={() => setAjukanOpen({ type: 'beli', requestId: newRequestId() })}
+              /* Prefilled for the item that ran low. The register already knows its name and
+                 unit; asking somebody to retype them is the tap §0.0 exists to remove — and
+                 without this the "Sudah diajukan" bar above the list could never leave zero. */
+              onRestock={(itemId) => setAjukanOpen({ type: 'beli', itemId, requestId: newRequestId() })}
               onNavigate={navigate}
             />
           )}
@@ -808,8 +812,8 @@ export function App() {
               /* Minted here, before the form opens, because photos are filed under it — and it
                  is what the gateway stores, so the attachments are not orphaned. */
               requestId={ajukanOpen?.requestId ?? 'REQ-baru'}
-              prefill={ajukanOpen?.assetId
-                ? { type: ajukanOpen.type, assetId: ajukanOpen.assetId }
+              prefill={ajukanOpen?.assetId || ajukanOpen?.itemId
+                ? { type: ajukanOpen.type, assetId: ajukanOpen.assetId, itemId: ajukanOpen.itemId }
                 : undefined}
               /* Remounts per request, so a second broken knife does not inherit the first
                  one's half-typed form or its photos. */

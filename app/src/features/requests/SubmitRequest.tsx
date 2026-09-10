@@ -55,7 +55,8 @@ export function SubmitRequest(
     /** Minted by the caller before opening, so photos have somewhere to go. */
     requestId: string;
     /** `assetId` is required when there is a prefill at all: the whole point is naming a unit. */
-    prefill?: { type: 'beli' | 'perbaikan'; assetId: string; note?: string };
+    /** A unit (broken/lost), or an ITEM to restock — see `RequestForm`. */
+    prefill?: { type: 'beli' | 'perbaikan'; assetId?: string; itemId?: string; note?: string };
     onDone: () => void;
   },
 ) {
@@ -108,7 +109,7 @@ export function SubmitRequest(
           Pengurus akan melihatnya dan memutuskan. Daftarnya tidak bisa dibuka di sini karena
           menyebut nama orang.
         </p>
-        <p class="mt-2 font-mono text-[11px] uppercase tracking-tight text-slate-400">{sentId}</p>
+        <p class="mt-2 font-mono text-[11px] uppercase tracking-tight text-slate-500">{sentId}</p>
         <Button class="mt-5" size="panel" onClick={onDone}>Selesai</Button>
       </div>
     );

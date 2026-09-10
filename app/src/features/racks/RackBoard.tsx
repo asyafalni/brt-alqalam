@@ -46,9 +46,13 @@ import { RackContents } from './RackContents';
  * Darkened to `-500`, which clears 3:1 while staying recognisably the same red and amber. The
  * fills stay pale, so the tile still reads as tinted rather than as a warning banner.
  */
+/* `-600`/`-700` on the tinted ones. A rack tile is a control, so its edge wants 3:1, and
+   `amber-500` on `amber-50` measures 2.13 — the last finding left over from §77's audit, which
+   had been standing as a colour-language trade-off. Darkening within the same hue settles it
+   without touching what the colour means. */
 const CELL: Record<LocationStatus, string> = {
-  out: 'bg-red-50 border-red-500 text-red-800 hover:border-red-700',
-  low: 'bg-amber-50 border-amber-500 text-amber-800 hover:border-amber-700',
+  out: 'bg-red-50 border-red-600 text-red-800 hover:border-red-700',
+  low: 'bg-amber-50 border-amber-700 text-amber-800 hover:border-amber-800',
   available: 'bg-white border-slate-500 text-slate-700 hover:border-slate-900',
   empty: 'bg-slate-50 border-dashed border-slate-500 text-slate-600 hover:border-slate-900',
 };
@@ -492,7 +496,7 @@ export function RackBoard(
               {contents.length === 0 ? (
                 <div class="py-8 text-center">
                   <Package class="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                  <p class="italic text-slate-400">Rak ini kosong.</p>
+                  <p class="italic text-slate-500">Rak ini kosong.</p>
                 </div>
               ) : (
                 <ul class="-mx-[var(--card-pad)] divide-y divide-slate-100">
@@ -522,7 +526,7 @@ export function RackBoard(
                           >
                             {/* What is on THIS shelf, not the item's total across the gudang. */}
                             {d?.byLocation[selectedRack.location.locationId] ?? 0}{' '}
-                            <span class="text-xs font-normal text-slate-400">{i.unit}</span>
+                            <span class="text-xs font-normal text-slate-500">{i.unit}</span>
                           </span>
                         </button>
                         {/* Outside the row button, not inside it: a button in a button is not
@@ -740,7 +744,7 @@ function RackForm(
             // is the platform event and only fires on blur.
             onInput={(e: Event) => setCode((e.target as HTMLInputElement).value)}
           />
-          <p class="mt-1 text-xs text-slate-400">Yang tertulis di raknya.</p>
+          <p class="mt-1 text-xs text-slate-500">Yang tertulis di raknya.</p>
         </div>
         <div>
           <label class={LABEL} for="rack-name">Isi rak (opsional)</label>
@@ -781,7 +785,7 @@ function RackForm(
               <option value={NEW_ZONE}>+ Zona baru…</option>
             </Select>
           )}
-          <p class="mt-1 text-xs text-slate-400">Ruangan atau areanya.</p>
+          <p class="mt-1 text-xs text-slate-500">Ruangan atau areanya.</p>
         </div>
       </div>
 
@@ -832,7 +836,7 @@ function RackForm(
             corrected. On a rack that does not exist yet it is reassurance about a sticker
             nobody has printed. */}
         {initial.code !== '' && (
-          <span class="ml-auto max-w-xs text-xs text-slate-400">
+          <span class="ml-auto max-w-xs text-xs text-slate-500">
             Mengubah kode tidak merusak stiker QR yang sudah dicetak.
           </span>
         )}

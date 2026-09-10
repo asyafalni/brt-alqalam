@@ -264,7 +264,7 @@ export function Board(
             <Stat
               value={notifications.length}
               label="Perlu perhatian"
-              tint={notifications.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}
+              tint={notifications.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}
             />
           </div>
 

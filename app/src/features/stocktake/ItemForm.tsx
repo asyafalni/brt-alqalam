@@ -369,7 +369,7 @@ export function ItemForm(p: Props) {
           {p.input.minStock == null ? (
             <button
               type="button"
-              class={`${FIELD} flex items-center justify-between text-left text-slate-400`}
+              class={`${FIELD} flex items-center justify-between text-left text-slate-500`}
               onClick={() => p.onChange('minStock', 0)}
             >
               <span>Tidak ada minimum ( - )</span>

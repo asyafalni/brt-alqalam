@@ -104,7 +104,7 @@ export function RequestBoard(
   {
     draft: Draft; inventory: Inventory; now: number; actor?: string;
     /** Set when the screen was opened from a broken or lost unit on the Aset page. */
-    prefill?: { type: RequestType; assetId: string };
+    prefill?: { type: RequestType; assetId?: string; itemId?: string };
     onPrefillUsed?: () => void;
     /**
      * True when this device is reading the PII-free tier, which carries no requests at all.

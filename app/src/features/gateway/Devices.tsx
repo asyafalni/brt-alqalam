@@ -185,7 +185,7 @@ export function Devices(
             <li key={d.deviceId} class="flex items-center gap-2 py-2">
               <Smartphone class={`h-4 w-4 shrink-0 ${d.revoked ? 'text-slate-300' : 'text-slate-400'}`} />
               <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
-                <span class={`truncate text-sm font-semibold ${d.revoked ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                <span class={`truncate text-sm font-semibold ${d.revoked ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
                   {d.label}
                 </span>
                 {d.revoked && <span class="shrink-0 text-[11px] text-slate-500">dicabut</span>}

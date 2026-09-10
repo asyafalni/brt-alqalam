@@ -74,7 +74,7 @@ export function ScannerView({ onFound, onClose }: { onFound: (route: Route) => v
           <p class="mt-1 text-sm text-slate-500">
             QR ini bukan label dari sistem ini.
           </p>
-          <p class="mt-2 break-all font-mono text-xs text-slate-400">{rejected}</p>
+          <p class="mt-2 break-all font-mono text-xs text-slate-500">{rejected}</p>
           <Button class="mt-4 w-full" size="touch" onClick={onClose}>Tutup</Button>
         </div>
       )}
@@ -103,7 +103,7 @@ export function ScannerView({ onFound, onClose }: { onFound: (route: Route) => v
                   but never shown would make the field write-only, and diagnosing a camera on
                   somebody else's phone is exactly when you want it. */}
               {scanner.message && (
-                <p class="mt-2 break-all font-mono text-[11px] text-slate-400">{scanner.message}</p>
+                <p class="mt-2 break-all font-mono text-[11px] text-slate-500">{scanner.message}</p>
               )}
               <p class="mt-4 text-sm font-semibold text-slate-900">Ketik saja kodenya:</p>
             </>
@@ -123,7 +123,7 @@ export function ScannerView({ onFound, onClose }: { onFound: (route: Route) => v
               if (e.key === 'Enter' && typed.trim() !== '') accept(typed.trim());
             }}
           />
-          <p class="mt-1.5 text-xs text-slate-400">
+          <p class="mt-1.5 text-xs text-slate-500">
             Kode ini tercetak kecil di bawah QR pada stikernya.
           </p>
           <div class="mt-4 flex gap-2">

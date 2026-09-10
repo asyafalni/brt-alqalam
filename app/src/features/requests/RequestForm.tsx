@@ -79,7 +79,15 @@ export function RequestForm(
      * Set when the form was opened from a broken or lost unit rather than from the button.
      * `note` is what the person who reported the loss wrote at the time.
      */
-    prefill?: { type: RequestType; assetId: string; note?: string };
+    /**
+     * What this request is about before anybody types.
+     *
+     * `assetId` is a unit — the broken-or-lost link from Aset. `itemId` is a RESTOCK of
+     * something already in the catalog, which is what "Sabun habis" is: the register already
+     * knows the name, the unit and that we own it, and making somebody retype all three is the
+     * kind of tap §0.0 exists to remove.
+     */
+    prefill?: { type: RequestType; assetId?: string; itemId?: string; note?: string };
   },
 ) {
   /* Everything a replacement needs is already recorded: which unit, which catalog row it
@@ -96,7 +104,7 @@ export function RequestForm(
      row called "Pisau potong" is exactly the mess §0 says the register exists to clear up —
      and "Barang baru" is still one tap away for a different model. */
   const [itemId, setItemId] = useState(
-    initial?.itemId ?? (replacing && fromItem ? fromItem.itemId : NEW_THING),
+    initial?.itemId ?? prefill?.itemId ?? (replacing && fromItem ? fromItem.itemId : NEW_THING),
   );
   const [name, setName] = useState(initial?.name ?? (replacing && fromItem ? fromItem.name : ''));
   const [qty, setQty] = useState(initial?.qty ?? 1);
@@ -344,7 +352,7 @@ export function RequestForm(
             onInput={(e: Event) => setPrice((e.target as HTMLInputElement).value)}
           />
         </div>
-        <p class="mt-1 text-xs text-slate-400">
+        <p class="mt-1 text-xs text-slate-500">
           Boleh dikosongkan kalau belum tahu — nanti dihitung terpisah, tidak dianggap gratis.
         </p>
       </div>

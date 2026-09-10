@@ -283,3 +283,34 @@ describe('the low-stock card measures the shopping, not the shelf', () => {
     expect(r.getByLabelText('Sudah diajukan: 50 persen')).toBeTruthy();
   });
 });
+
+describe('acting on a low item from where it is reported', () => {
+  /*
+   * The bar above this list counts how many low items have been asked for. Without a way to ask
+   * FROM the list it could never move off zero — a progress bar over rows you cannot act on
+   * measures nothing. And the register already knows the name, the unit, and that we own the
+   * thing, so making somebody open Pengajuan and retype all three is the tap §0.0 exists to
+   * remove.
+   */
+  it('offers to file a purchase for the item that ran low', () => {
+    seed(catalog(input({ name: 'Sabun', initialStock: 1, minStock: 5 })));
+    const r = render(App);
+
+    fireEvent.click(r.getByLabelText('Ajukan pembelian Sabun'));
+    // The form opens already naming it, rather than as a blank "Barang baru".
+    expect(r.getByText(/Ajukan pembelian/)).toBeTruthy();
+    expect(r.getAllByText(/Sabun/).length).toBeGreaterThan(0);
+  });
+
+  it('says why it cannot be filed on a device with no gateway', () => {
+    /* A request goes to the spreadsheet, so there is nowhere to put one without a gateway.
+       The form is genuinely absent here rather than broken — and it says so, which is the
+       distinction this project keeps having to restate. The prefill itself is asserted in
+       `RequestForm.test.tsx`, where the form actually exists. */
+    seed(catalog(input({ name: 'Sabun', initialStock: 1, minStock: 5 })));
+    const r = render(App);
+
+    fireEvent.click(r.getByLabelText('Ajukan pembelian Sabun'));
+    expect(r.getByText(/belum tersambung ke gateway/)).toBeTruthy();
+  });
+});

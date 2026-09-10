@@ -59,14 +59,35 @@ const CHECK = `(() => {
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+
+/**
+ * Wait for a screen with something ON it.
+ *
+ * Without this the audit measures whatever is up at 1500ms, and on a build that carries a
+ * gateway URL that is "Memuat register…" — a spinner and two lines of text, which has almost
+ * no colours to get wrong. It reports "bersih" and means nothing, which is the fourth way this
+ * tool has found to be confidently wrong (§77 records the first three). A run that cannot see
+ * the page has to say so rather than pass it.
+ */
+async function ready() {
+  await p.waitForFunction(
+    () => !document.body.textContent.includes('Memuat register'),
+    null,
+    { timeout: 20000 },
+  ).catch(() => { throw new Error('register tidak pernah termuat — audit dibatalkan'); });
+  await p.waitForTimeout(600);
+}
+
 await p.goto('http://localhost:4360/#/');
 await p.waitForTimeout(1200);
 const demo = p.getByRole('button', { name: /Muat contoh data/ });
 if (await demo.count()) { await demo.click(); await p.waitForTimeout(1500); }
+await ready();
 let total = 0;
 for (const route of ROUTES) {
   await p.goto('http://localhost:4360/#' + route);
   await p.waitForTimeout(1500);
+  await ready();
   const r = await p.evaluate(CHECK);
   total += r.text.length + r.edges.length;
   console.log(route.padEnd(11) + (r.text.length + r.edges.length ? '' : 'bersih'));

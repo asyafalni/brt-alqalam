@@ -82,7 +82,7 @@ export function LazyList(
       {/* Inside the scroller, below the last row: it has to be able to come into view. */}
       <div ref={sentinel} aria-hidden={done ? 'true' : undefined} class="h-1" />
       {!done && (
-        <p class="py-3 text-center text-xs text-slate-400" role="status">
+        <p class="py-3 text-center text-xs text-slate-500" role="status">
           {label ?? 'Gulir untuk melihat lainnya…'}
         </p>
       )}

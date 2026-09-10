@@ -185,7 +185,7 @@ export function ImportPanel(
             )}
           </div>
 
-          <p class="mt-4 text-xs leading-relaxed text-slate-400">
+          <p class="mt-4 text-xs leading-relaxed text-slate-500">
             Tab yang tidak dipilih dibiarkan apa adanya — memuat Items saja tidak menghapus rak
             atau pengajuan.
           </p>
