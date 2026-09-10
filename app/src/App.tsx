@@ -49,6 +49,12 @@ function explainPin(code: string): string {
   if (code === 'locked') return 'Terkunci sementara karena terlalu banyak percobaan.';
   if (code === 'device_not_enrolled') return 'Perangkat ini tidak dikenali gateway.';
   if (code === 'offline') return 'Tidak bisa menghubungi gateway.';
+  /* These three reach somebody as the line on a keypad that has just come BACK, so they have to
+     say what to do rather than name the code — "Gagal: session_expired" told a marbot holding a
+     bar of soap nothing at all. */
+  if (code === 'session_expired') return 'Sesi sudah berakhir. Masukkan PIN lagi.';
+  if (code === 'session_revoked') return 'Sesi dihentikan. Masukkan PIN lagi.';
+  if (code === 'no_session') return 'Sesi tidak ditemukan. Masukkan PIN lagi.';
   return `Gagal: ${code}`;
 }
 
@@ -146,6 +152,21 @@ export function App() {
     const { url } = connection;
     setPinBusy(true);
     setPinError('');
+    /*
+     * THE KEYPAD CLOSES HERE, not when the append returns.
+     *
+     * Its job is the question "who is this?", and a session token is that question answered.
+     * Leaving it up for the round trip meant somebody who had just proved who they are sat
+     * watching a keypad for two to four seconds — longer whenever Apps Script cold-starts,
+     * which was measured at forty on a live call — with no way to tell a slow network from a
+     * refused PIN. Reported as "stuck at the PIN entry keypad", and that is exactly what it
+     * looked like.
+     *
+     * The wait itself does not go away: the progress bar covers it, and the receipt says how
+     * it ended. A refusal that needs the PIN again puts the keypad straight back up, which is
+     * the one case where it should still be on screen.
+     */
+    setPinFor(null);
     try {
       const result = await append(url, token, entries);
 
@@ -156,7 +177,6 @@ export function App() {
         text: what && result.appended.length === 1 ? `Tercatat: ${what}` : 'Tercatat di spreadsheet.',
         hint: sessionName() ? `Sebagai ${sessionName()}.` : undefined,
       });
-      setPinFor(null);
       // The gateway slid its own expiry by serving this; keep the local one in step.
       touchSession(SESSION_TTL_MS);
       readActor();
@@ -185,21 +205,19 @@ export function App() {
           text: 'Gagal terhubung — catatan tidak tersimpan.',
           hint: 'Periksa koneksi, lalu ulangi. Tidak ada yang berubah di spreadsheet.',
         });
-        setPinFor(null);
-        setPinError('');
-      } else {
+      } else if (code === 'session_expired' || code === 'session_revoked' || code === 'no_session') {
         /* A session that is gone or revoked must not linger locally — otherwise every later
            action retries with it and fails identically, with no way for anyone to guess that
-           the fix is to type a PIN again. */
-        if (code === 'session_expired' || code === 'session_revoked' || code === 'no_session') {
-          endSession();
-          readActor();
-          setPinFor(entries);
-        }
+           the fix is to type a PIN again. This is the one refusal that belongs back on the
+           keypad, so it is the one that puts the keypad back up, with the reason on it. */
+        endSession();
+        readActor();
+        setPinFor(entries);
         setPinError(explainPin(code));
-        /* `pinError` shows INSIDE the PIN sheet, and a record made under a live session never
-           opened one — so a refusal had nowhere to appear at all. */
-        if (pinFor === null) say({ kind: 'problem', text: explainPin(code) });
+      } else {
+        /* Everything else lands as a receipt. The keypad closed the moment the session opened,
+           so `pinError` — which only ever shows inside that sheet — would have nowhere to go. */
+        say({ kind: 'problem', text: explainPin(code) });
       }
     } finally {
       setPinBusy(false);
@@ -432,6 +450,13 @@ export function App() {
   /* Managing people and phones is an admin screen by definition: every control on it is a
      gateway call that an admin token is the only thing that satisfies. */
   if (route.name === 'kelola' && !admin) {
+    navigate({ name: 'beranda' });
+  }
+
+  /* Hiding the nav entry is not the gate — `#/label` is a typeable address and a shareable one.
+     Same `!firstLoad` reason as below: a connected device has no admin resolved on the first
+     pass, so bouncing immediately would throw an admin off their own screen. */
+  if (route.name === 'label' && connection && !admin && !firstLoad) {
     navigate({ name: 'beranda' });
   }
 
@@ -690,7 +715,19 @@ export function App() {
               now={now}
               /* The public tier omits Requests entirely (§39), so an empty list here may mean
                  "withheld" rather than "none" — and only this level knows which. */
-              withheld={register.state?.tier === 'public'}
+              /*
+               * "Withheld" only when nobody is signed in. An admin reads the detailed tier, so
+               * a public-tier state in their hands means the detailed read has not landed YET
+               * — and telling somebody their own data is being kept from them, for the two to
+               * five seconds Apps Script takes, is the same "none vs withheld" confusion this
+               * screen exists to prevent, pointed the other way.
+               */
+              withheld={register.state?.tier === 'public' && admin == null}
+              /* Signed in, but the detailed read has not landed yet — the app opens on the
+                 cached PUBLIC copy so the shelves are there immediately, and this is the one
+                 screen that copy cannot answer. "Belum ada pengajuan" would be a lie for the
+                 two to forty seconds Apps Script takes to answer. */
+              pending={register.state?.tier === 'public' && admin != null}
               /* Keyed by the prefill so arriving from a second broken unit remounts the form
                  rather than reusing the state of the first. */
               key={route.assetId ?? 'pengajuan'}
