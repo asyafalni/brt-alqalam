@@ -23,6 +23,10 @@ function Harness() {
       draft={draft}
       inventory={useInventory(draft, NOW)}
       now={NOW}
+      /* Both present, or the two lists they gate — closing a loan and recording a check —
+         simply do not render and every assertion about them passes vacuously. */
+      onLoan={() => {}}
+      onInspect={() => {}}
       onOpenItem={opened}
       onRequest={requested}
       onOpenCounted={counted}
@@ -112,8 +116,13 @@ describe('Aset — three questions, three answers', () => {
     expect(desk(r, 'Hilang').getByText('Timbangan gantung #1')).toBeTruthy();
     expect(desk(r, 'Hilang').queryByText('Pisau potong #2')).toBeNull();
 
-    // An untouched unit is in none of them — it is on the shelf.
-    expect(r.queryByText('Pisau potong #3')).toBeNull();
+    /* An untouched unit is in none of THOSE THREE — it is on the shelf. It does appear in
+       "Perlu diperiksa", and correctly: being on the shelf is not the same as somebody having
+       confirmed it still works, which is the whole point of that list. */
+    for (const group of ['Sedang dipinjam', 'Perlu diperbaiki', 'Hilang']) {
+      expect(desk(r, group).queryByText('Pisau potong #3')).toBeNull();
+    }
+    expect(desk(r, 'Perlu diperiksa').getAllByText('Pisau potong #3').length).toBeGreaterThan(0);
   });
 
   it('raises the replacement banner for a lost asset, and stops counting it as ours', () => {
@@ -290,5 +299,42 @@ describe('a loan that is quietly becoming a loss', () => {
     const r = out(loan('001', 2), loan('002', 40));
     expect(r.getAllByText('2 hari')[0].getAttribute('class')).toContain('slate');
     expect(r.getAllByText('40 hari')[0].getAttribute('class')).toContain('red');
+  });
+});
+
+describe('the list of units nobody has looked at', () => {
+  /*
+   * It shipped as a hand-rolled list beside three DataTables: no item drawing, and capped at
+   * six with "dan 31 unit lain" — which named the problem and then refused to show it. A
+   * `Section` like its neighbours brings paging and the row shape with it.
+   */
+  const never = () => { seed(ITEMS(), []); return render(Harness); };
+
+  it('pages through every unit instead of stopping at six', () => {
+    // It capped at six with "dan 31 unit lain", which named the problem and refused to show it.
+    const r = never();
+    expect(r.queryByText(/unit lain/)).toBeNull();
+    // The heading, not the stat tile above — both carry the same words now.
+    expect(r.getByRole('heading', { name: 'Perlu diperiksa' })).toBeTruthy();
+  });
+
+  /** The section's own table, found by its heading rather than by position. */
+  const inspectTable = (r: ReturnType<typeof render>) => {
+    const heading = [...r.container.querySelectorAll('h2')]
+      .find((h) => h.textContent?.includes('Perlu diperiksa'))!;
+    return heading.closest('section')!.querySelector('table')!;
+  };
+
+  it('carries the item drawing, like every other row on this screen', () => {
+    expect(inspectTable(never()).querySelector('tbody svg')).toBeTruthy();
+  });
+
+  it('drops the status column, where every row would say the same word', () => {
+    // The three lists above are read next to each other and the pill is what separates them.
+    // Here every unit is available by definition, so the column only takes width.
+    const heads = [...inspectTable(never()).querySelectorAll('thead th')]
+      .map((th) => th.textContent?.trim());
+    expect(heads).toContain('Terakhir diperiksa');
+    expect(heads).not.toContain('Status');
   });
 });

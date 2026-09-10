@@ -26,6 +26,7 @@ import type { RequestType } from '../../../../domain/requests';
 import type { LoanTarget } from '../movement/LoanSheet';
 import type { InspectTarget } from '../movement/InspectSheet';
 import { inspection, lastInspected } from '../../../../domain/inspect';
+import type { Inspection } from '../../../../domain/inspect';
 import type { DerivedInstance, Item } from '../../../../domain/types';
 import type { Draft } from '../../state/useDraft';
 import type { Inventory } from '../../state/useInventory';
@@ -109,14 +110,13 @@ export function AssetBoard(
    * borrowed one is not here to look at. Oldest first, and never-checked ahead of everything —
    * that unit's readiness is an assumption made on the day it was counted and never revisited.
    */
-  const stale = useMemo(() => {
-    const checks = lastInspected(inventory.txns);
-    return all
+  const checks = useMemo(() => lastInspected(inventory.txns), [inventory.txns]);
+  const stale = useMemo(() => all
       .filter((d) => d.status === 'available' && matches(d))
       .map((d) => ({ d, seen: inspection(checks.get(d.instance.assetId), now) }))
       .filter((r) => r.seen.level !== 'baru')
-      .sort((a, b) => (b.seen.days ?? Infinity) - (a.seen.days ?? Infinity));
-  }, [all, q, inventory.txns, now]);
+      .sort((a, b) => (b.seen.days ?? Infinity) - (a.seen.days ?? Infinity)),
+  [all, q, checks, now]);
 
   const groups = useMemo(() => ({
     /* OLDEST FIRST. A unit borrowed three days ago and one borrowed since last Qurban looked
@@ -277,70 +277,34 @@ export function AssetBoard(
       />
 
       {/* LAST, and quiet. The three lists above are exceptions somebody has reported; this one
-          is a rotation nobody has got to yet — background work, not an agenda. */}
+          is a rotation nobody has got to yet — background work, not an agenda.
+
+          A `Section` like the others rather than the hand-rolled list it started as: that
+          version capped at six with "dan 31 unit lain", which named the problem and then
+          refused to show it. Paging is what the neighbours already do, and it brings the item
+          drawing and the row shape with it. */}
       {onInspect && draft.canRecord !== false && stale.length > 0 && (
-        <section class={CARD}>
-          {/* An icon, like the three sections above it. `Eye` and not `ClipboardCheck`: that one
-              already means the RACK rotation, and two different rotations wearing one glyph is
-              two things somebody has to tell apart by reading. */}
-          <div class="mb-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <div class="flex min-w-0 items-center gap-2.5">
-              <Eye class="h-5 w-5 shrink-0 text-slate-400" />
-              <h2 class="font-bold text-slate-900">Perlu diperiksa</h2>
-            </div>
-            <span class="text-sm tabular-nums text-slate-600">{stale.length} unit</span>
-          </div>
-          <p class="mb-3 max-w-prose text-sm leading-relaxed text-slate-600">
-            “Siap pakai” itu pernyataan tentang kondisi, dan ini yang belum ada yang
-            memastikannya — sebagian sejak lama, sebagian belum pernah sama sekali. Barang yang
-            cuma dipakai setahun sekali paling sering ketahuan rusaknya pas hari H.
-          </p>
-          <ul class="space-y-1.5">
-            {stale.slice(0, SHOWN_STALE).map(({ d, seen }) => (
-              <li
-                key={d.instance.assetId}
-                class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 p-2.5"
-              >
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-semibold text-slate-900">
-                    {d.instance.label}
-                  </span>
-                  <span class="block truncate text-xs text-slate-600">
-                    {seen.level === 'belum-pernah'
-                      ? 'belum pernah diperiksa'
-                      : `terakhir diperiksa ${seen.days} hari lalu`}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
-                  onClick={() => onInspect({
-                    assetId: d.instance.assetId,
-                    label: d.instance.label,
-                    item: itemOf(d)!,
-                    lastTs: seen.ts,
-                  })}
-                >
-                  <Eye class="h-4 w-4" /> Periksa
-                </button>
-              </li>
-            ))}
-          </ul>
-          {stale.length > SHOWN_STALE && (
-            /* Capped rather than paged. On day one every unit is unchecked, and a list of forty
-               knives would bury the three lists above it that somebody actually reported. */
-            <p class="mt-2 text-xs italic text-slate-500">
-              dan {stale.length - SHOWN_STALE} unit lain
-            </p>
-          )}
-        </section>
+        <Section
+          {...section}
+          title="Perlu diperiksa"
+          subtitle="“Siap pakai” itu pernyataan tentang kondisi, dan ini yang belum ada yang memastikannya. Barang yang cuma dipakai setahun sekali paling sering ketahuan rusaknya pas hari H."
+          icon={Eye}
+          rows={stale.map((r) => r.d)}
+          empty="Semua unit sudah diperiksa."
+          emptyHint="Tidak ada yang menunggu dilihat."
+          showStatus={false}
+          checkedOf={(d) => inspection(checks.get(d.instance.assetId), now)}
+          onInspectRow={(d) => onInspect({
+            assetId: d.instance.assetId,
+            label: d.instance.label,
+            item: itemOf(d)!,
+            lastTs: inspection(checks.get(d.instance.assetId), now).ts,
+          })}
+        />
       )}
     </div>
   );
 }
-
-/** Enough to make a start on, never enough to bury the reported problems above it. */
-const SHOWN_STALE = 6;
 
 /*
  * A TIME ramp, kept off the status palette on purpose.
@@ -361,7 +325,7 @@ function Section(
   {
     title, subtitle, icon: Icon, rows, empty, emptyHint, itemOf, draft, onOpenItem,
     showHolder, showNote, showAge, now = 0, holderHeader = 'Dipegang', noteFor, onRequest,
-    onResolve, action,
+    onResolve, checkedOf, onInspectRow, showStatus = true, action,
   }: {
     title: string; subtitle: string; icon: (p: { class?: string }) => unknown;
     rows: DerivedInstance[]; empty: string; emptyHint: string;
@@ -370,6 +334,18 @@ function Section(
     showHolder?: boolean; showNote?: boolean; holderHeader?: string;
     /** Adds "sejak berapa lama", which is the difference between a loan and a loss. */
     showAge?: boolean; now?: number;
+    /** Adds "terakhir diperiksa", and with it the button that answers it. */
+    checkedOf?: (d: DerivedInstance) => Inspection;
+    onInspectRow?: (d: DerivedInstance) => void;
+    /**
+     * Off where every row says the same word.
+     *
+     * The three lists above each hold ONE status, but they are read next to each other and the
+     * pill is what tells them apart at a glance. "Perlu diperiksa" is not one of those: it is
+     * every available unit nobody has looked at, so a column of identical TERSEDIA pills is a
+     * column that only takes width from the two facts that differ.
+     */
+    showStatus?: boolean;
     noteFor: (d: DerivedInstance) => string | undefined;
     onRequest: (type: RequestType, assetId: string) => void;
     /**
@@ -443,16 +419,45 @@ function Section(
         </span>
       ),
     }] : []),
-    {
+    ...(showStatus ? [{
       key: 'status',
       header: 'Status',
-      mobile: 'trailing',
-      align: 'right',
-      cell: (d) => {
+      mobile: 'trailing' as const,
+      align: 'right' as const,
+      cell: (d: DerivedInstance) => {
         const badge = instanceStatusBadge(d.status);
         return <span class={`${PILL} ${badge.chip}`}>{badge.label}</span>;
       },
-    },
+    }] : []),
+    ...(checkedOf ? [{
+      key: 'checked',
+      header: 'Terakhir diperiksa',
+      mobile: 'meta' as const,
+      cell: (d: DerivedInstance) => {
+        const seen = checkedOf(d);
+        return (
+          <span class="whitespace-nowrap text-sm text-slate-600">
+            {seen.level === 'belum-pernah' ? 'belum pernah' : `${seen.days} hari lalu`}
+          </span>
+        );
+      },
+    }] : []),
+    ...(onInspectRow ? [{
+      key: 'inspect',
+      header: '',
+      mobile: 'meta' as const,
+      align: 'right' as const,
+      cell: (d: DerivedInstance) => (
+        <button
+          type="button"
+          class="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
+          aria-label={`Periksa ${d.instance.label}`}
+          onClick={(e: MouseEvent) => { e.stopPropagation(); onInspectRow(d); }}
+        >
+          <Eye class="h-4 w-4" /> Periksa
+        </button>
+      ),
+    }] : []),
     ...(onResolve ? [{
       key: 'resolve',
       header: '',
