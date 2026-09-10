@@ -143,3 +143,14 @@ describe('KETERANGAN comes from the item, per the spec', () => {
     expect(n[0].keterangan).toBe('pemakaian');
   });
 });
+
+describe('a counted durable borrowed below its minimum', () => {
+  it('raises the alarm, which it did not', () => {
+    /* The alarm inherited the reducer's bug: `peminjaman` was written for instance-tracked
+       units that carry "out" as a status, so a quantity-tracked durable could be borrowed past
+       its minimum with nothing noticing. */
+    const mop = item({ itemId: 'ITM-0008', name: 'Alat pel', minStock: 3 });
+    const out = tx({ itemId: 'ITM-0008', type: 'peminjaman', qtyDelta: -8, ts: 100 });
+    expect(notify([mop], [out], 1000).map((n) => n.itemId)).toEqual(['ITM-0008']);
+  });
+});

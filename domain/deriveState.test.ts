@@ -354,3 +354,43 @@ describe('an inspection', () => {
     expect(after.items['ITM-0001'].qty).toBe(before.items['ITM-0001'].qty);
   });
 });
+
+describe('borrowing something that is counted rather than labelled', () => {
+  /*
+   * Reported from the live register: an alat pel was taken with a PIN, the movement reached the
+   * log with `qtyDelta: -1`, and the screen went on saying four. `peminjaman` was written for
+   * INSTANCE-tracked equipment, where "out" is a status on a numbered unit — a mop, a tarpaulin
+   * or a cable roll has no unit to carry it, so its "out" has to be the number.
+   */
+  const mop = (): Item => ({
+    itemId: 'ITM-0008', barcode: 'ALQ-ITM-0008', name: 'Alat pel', categoryId: 'CAT-KEBERSIHAN',
+    kind: 'equipment', unit: 'set', trackBy: 'quantity', minStock: null, active: true,
+  });
+  const lines = [{ itemId: 'ITM-0008', locationId: 'LOC-K1', initialStock: 4 }];
+  const loan = (n: number): Txn => ({
+    txnId: `T${n}`, clientTxnId: `c${n}`, ts: 1000 + n, type: 'peminjaman',
+    itemId: 'ITM-0008', locationId: 'LOC-K1', qtyDelta: -1, actorUserId: 'USR-1',
+  });
+
+  it('takes it off the shelf, like any other thing that left', () => {
+    const d = deriveState([mop()], [], [loan(1), loan(2)], 5000, lines);
+    expect(d.items['ITM-0008'].qty).toBe(2);
+  });
+
+  it('takes it off the RACK it came from, not off the total in the abstract', () => {
+    const d = deriveState([mop()], [], [loan(1)], 5000, lines);
+    expect(d.items['ITM-0008'].byLocation['LOC-K1']).toBe(3);
+  });
+
+  it('counts toward PENGAMBILAN, because it was taken out', () => {
+    expect(deriveState([mop()], [], [loan(1)], 5000, lines).items['ITM-0008'].takenTotal).toBe(1);
+  });
+
+  it('comes back on a pengembalian', () => {
+    const back: Txn = {
+      txnId: 'T9', clientTxnId: 'c9', ts: 3000, type: 'pengembalian',
+      itemId: 'ITM-0008', locationId: 'LOC-K1', qtyDelta: 1, actorUserId: 'USR-1',
+    };
+    expect(deriveState([mop()], [], [loan(1), back], 5000, lines).items['ITM-0008'].qty).toBe(4);
+  });
+});

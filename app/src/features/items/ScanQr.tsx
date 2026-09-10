@@ -27,7 +27,19 @@ export function ScanQr({ url, caption }: { url: string; caption: string }) {
   return (
     <svg
       viewBox={`0 0 ${span} ${span}`}
-      class={`shrink-0 rounded-md bg-white ${SIZE}`}
+      /*
+       * TRANSPARENT, deliberately — it used to paint its own white square.
+       *
+       * On a white card that is invisible, but the rack row highlights on hover, and a white
+       * block sitting on the highlight reads as a misaligned patch: the quiet zone puts four
+       * modules of margin between the code and the edge of that block, so the code looks
+       * off-centre inside a rectangle that should not have been there at all.
+       *
+       * The quiet zone is still in the viewBox, so the spacing a scanner needs survives — it
+       * just takes the colour of whatever it is sitting on. Both grounds here are white or a
+       * hair off it, which is what a scanner is looking for anyway.
+       */
+      class={`shrink-0 ${SIZE}`}
       /* No caption. A QR on a screen is one of the few things that explains itself, and two
          "Pindai untuk buka" labels on one page is a sentence read twice for nothing. The
          accessible name still says what it is, for anybody who cannot see the square. */
@@ -35,7 +47,6 @@ export function ScanQr({ url, caption }: { url: string; caption: string }) {
       aria-label={`Kode QR ${caption}`}
       shape-rendering="crispEdges"
     >
-      <rect width={span} height={span} fill="#fff" />
       <path d={qr.d} fill="#0f172a" transform={`translate(${qr.quietZone} ${qr.quietZone})`} />
     </svg>
   );

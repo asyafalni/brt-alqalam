@@ -92,6 +92,20 @@ export function deriveState(
       switch (t.type) {
         case 'pemakaian':   rows[at] += t.qtyDelta;                            // delta < 0, permanent
                             taken[t.itemId] += -t.qtyDelta; break;
+        /*
+         * `peminjaman` BELONGS HERE, and its absence was a real bug with a real report behind
+         * it: somebody borrowed an alat pel, the movement was written to the log with
+         * `qtyDelta: -1`, and the register went on saying four.
+         *
+         * The word was built for INSTANCE-tracked equipment, where "out" is a status carried by
+         * a numbered unit. A quantity-tracked durable — a mop, a tarpaulin, a cable roll — has
+         * no unit to carry it, so its "out" has to be the number. Falling through the switch
+         * meant the shelf said four while two were in somebody's hands, which is the confident
+         * wrong answer §0 says is worse than no system at all.
+         *
+         * Like `pengambilan`, not like `pemakaian`: it left and it is expected back.
+         */
+        case 'peminjaman':
         case 'pengambilan':
         case 'digunakan':   rows[at] += t.qtyDelta;                            // delta < 0, may return
                             taken[t.itemId] += -t.qtyDelta;

@@ -22,7 +22,14 @@ export interface StockNotification {
   keterangan: string;
 }
 
-const QTY_TYPES = new Set(['pemakaian', 'pengambilan', 'pengembalian', 'digunakan', 'adjust']);
+/*
+ * `peminjaman` included — it was missing, and the alarm inherited the same bug the reducer had:
+ * a quantity-tracked durable could be borrowed down past its minimum without anything noticing,
+ * because the word was written for instance-tracked units that carry "out" as a status.
+ */
+const QTY_TYPES = new Set([
+  'pemakaian', 'pengambilan', 'peminjaman', 'pengembalian', 'digunakan', 'adjust',
+]);
 
 export function deriveNotifications(
   items: Item[], txns: Txn[], now: number, stock: readonly StockLine[] = [],
