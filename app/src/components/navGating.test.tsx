@@ -71,6 +71,31 @@ describe('the two screens that name people', () => {
   });
 });
 
+describe('Cetak Label is an admin destination too', () => {
+  // Not because it names anybody — it prints QR stickers. Because sticking a code onto a shelf
+  // fixes it there for years (§78), and a sheet of blanks costs label stock. Deciding what gets
+  // printed is the admin's job; the marbot's is to record what moves.
+  it('is hidden on the shared register when nobody is signed in', () => {
+    const r = render(() => <Sidebar {...base} connected admin={null} />);
+    expect(names(r)).not.toContain('Cetak Label');
+    expect(names(r)).toContain('Opname Gudang');
+  });
+
+  it('appears for an admin', () => {
+    const r = render(() => (
+      <Sidebar {...base} connected admin={{ name: 'Alfin', role: 'admin' }} />
+    ));
+    expect(names(r)).toContain('Cetak Label');
+  });
+
+  it('stays visible OFFLINE, where labelling IS the work', () => {
+    // Stage 1 is walking the gudang adding items and sticking tags on racks. That mode has no
+    // roster to check, and it is the mode the printing screen exists for.
+    const r = render(() => <Sidebar {...base} connected={false} admin={null} />);
+    expect(names(r)).toContain('Cetak Label');
+  });
+});
+
 describe('the rail no longer advertises Admin as a destination', () => {
   it('has no Admin nav item — it lives in the footer beside the connection', () => {
     const r = render(() => <Sidebar {...base} connected admin={null} />);

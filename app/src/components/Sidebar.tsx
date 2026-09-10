@@ -74,7 +74,7 @@ export function Sidebar(p: Props) {
    * everything on it is this phone's own draft, roles do not exist yet, and hiding them there
    * would take function away from the one mode that has no accounts at all.
    */
-  const canSeeNames = !p.connected || p.admin?.role === 'admin' || p.admin?.role === 'admin_utama';
+  const canAdmin = !p.connected || p.admin?.role === 'admin' || p.admin?.role === 'admin_utama';
 
   const items: NavItem[] = [
     { name: 'Beranda', icon: LayoutDashboard, route: { name: 'beranda' } },
@@ -91,15 +91,21 @@ export function Sidebar(p: Props) {
        every row. The gateway already withholds that data from a device without an admin token
        (§39), so leaving the menu items visible would advertise two destinations that can only
        ever be empty — which reads as the register having lost something. */
-    ...(canSeeNames ? [{
+    ...(canAdmin ? [{
       name: 'Pengajuan', icon: ShoppingCart, route: { name: 'pengajuan' } as Route,
       badge: p.requestCount,
     }] : []),
-    { name: 'Cetak Label', icon: QrCode, route: { name: 'label' }, badge: p.itemCount },
+    /* ADMIN ONLY as well, for a third reason: printing is a decision about the gudang, not a
+       lookup in it. A sheet of stickers costs label stock and, once stuck, fixes a rack code
+       onto a shelf for years (§78) — that is an act somebody has to own, and the marbot's job
+       is to record movements, not to re-tag the room. */
+    ...(canAdmin ? [{
+      name: 'Cetak Label', icon: QrCode, route: { name: 'label' } as Route, badge: p.itemCount,
+    }] : []),
     // Below Laporan: the report is the summary somebody reads, this is the raw record they
     // drop to when the summary looks wrong.
     { name: 'Laporan', icon: ChartColumn, route: { name: 'laporan' } },
-    ...(canSeeNames ? [{ name: 'Histori Data', icon: History, route: { name: 'histori' } as Route }] : []),
+    ...(canAdmin ? [{ name: 'Histori Data', icon: History, route: { name: 'histori' } as Route }] : []),
     /* No `Admin` entry here. It moved to the footer beside the gateway connection, which is
        where it belongs — both are facts about THIS DEVICE rather than places in the register,
        and both now open the same kind of flyout. Leaving a nav item as well would be two doors
