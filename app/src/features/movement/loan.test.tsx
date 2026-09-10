@@ -162,3 +162,55 @@ describe('confirming a unit is still good', () => {
     expect(r.getAllByText(/Pisau potong #1/).length).toBeGreaterThan(0);
   });
 });
+
+describe('a lost thing that turns up', () => {
+  /*
+   * §23 always had `lost ──ditemukan──► available`, and §24 asked for the action by name. The
+   * loss log shipped able only to buy a replacement — so a knife found under a tarpaulin after
+   * Qurban had nowhere to be recorded, and the register went on calling it gone.
+   */
+  const lost = (unit: string): Txn => ({
+    txnId: `X-${unit}`, clientTxnId: `x-${unit}`, ts: Date.now() - 30 * DAY,
+    type: 'pengembalian', assetId: `ALQ-ITM-0001-${unit}`, condition: 'hilang',
+    qtyDelta: 0, actorUserId: 'USR-1',
+  });
+  const DAY = 24 * 60 * 60 * 1000;
+
+  const openFound = () => {
+    seed(knives(), [lost('001')]);
+    at('#/barang?i=ITM-0001');
+    const r = render(App);
+    fireEvent.click(r.getAllByText('Ditemukan')[0]);
+    return { r, sheet: within(r.container.querySelector('[role="dialog"]')!) };
+  };
+
+  it('offers the action on a unit the register has written off', () => {
+    seed(knives(), [lost('001')]);
+    at('#/barang?i=ITM-0001');
+    expect(render(App).getAllByText('Ditemukan').length).toBeGreaterThan(0);
+  });
+
+  it('brings it back to the active base', () => {
+    const { r, sheet } = openFound();
+    fireEvent.click(sheet.getByText('Kembalikan ke daftar aset'));
+    expect(stored()[1]).toMatchObject({ type: 'status_change', toStatus: 'available' });
+    expect(r.getAllByText(/TERSEDIA/i).length).toBeGreaterThan(0);
+  });
+
+  it('can bring it back BROKEN, because a thing found is not a thing intact', () => {
+    // A knife under a tarpaulin since Qurban is not the knife that went under it.
+    const { sheet } = openFound();
+    fireEvent.click(sheet.getByText('Ketemu, tapi rusak'));
+    fireEvent.click(sheet.getByText('Kembalikan ke daftar aset'));
+    expect(stored()[1]).toMatchObject({ type: 'status_change', toStatus: 'broken' });
+  });
+
+  it('APPENDS — the loss stays in the log', () => {
+    /* A replacement may already have been bought because of it, and somebody looking at two of
+       the same thing later has to be able to find out why. */
+    const { sheet } = openFound();
+    fireEvent.click(sheet.getByText('Kembalikan ke daftar aset'));
+    expect(stored()).toHaveLength(2);
+    expect(stored()[0]).toMatchObject({ condition: 'hilang' });
+  });
+});

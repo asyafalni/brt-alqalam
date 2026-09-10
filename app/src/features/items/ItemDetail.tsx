@@ -422,14 +422,57 @@ export function ItemDetail(
               const status = d?.status ?? 'available';
               const chip = instanceStatusBadge(status);
               const seen = inspection(checks.get(a.assetId), now);
-              /* Lending out and closing a loan are the two things this card is FOR, and until
-                 now it was decoration: the borrowed / broken / lost states existed and nothing
-                 could reach them (§60). Only these two states have a next step — a broken unit
-                 goes through Pengajuan perbaikan, a lost one through a replacement purchase. */
-              const actionable = onLoan && draft.canRecord !== false
-                && (status === 'available' || status === 'out');
-              const Row = (
-                <>
+              const may = draft.canRecord !== false;
+
+              /*
+               * A CARD, not a button, with its verbs as links inside it.
+               *
+               * It used to be one big button whose whole surface meant "lend this out", with
+               * Periksa bolted on underneath as a bordered button — which could not go inside
+               * (a button in a button is invalid) and so hung below, leaving the cards ragged
+               * and the two actions looking like different kinds of thing. Every verb is a link
+               * now, and the card is just a card.
+               */
+              const verbs: { label: string; run: () => void }[] = [];
+              if (onLoan && may && status === 'available') {
+                verbs.push({
+                  label: 'Pinjamkan',
+                  run: () => onLoan({ assetId: a.assetId, label: a.label, item, status, holder: d?.holder }),
+                });
+              }
+              if (onLoan && may && status === 'out') {
+                verbs.push({
+                  label: 'Selesaikan pinjaman',
+                  run: () => onLoan({ assetId: a.assetId, label: a.label, item, status, holder: d?.holder }),
+                });
+              }
+              if (onInspect && may && status === 'available') {
+                verbs.push({
+                  label: 'Periksa',
+                  run: () => onInspect({
+                    assetId: a.assetId, label: a.label, item, status,
+                    lastTs: checks.get(a.assetId) ?? null,
+                  }),
+                });
+              }
+              /* §23 always had `lost ──ditemukan──► available`, and §24 asked for the action by
+                 name. The loss log shipped able only to buy a replacement, so a thing that came
+                 back had nowhere to be recorded — and the register went on calling it gone. */
+              if (onInspect && may && status === 'lost') {
+                verbs.push({
+                  label: 'Ditemukan',
+                  run: () => onInspect({
+                    assetId: a.assetId, label: a.label, item, status,
+                    lastTs: checks.get(a.assetId) ?? null,
+                  }),
+                });
+              }
+
+              return (
+                <li
+                  key={a.assetId}
+                  class="flex items-stretch gap-2.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 sm:gap-3 sm:p-3"
+                >
                   {/* The status is the first thing read, before any word of it. */}
                   <span class={`w-1 shrink-0 rounded-full ${chip.rail}`} aria-hidden="true" />
                   <div class="min-w-0 flex-1">
@@ -445,48 +488,21 @@ export function ItemDetail(
                           : `diperiksa ${seen.days} hari lalu`}
                       </span>
                     )}
-                    {actionable && (
-                      <span class="mt-2 block text-xs font-semibold text-slate-700 underline underline-offset-2">
-                        {status === 'available' ? 'Pinjamkan' : 'Selesaikan pinjaman'}
+                    {verbs.length > 0 && (
+                      <span class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                        {verbs.map((v) => (
+                          <button
+                            key={v.label}
+                            type="button"
+                            class="text-xs font-semibold text-slate-700 underline underline-offset-2 hover:text-slate-900"
+                            onClick={v.run}
+                          >
+                            {v.label}
+                          </button>
+                        ))}
                       </span>
                     )}
                   </div>
-                </>
-              );
-              const shell = 'flex items-stretch gap-2.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 text-left sm:gap-3 sm:p-3';
-              return (
-                <li key={a.assetId}>
-                  {actionable ? (
-                    <button
-                      type="button"
-                      class={`${shell} w-full hover:border-slate-400`}
-                      onClick={() => onLoan!({
-                        assetId: a.assetId,
-                        label: a.label,
-                        item,
-                        status,
-                        holder: d?.holder,
-                      })}
-                    >
-                      {Row}
-                    </button>
-                  ) : (
-                    <div class={shell}>{Row}</div>
-                  )}
-                  {/* Its OWN button, not a second meaning for the card. Lending a thing out and
-                      checking it are different acts, and a card that did both depending on
-                      where you tapped would be a card nobody taps confidently. */}
-                  {onInspect && draft.canRecord !== false && status === 'available' && (
-                    <button
-                      type="button"
-                      class="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900"
-                      onClick={() => onInspect({
-                        assetId: a.assetId, label: a.label, item, lastTs: checks.get(a.assetId) ?? null,
-                      })}
-                    >
-                      <Eye class="h-3.5 w-3.5" /> Periksa
-                    </button>
-                  )}
                 </li>
               );
             })}

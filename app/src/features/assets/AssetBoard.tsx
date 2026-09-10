@@ -265,9 +265,22 @@ export function AssetBoard(
       <Section
         {...section}
         title="Hilang"
-        subtitle="Sudah tidak ada. Dicatat untuk pertanggungjawaban dan pembelian ulang."
+        subtitle="Sudah tidak ada. Dicatat untuk pertanggungjawaban dan pembelian ulang — dan kalau ternyata ketemu, dikembalikan dari sini."
         icon={TriangleAlert}
         rows={groups.lost}
+        /* §23 always had `lost ──ditemukan──► available` and §24 asked for this by name. The
+           log shipped able only to buy a replacement, so a thing that turned up had nowhere to
+           be recorded and the register went on calling it gone. */
+        inspectLabel="Ditemukan"
+        onInspectRow={onInspect && draft.canRecord !== false
+          ? (d) => onInspect({
+            assetId: d.instance.assetId,
+            label: d.instance.label,
+            item: itemOf(d)!,
+            status: d.status,
+            lastTs: inspection(checks.get(d.instance.assetId), now).ts,
+          })
+          : undefined}
         empty="Tidak ada yang hilang."
         emptyHint="Semua yang kita punya masih tercatat ada."
         holderHeader="Terakhir dipegang"
@@ -298,6 +311,7 @@ export function AssetBoard(
             assetId: d.instance.assetId,
             label: d.instance.label,
             item: itemOf(d)!,
+            status: d.status,
             lastTs: inspection(checks.get(d.instance.assetId), now).ts,
           })}
         />
@@ -325,7 +339,8 @@ function Section(
   {
     title, subtitle, icon: Icon, rows, empty, emptyHint, itemOf, draft, onOpenItem,
     showHolder, showNote, showAge, now = 0, holderHeader = 'Dipegang', noteFor, onRequest,
-    onResolve, checkedOf, onInspectRow, showStatus = true, action,
+    onResolve, checkedOf, onInspectRow, inspectLabel = 'Periksa', showStatus = true,
+    action,
   }: {
     title: string; subtitle: string; icon: (p: { class?: string }) => unknown;
     rows: DerivedInstance[]; empty: string; emptyHint: string;
@@ -337,6 +352,8 @@ function Section(
     /** Adds "terakhir diperiksa", and with it the button that answers it. */
     checkedOf?: (d: DerivedInstance) => Inspection;
     onInspectRow?: (d: DerivedInstance) => void;
+    /** What that button says. A lost unit turning up is the same sheet with a different verb. */
+    inspectLabel?: string;
     /**
      * Off where every row says the same word.
      *
@@ -451,10 +468,10 @@ function Section(
         <button
           type="button"
           class="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-400 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
-          aria-label={`Periksa ${d.instance.label}`}
+          aria-label={`${inspectLabel} ${d.instance.label}`}
           onClick={(e: MouseEvent) => { e.stopPropagation(); onInspectRow(d); }}
         >
-          <Eye class="h-4 w-4" /> Periksa
+          <Eye class="h-4 w-4" /> {inspectLabel}
         </button>
       ),
     }] : []),
