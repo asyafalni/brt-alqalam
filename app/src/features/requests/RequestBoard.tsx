@@ -382,7 +382,7 @@ export function RequestBoard(
               label="Saring pengajuan"
               placeholder="Saring pengajuan…"
             />
-            <Button onClick={() => setAdding(true)}>
+            <Button size="panel" onClick={() => setAdding(true)}>
               <Plus class="h-4 w-4" /> Ajukan
             </Button>
           </div>

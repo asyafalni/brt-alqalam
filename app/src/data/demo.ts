@@ -5,6 +5,7 @@
 import type { Category, Item, Location, StockLine, Txn } from '../../../domain/types';
 import type { PurchaseRequest } from '../../../domain/requests';
 import { SEED_CATEGORIES } from './seedCategories';
+import { deriveNotifications } from '../../../domain/notifications';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -322,9 +323,49 @@ export function demoDraft(): {
   const sabun = items.find((i) => i.name === 'Sabun cuci tangan');
   if (sabun) stock.push({ itemId: sabun.itemId, locationId: 'LOC-K2', initialStock: 4 });
 
+  const txns = demoTxns(items, stock);
   return {
-    items, categories: SEED_CATEGORIES, locations: DEMO_LOCATIONS, stock,
-    txns: demoTxns(items, stock),
-    requests: demoRequests(items),
+    items, categories: SEED_CATEGORIES, locations: DEMO_LOCATIONS, stock, txns,
+    requests: [...demoRequests(items), ...restockRequests(items, stock, txns)],
   };
+}
+
+/**
+ * A pengajuan for some of the things that have actually run low.
+ *
+ * DERIVED, never a list of names. `demoRequests` above warns that a name guess which misses
+ * silently drops the request it was meant to create — and a hardcoded list here would rot the
+ * first time a quantity in `SEEDS` changed, leaving requests pointing at items that are
+ * comfortably stocked while the low ones show none.
+ *
+ * SOME, not all: the "Sudah diajukan" bar on Beranda exists to show progress, and progress is
+ * only visible when part of the work is done. Every one filed, or none, both draw a bar that
+ * teaches nothing about what it means.
+ */
+function restockRequests(
+  items: Item[], stock: StockLine[], txns: Txn[],
+): PurchaseRequest[] {
+  const low = deriveNotifications(items, txns, Date.now(), stock);
+  const now = Date.now();
+  /* Every other one, so the list underneath shows both states side by side — a row that has
+     been asked for and a row that has not. */
+  return low.filter((_, i) => i % 2 === 0).map((n, i) => {
+    const item = items.find((x) => x.itemId === n.itemId)!;
+    const short = Math.max(1, n.setMin - n.stokAkhir);
+    return {
+      requestId: `REQ-1${String(i + 1).padStart(3, '0')}`,
+      type: 'beli' as const,
+      name: item.name,
+      // The whole point of a restock: it names the thing we already own (§94).
+      itemId: item.itemId,
+      qty: short,
+      unit: item.unit,
+      reason: n.stokAkhir === 0
+        ? `Sudah habis di rak. Minimalnya ${n.setMin} ${item.unit}.`
+        : `Tinggal ${n.stokAkhir} ${item.unit}, di bawah minimum ${n.setMin}.`,
+      status: 'diajukan' as const,
+      requestedBy: 'USR-DEMO',
+      requestedTs: now - (i + 1) * 60 * 60 * 1000,
+    };
+  });
 }

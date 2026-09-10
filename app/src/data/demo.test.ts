@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveState } from '../../../domain/deriveState';
+import { deriveNotifications } from '../../../domain/notifications';
 import { demoDraft } from './demo';
 import { instancesFor } from '../features/stocktake/draft';
 import { racksFor, totalFor } from '../../../domain/stock';
@@ -65,5 +66,43 @@ describe('demo data is internally consistent', () => {
   it('the log runs forwards in time', () => {
     const ts = draft.txns.map((t) => t.ts);
     expect([...ts].sort((a, b) => a - b)).toEqual(ts);
+  });
+});
+
+describe('the demo shows the shopping bar part-done', () => {
+  /*
+   * The "Sudah diajukan" bar on Beranda exists to show progress, and progress is only visible
+   * when part of the work is done. A demo where every low item has been asked for — or none —
+   * draws a bar that teaches nothing about what it means.
+   */
+  it('files a request for SOME of the low items, not all and not none', () => {
+    const d = demoDraft();
+    const low = deriveNotifications(d.items, d.txns, Date.now(), d.stock);
+    const asked = new Set(
+      d.requests.filter((r) => r.status === 'diajukan' && r.itemId).map((r) => r.itemId),
+    );
+    const covered = low.filter((n) => asked.has(n.itemId)).length;
+
+    expect(low.length).toBeGreaterThan(1);
+    expect(covered).toBeGreaterThan(0);
+    expect(covered).toBeLessThan(low.length);
+  });
+
+  it('points every restock at an item that is genuinely low right now', () => {
+    /* Derived, never a list of names — `demoRequests` warns that a name guess which misses
+       silently drops the request, and a hardcoded list rots the first time a quantity moves. */
+    const d = demoDraft();
+    const low = new Set(deriveNotifications(d.items, d.txns, Date.now(), d.stock).map((n) => n.itemId));
+    const restocks = d.requests.filter((r) => r.requestId.startsWith('REQ-1'));
+
+    expect(restocks.length).toBeGreaterThan(0);
+    for (const r of restocks) expect(low.has(r.itemId!)).toBe(true);
+  });
+
+  it('asks for enough to clear the minimum, and says why in the requester\'s terms', () => {
+    const d = demoDraft();
+    const r = d.requests.find((x) => x.requestId.startsWith('REQ-1'))!;
+    expect(r.qty).toBeGreaterThan(0);
+    expect(r.reason).toMatch(/minimum|habis/i);
   });
 });

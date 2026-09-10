@@ -13,12 +13,22 @@
 
 import { Search, X } from '@octanejs/lucide';
 
+/*
+ * 44px, not the 56px `touch` target.
+ *
+ * It shipped at `min-h-touch` and stood a head taller than every button beside it — 56px next
+ * to a 34px "Rak baru", which reads as two controls from two different apps sharing a row.
+ * `ui.tsx` already argued this exact case for the side panels and landed on the same number:
+ * "44px with 14px text is both" — a real finger target and in proportion. A filter is typed at
+ * a desk or between shelves, not stabbed at with wet hands mid-lift, which is what 56px is for.
+ */
+
 export function FilterField(
   { value, onChange, label, placeholder }:
   { value: string; onChange: (v: string) => void; label: string; placeholder?: string },
 ) {
   return (
-    <div class="field-shell flex min-h-touch w-full items-center gap-2.5 rounded-lg border border-slate-500 bg-white px-3.5 focus-within:outline-2 focus-within:outline-solid focus-within:outline-offset-2 focus-within:outline-slate-900 sm:w-64">
+    <div class="field-shell flex min-h-11 w-full items-center gap-2.5 rounded-lg border border-slate-500 bg-white px-3.5 focus-within:outline-2 focus-within:outline-solid focus-within:outline-offset-2 focus-within:outline-slate-900 sm:w-64">
       <Search class="h-4 w-4 shrink-0 text-slate-400" />
       <input
         class="w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-slate-400"

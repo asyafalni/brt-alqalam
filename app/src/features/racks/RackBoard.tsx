@@ -145,7 +145,7 @@ export function RackBoard(
               label="Saring peta rak"
               placeholder="Saring rak…"
             />
-            <Button onClick={() => { setSelected(null); setCounting(null); setEditing('new'); }}>
+            <Button size="panel" onClick={() => { setSelected(null); setCounting(null); setEditing('new'); }}>
               <Plus class="h-4 w-4" /> Rak baru
             </Button>
           </div>
