@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'octane';
 import {
   ArrowDownLeft, ArrowLeft, ArrowUpRight, Eye, History, MapPin, Package, Pencil, QrCode,
+  ShoppingCart,
 } from '@octanejs/lucide';
 import { keteranganLabel } from '../../../../domain/keterangan';
 import type { Location, Txn } from '../../../../domain/types';
@@ -86,7 +87,7 @@ const HISTORY: Column<Txn>[] = [
 ];
 
 export function ItemDetail(
-  { id, draft, inventory, now, onNavigate, onMove, onLoan, onInspect, photos }:
+  { id, draft, inventory, now, onNavigate, onMove, onLoan, onInspect, onRestock, photos }:
   {
     id: string; draft: Draft; inventory: Inventory; now: number;
     onNavigate: (r: Route) => void;
@@ -96,6 +97,15 @@ export function ItemDetail(
     onLoan?: (target: LoanTarget) => void;
     /** Records that a unit was looked at and found still good — or found broken. */
     onInspect?: (target: InspectTarget) => void;
+    /**
+     * Files a purchase for THIS item, prefilled.
+     *
+     * Here rather than on Beranda's low-stock rows, where it first landed: seven buttons down a
+     * column turned a glance-and-go list into a form. Asking for something to be bought is a
+     * decision about one thing, made after looking at it — so it belongs on the page that shows
+     * you the thing.
+     */
+    onRestock?: (itemId: string) => void;
     /**
      * The SHARED photo store, when this device has a gateway to share through.
      *
@@ -232,6 +242,13 @@ export function ItemDetail(
             >
               <Pencil class="h-4 w-4" /> Ubah
             </Button>
+            {/* Not gated on `canRecord`: filing a request is not recording a movement, and
+                §93 keeps the FORM open to everybody even though the list is admin-only. */}
+            {onRestock && item.trackBy === 'quantity' && (
+              <Button variant="secondary" onClick={() => onRestock(item.itemId)}>
+                <ShoppingCart class="h-4 w-4" /> Ajukan
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => onNavigate({ name: 'label' })}>
               <QrCode class="h-4 w-4" /> Label
             </Button>

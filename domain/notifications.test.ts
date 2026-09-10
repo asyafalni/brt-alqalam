@@ -90,12 +90,40 @@ describe('deriveNotifications (Notifikasi Stok)', () => {
     expect(n[0]).toMatchObject({ stokAkhir: 4, keterangan: 'pengambilan' });
   });
 
-  it('sorts multiple notifications by breach time', () => {
-    const a = item({ itemId: 'A', name: 'A' });
-    const b = item({ itemId: 'B', name: 'B' });
+  /*
+   * This is a SHOPPING LIST, so it is ordered the way somebody would walk a shop — not by what
+   * went short longest ago, which is a fact about the past and the wrong one to lead with.
+   */
+  it('puts what has run OUT above what is merely low', () => {
+    // An empty shelf is one people are already reaching into and finding nothing on.
+    const a = item({ itemId: 'A', name: 'A', minStock: 5 });
+    const b = item({ itemId: 'B', name: 'B', minStock: 5 });
     const txns = [
-      tx({ itemId: 'B', type: 'pemakaian', qtyDelta: -6, ts: 300 }),
-      tx({ itemId: 'A', type: 'pemakaian', qtyDelta: -6, ts: 100 }),
+      tx({ itemId: 'A', type: 'pemakaian', qtyDelta: -6, ts: 100 }),   // 10 → 4, low
+      tx({ itemId: 'B', type: 'pemakaian', qtyDelta: -10, ts: 300 }),  // 10 → 0, out
+    ];
+    expect(notify([a, b], txns, 1000).map((x) => x.itemId)).toEqual(['B', 'A']);
+  });
+
+  it('then by the biggest minimum, because that is how much we say we need', () => {
+    // Between two empty shelves, the one we normally keep ten of disrupts more than the one we
+    // keep three of — the shortfall is bigger and so is what depends on it.
+    const a = item({ itemId: 'A', name: 'A', minStock: 3 });
+    const b = item({ itemId: 'B', name: 'B', minStock: 10 });
+    const txns = [
+      tx({ itemId: 'A', type: 'pemakaian', qtyDelta: -10, ts: 100 }),
+      tx({ itemId: 'B', type: 'pemakaian', qtyDelta: -10, ts: 300 }),
+    ];
+    expect(notify([a, b], txns, 1000).map((x) => x.itemId)).toEqual(['B', 'A']);
+  });
+
+  it('falls back to breach time, and then to the name, so the order never shuffles', () => {
+    // A list that reorders between renders is a list nobody can point at.
+    const a = item({ itemId: 'A', name: 'Zebra', minStock: 5 });
+    const b = item({ itemId: 'B', name: 'Angsa', minStock: 5 });
+    const txns = [
+      tx({ itemId: 'A', type: 'pemakaian', qtyDelta: -10, ts: 100 }),
+      tx({ itemId: 'B', type: 'pemakaian', qtyDelta: -10, ts: 300 }),
     ];
     expect(notify([a, b], txns, 1000).map((x) => x.itemId)).toEqual(['A', 'B']);
   });

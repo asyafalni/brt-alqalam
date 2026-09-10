@@ -600,10 +600,6 @@ export function App() {
               now={now}
               canReview={!connection || admin != null}
               onAjukan={() => setAjukanOpen({ type: 'beli', requestId: newRequestId() })}
-              /* Prefilled for the item that ran low. The register already knows its name and
-                 unit; asking somebody to retype them is the tap §0.0 exists to remove — and
-                 without this the "Sudah diajukan" bar above the list could never leave zero. */
-              onRestock={(itemId) => setAjukanOpen({ type: 'beli', itemId, requestId: newRequestId() })}
               onNavigate={navigate}
             />
           )}
@@ -660,6 +656,9 @@ export function App() {
               onMove={setMoving}
               onLoan={setLoan}
               onInspect={setInspecting}
+              /* Prefilled with this item, so a restock names what we already own rather than
+                 minting a second catalog row for it (§94). */
+              onRestock={(itemId) => setAjukanOpen({ type: 'beli', itemId, requestId: newRequestId() })}
               photos={sharedPhotos}
             />
           )}

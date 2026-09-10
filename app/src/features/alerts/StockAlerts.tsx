@@ -11,7 +11,6 @@
 // AKHIR, SET MIN, KETERANGAN and the HARI/TGL/JAM it breached — without being a table, because
 // six of those columns on a phone is a horizontal scroll and this is a shopping list.
 
-import { ShoppingCart } from '@octanejs/lucide';
 import type { StockNotification } from '../../../../domain/notifications';
 import type { DerivedState } from '../../../../domain/types';
 import { itemStatusBadge, PILL } from '../scan/resolve';
@@ -26,7 +25,7 @@ export function breachedWhen(ts: number, now: number): string {
 }
 
 export function StockAlerts(
-  { notifications, derived, categoryNameOf, now, onOpenItem, onRestock }:
+  { notifications, derived, categoryNameOf, now, onOpenItem }:
   {
     notifications: readonly StockNotification[];
     derived: DerivedState;
@@ -34,15 +33,6 @@ export function StockAlerts(
     now: number;
     /** Optional: rows become buttons into the item when there is somewhere to go. */
     onOpenItem?: (itemId: string) => void;
-    /**
-     * Files a purchase for this exact item, prefilled.
-     *
-     * The register already knows sabun is low, that it is called sabun, and that it is measured
-     * in botol — and until this existed the only way to act on that was to open Pengajuan and
-     * type all three again. The list that identifies the problem should offer the thing you do
-     * about it.
-     */
-    onRestock?: (itemId: string) => void;
   },
 ) {
   return (
@@ -82,29 +72,22 @@ export function StockAlerts(
           </div>
         );
 
+        /* A ROW, and nothing else. It briefly carried an "Ajukan" button per line, which put
+           seven of them in a column and turned a glance-and-go list into a form. Filing a
+           purchase is a decision about one thing, so it lives on that thing's own page. */
         return (
-          <li key={n.itemId} class="flex items-center gap-2 px-[var(--card-pad)]">
+          <li key={n.itemId}>
             {onOpenItem ? (
               <button
                 type="button"
-                class="-mx-[var(--card-pad)] min-w-0 flex-1 px-[var(--card-pad)] py-3 hover:bg-slate-50"
+                class="w-full px-[var(--card-pad)] py-3 hover:bg-slate-50"
                 aria-label={`Buka ${n.name}`}
                 onClick={() => onOpenItem(n.itemId)}
               >
                 {row}
               </button>
             ) : (
-              <div class="min-w-0 flex-1 py-3">{row}</div>
-            )}
-            {onRestock && (
-              <button
-                type="button"
-                class="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-500 px-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-100"
-                aria-label={`Ajukan pembelian ${n.name}`}
-                onClick={() => onRestock(n.itemId)}
-              >
-                <ShoppingCart class="h-4 w-4" /> Ajukan
-              </button>
+              <div class="px-[var(--card-pad)] py-3">{row}</div>
             )}
           </li>
         );

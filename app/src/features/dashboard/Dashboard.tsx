@@ -28,13 +28,11 @@ import { openRequests, openTotal } from '../../../../domain/requests';
 const PAGE = 6;
 
 export function Dashboard(
-  { draft, inventory, now, onNavigate, onAjukan, onRestock, canReview = true }:
+  { draft, inventory, now, onNavigate, onAjukan, canReview = true }:
   {
     draft: Draft; inventory: Inventory; now: number; onNavigate: (r: Route) => void;
     /** Opens the request FORM. Available to everybody, unlike the list. */
     onAjukan?: () => void;
-    /** The same form, prefilled for one item that has run low. */
-    onRestock?: (itemId: string) => void;
     /** False when this device may file requests but not read them back. */
     canReview?: boolean;
   },
@@ -312,10 +310,6 @@ export function Dashboard(
                   categoryNameOf={categoryNameOf}
                   now={now}
                   onOpenItem={(id) => onNavigate({ name: 'item', id })}
-                  /* The bar above this list counts how many of these have been asked for. With
-                     no way to ask from here it could never move off zero — a progress bar over
-                     a list you cannot act on is a progress bar that measures nothing. */
-                  onRestock={onRestock}
                 />
               </LazyList>
             </section>

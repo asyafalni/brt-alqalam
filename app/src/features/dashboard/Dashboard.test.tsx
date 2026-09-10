@@ -292,25 +292,30 @@ describe('acting on a low item from where it is reported', () => {
    * thing, so making somebody open Pengajuan and retype all three is the tap §0.0 exists to
    * remove.
    */
-  it('offers to file a purchase for the item that ran low', () => {
+  it('stays a glance-and-go list, with no button on every row', () => {
+    /* It briefly carried an "Ajukan" per line, which put seven buttons down one column and
+       turned a list you scan into a form. Filing a purchase is a decision about ONE thing,
+       made after looking at it, so it lives on that thing's page. */
     seed(catalog(input({ name: 'Sabun', initialStock: 1, minStock: 5 })));
     const r = render(App);
 
-    fireEvent.click(r.getByLabelText('Ajukan pembelian Sabun'));
-    // The form opens already naming it, rather than as a blank "Barang baru".
-    expect(r.getByText(/Ajukan pembelian/)).toBeTruthy();
-    expect(r.getAllByText(/Sabun/).length).toBeGreaterThan(0);
+    expect(r.queryByLabelText('Ajukan pembelian Sabun')).toBeNull();
+    // The row still gets you there in one tap.
+    expect(r.getAllByLabelText('Buka Sabun').length).toBeGreaterThan(0);
   });
 
-  it('says why it cannot be filed on a device with no gateway', () => {
-    /* A request goes to the spreadsheet, so there is nowhere to put one without a gateway.
-       The form is genuinely absent here rather than broken — and it says so, which is the
-       distinction this project keeps having to restate. The prefill itself is asserted in
-       `RequestForm.test.tsx`, where the form actually exists. */
-    seed(catalog(input({ name: 'Sabun', initialStock: 1, minStock: 5 })));
+  it('leads with what has run out, then with the biggest minimum', () => {
+    // A shopping list, ordered the way somebody would walk a shop.
+    seed(catalog(
+      input({ name: 'Menipis saja', initialStock: 2, minStock: 5 }),
+      input({ name: 'Habis kecil', initialStock: 0, minStock: 3 }),
+      input({ name: 'Habis besar', initialStock: 0, minStock: 20 }),
+    ));
     const r = render(App);
-
-    fireEvent.click(r.getByLabelText('Ajukan pembelian Sabun'));
-    expect(r.getByText(/belum tersambung ke gateway/)).toBeTruthy();
+    const names = [...r.container.querySelectorAll('[aria-label^="Buka "]')]
+      .map((el) => el.getAttribute('aria-label'))
+      // The drawer toggle is also "Buka menu"; this is about the list.
+      .filter((l) => l !== 'Buka menu');
+    expect(names.slice(0, 3)).toEqual(['Buka Habis besar', 'Buka Habis kecil', 'Buka Menipis saja']);
   });
 });

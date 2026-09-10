@@ -60,5 +60,24 @@ export function deriveNotifications(
     }
   }
 
-  return out.sort((a, b) => a.ts - b.ts);
+  /*
+   * WHAT TO BUY FIRST, in the order somebody would actually walk a shop.
+   *
+   * It used to sort by breach time, which answers "what went short longest ago" — a fact about
+   * the past, and the wrong one to lead a shopping list with. Something at ZERO is a shelf
+   * people are already reaching into and finding empty; something merely low is not yet.
+   *
+   * Then by the highest minimum. That number is this masjid's own statement of how much of a
+   * thing it needs on hand, so among two empty shelves the one we normally keep ten of matters
+   * more than the one we keep three of — the shortfall is bigger and so is the disruption.
+   *
+   * Breach time survives as the third key, and the name as a fourth, so the order is stable:
+   * a list that reshuffles between renders is a list nobody can point at.
+   */
+  return out.sort((a, b) => (
+    Number(a.stokAkhir > 0) - Number(b.stokAkhir > 0)
+    || b.setMin - a.setMin
+    || a.ts - b.ts
+    || a.name.localeCompare(b.name)
+  ));
 }
