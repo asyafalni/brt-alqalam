@@ -53,6 +53,14 @@ export function useRegister(
    * whether anybody has to watch it. The fresh copy is already in flight, the progress bar says
    * so, and it lands about a second and a half later.
    */
+  /* An ADMIN is seeded too, and that took a correction to get right.
+   *
+   * Only the public tier is ever cached (§39 — the detailed one names people), so an admin's
+   * seed is necessarily the public copy. Withholding it altogether made the person with the
+   * most to do wait the longest, measured at up to forty seconds on a cold Apps Script. So the
+   * seed is painted for them as well, and the two screens that can tell the difference say
+   * which they are looking at: `withheld` is only true with nobody signed in, and Pengajuan
+   * shows "still arriving" rather than "none" while an admin's detailed read is in flight. */
   const seed = connection ? cachedRegister(connection.url) : null;
   const [state, setState] = useState<GatewayState | null>(seed?.state ?? null);
   const [loading, setLoading] = useState(false);
@@ -81,9 +89,16 @@ export function useRegister(
         setState(next);
         setError('');
         setFetchedTs(Date.now());
-        /* Kept for the NEXT visit, not for this one. Written after a successful read only, so
-           a cache can never contain something the gateway refused. */
-        cacheRegister(connection.url, next);
+        /*
+         * ONLY THE PUBLIC TIER is ever written to disk.
+         *
+         * The detailed one carries `Requests`, and every row of that names who asked and who
+         * decided (§39). Caching it would leave those names in localStorage after the admin
+         * signs out — and the seed would then paint them for whoever picks the tablet up next.
+         * The public tier is what an unauthenticated reader could fetch anyway, so keeping a
+         * copy of it costs nothing that is not already given away.
+         */
+        if (next.tier === 'public') cacheRegister(connection.url, next);
       })
       .catch((err: unknown) => {
         if (!alive) return;

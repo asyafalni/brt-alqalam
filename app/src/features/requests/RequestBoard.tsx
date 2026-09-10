@@ -100,7 +100,7 @@ const ICON_SECONDARY = `${ICON_BTN} border-slate-400 text-slate-600 hover:border
 const ICON_PRIMARY = `${ICON_BTN} border-slate-900 bg-slate-900 text-white hover:bg-slate-800`;
 
 export function RequestBoard(
-  { draft, inventory, now, actor = 'USR-DEMO', prefill, onPrefillUsed, withheld = false }:
+  { draft, inventory, now, actor = 'USR-DEMO', prefill, onPrefillUsed, withheld = false, pending = false }:
   {
     draft: Draft; inventory: Inventory; now: number; actor?: string;
     /** Set when the screen was opened from a broken or lost unit on the Aset page. */
@@ -111,6 +111,11 @@ export function RequestBoard(
      * Distinguishes "nobody has asked for anything" from "you are not allowed to see this".
      */
     withheld?: boolean;
+    /**
+     * True while a signed-in admin is still looking at the public copy the app opened on.
+     * Neither "none" nor "withheld" — the rows are on their way.
+     */
+    pending?: boolean;
   },
 ) {
   const { requests, setRequests, setPurchase, setRepair, finishRequest } = draft;
@@ -394,7 +399,15 @@ export function RequestBoard(
         </div>
       </div>
 
-      {rows.length === 0 && withheld ? (
+      {rows.length === 0 && pending ? (
+        <div class={`${CARD} py-16 text-center`} role="status">
+          <p class="mb-1 font-semibold text-slate-700">Memuat pengajuan…</p>
+          <p class="mx-auto max-w-md text-sm text-slate-500">
+            Daftar barang dan rak sudah tampil dari salinan terakhir. Pengajuan menyebut nama
+            orang, jadi hanya dibaca setelah masuk sebagai admin — sebentar lagi muncul.
+          </p>
+        </div>
+      ) : rows.length === 0 && withheld ? (
         /*
          * "Empty" and "withheld" are not the same thing, and a screen that shows the first when
          * it means the second teaches people the register has lost their data. Pengajuan rows

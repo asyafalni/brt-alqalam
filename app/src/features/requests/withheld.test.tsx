@@ -19,9 +19,13 @@ const draft: Draft = {
   setCatalog: () => {}, reset: () => {}, loadDemo: () => {}, loadFrom: () => {},
 };
 
-function Board({ withheld }: { withheld: boolean }) {
+function Board({ withheld, pending = false }: { withheld: boolean; pending?: boolean }) {
   const inventory = useInventory(draft, 0);
-  return <RequestBoard draft={draft} inventory={inventory} now={0} withheld={withheld} />;
+  return (
+    <RequestBoard
+      draft={draft} inventory={inventory} now={0} withheld={withheld} pending={pending}
+    />
+  );
 }
 
 afterEach(cleanup);
@@ -38,5 +42,24 @@ describe('an empty Pengajuan screen', () => {
     // The reason has to be there, or it reads as a bug rather than a rule.
     expect(r.getByText(/menyebut nama orang/i)).toBeTruthy();
     expect(r.queryByText(/Belum ada pengajuan/)).toBeNull();
+  });
+});
+
+/*
+ * A third fact, and the one that arrived from live use: "kok jadi ada ... padahal saya
+ * admin_utama". The app now opens on the last PUBLIC copy so the shelves are on screen while
+ * Apps Script starts up — which for an admin means the one tier that carries no requests is on
+ * screen for the two to forty seconds the detailed read takes.
+ */
+describe('a signed-in admin whose detailed read has not landed', () => {
+  it('is told the rows are coming, not that there are none', () => {
+    const r = render(() => <Board withheld={false} pending />);
+    expect(r.getByText(/Memuat pengajuan/i)).toBeTruthy();
+    expect(r.queryByText(/Belum ada pengajuan/)).toBeNull();
+  });
+
+  it('is never told the data is withheld from them — it is not', () => {
+    const r = render(() => <Board withheld={false} pending />);
+    expect(r.queryByText(/tidak ditampilkan di sini/i)).toBeNull();
   });
 });

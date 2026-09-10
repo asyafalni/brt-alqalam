@@ -71,9 +71,13 @@ const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
  */
 async function ready() {
   await p.waitForFunction(
-    () => !document.body.textContent.includes('Memuat register'),
+    () => {
+      const t = document.body.textContent || '';
+      if (t.includes('Tidak bisa memuat register')) throw new Error('gateway menolak');
+      return !t.includes('Memuat register');
+    },
     null,
-    { timeout: 20000 },
+    { timeout: 90000 },
   ).catch(() => { throw new Error('register tidak pernah termuat — audit dibatalkan'); });
   await p.waitForTimeout(600);
 }
