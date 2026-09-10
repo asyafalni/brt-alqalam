@@ -83,8 +83,19 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb { @apply rounded-full bg-slate-300; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
 
-/* Never let a mis-tap zoom the kiosk. */
-input, select, textarea, button { font: inherit; }
+/* ⚠️ REMOVED: `input, select, textarea, button { font: inherit; }`
+ *
+ * It duplicated Tailwind's own preflight, which already does exactly that — but preflight sits
+ * inside `@layer base`, and this copy sat OUTSIDE every layer. An unlayered rule beats every
+ * layered one whatever the specificity, so this quietly disabled `text-xs`, `text-sm` and every
+ * other font utility on every button, input and select in the app: they inherited whatever
+ * their container happened to be. Measured on the live site — "Ubah" asked for `text-sm` and
+ * rendered at 16px, and the Button component's whole size scale had been decorative for as
+ * long as this line existed.
+ *
+ * The kiosk-zoom guarantee it was written for is the `max(16px, 1em)` rule further down, which
+ * is deliberately unlayered because it MUST beat a utility. This one only had to exist for the
+ * font family, and preflight already handles that in a layer where utilities can win. */
 
 /* Tailwind 4's preflight no longer sets `cursor: pointer` on buttons — v3 did, and dropping it
    was a deliberate change to follow the browser default. On a desk that reads as "this is not
