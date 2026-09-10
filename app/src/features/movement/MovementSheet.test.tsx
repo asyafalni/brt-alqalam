@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@octanejs/testing-library';
 import { App } from '../../App';
+// The item page's action buttons are icon-only on a phone, so each carries an
+// `aria-label` — which is the accessible name a role query matches against.
 import { SEED_CATEGORIES } from '../../data/seedCategories';
 import { createEntry, createLocation } from '../stocktake/draft';
 import type { DraftInput } from '../stocktake/draft';
@@ -44,7 +46,7 @@ describe('recording that something was taken', () => {
     at('#/barang?i=ITM-0001');
     const r = render(App);
 
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
     fireEvent.input(r.getByLabelText('Berapa galon?'), { target: { value: '2' } });
     fireEvent.click(r.getByText('Simpan'));
 
@@ -60,7 +62,7 @@ describe('recording that something was taken', () => {
     seed(catalog(input()));
     at('#/barang?i=ITM-0001');
     const r = render(App);
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
 
     expect(r.queryByText('Pemakaian')).toBeNull();
     expect(r.queryByText('Pengambilan')).toBeNull();
@@ -71,7 +73,7 @@ describe('recording that something was taken', () => {
     at('#/barang?i=ITM-0001');
     const r = render(App);
 
-    fireEvent.click(r.getByRole('button', { name: 'Kembalikan' }));
+    fireEvent.click(r.getByRole('button', { name: 'Kembalikan barang' }));
     fireEvent.click(r.getByText('Simpan'));
 
     expect(txns()[0]).toMatchObject({ type: 'pengembalian', qtyDelta: 1 });
@@ -83,7 +85,7 @@ describe('recording that something was taken', () => {
     at('#/barang?i=ITM-0001');
     const r = render(App);
 
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
     fireEvent.click(r.getByLabelText(/Dipinjam, akan dikembalikan/));
     fireEvent.click(r.getByText('Simpan'));
 
@@ -96,7 +98,7 @@ describe('recording that something was taken', () => {
     seed(catalog(input()));
     at('#/barang?i=ITM-0001');
     const r = render(App);
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
     expect(r.queryByLabelText('Diambil dari')).toBeNull();
   });
 
@@ -108,7 +110,7 @@ describe('recording that something was taken', () => {
     at('#/barang?i=ITM-0001');
     const r = render(App);
 
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
     fireEvent.change(r.getByLabelText('Diambil dari'), { target: { value: A3.locationId } });
     fireEvent.click(r.getByText('Simpan'));
 
@@ -122,7 +124,7 @@ describe('recording that something was taken', () => {
     at('#/barang?i=ITM-0001');
     const r = render(App);
 
-    fireEvent.click(r.getByRole('button', { name: 'Ambil' }));
+    fireEvent.click(r.getByRole('button', { name: 'Ambil barang' }));
     fireEvent.input(r.getByLabelText('Berapa galon?'), { target: { value: '3' } });
     expect(r.getByRole('alert')).toBeTruthy();
 

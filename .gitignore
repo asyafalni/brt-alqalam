@@ -7,3 +7,7 @@ dist/
 .env.*
 !.env.example
 !.env.test
+
+# Scratch Playwright helpers — a screenshot or a DOM probe written for one question and
+# thrown away. The audits that earn their keep live under their real names.
+docs/_*.mjs

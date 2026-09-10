@@ -224,7 +224,19 @@ export function ItemDetail(
         title={item.name}
         subtitle={categoryName || item.categoryId}
         action={
-          <div class="flex gap-2">
+          /*
+           * ICON-ONLY ON A PHONE, and `flex-wrap` behind it.
+           *
+           * Four labelled buttons in a nowrap row are wider than a 390px screen, so the whole
+           * page scrolled sideways — the title, the cards and the bottom bar all shifted off
+           * the left edge. Seen on a real handset, not reasoned about.
+           *
+           * The label hides from `sm` down rather than the row wrapping onto two lines,
+           * because Opname already solves it that way and one pattern is easier to trust than
+           * two. `aria-label` on every one of them: an icon alone is a picture, and a button
+           * whose only name is a picture has no name at all.
+           */
+          <div class="flex flex-wrap gap-2">
             {/* Ahead of Ubah and Label, because this is the thing that happens fifty times a
                 week while those happen once. Quantity items only — a loan needs a borrower,
                 and that flow is deliberately not built yet (§60). */}
@@ -232,11 +244,15 @@ export function ItemDetail(
                 promise the register cannot keep, and it invites the tap that explains nothing. */}
             {item.trackBy === 'quantity' && draft.canRecord !== false && (
               <>
-                <Button onClick={() => onMove({ item, direction: 'keluar' })}>
-                  <ArrowUpRight class="h-4 w-4" /> Ambil
+                <Button aria-label="Ambil barang" onClick={() => onMove({ item, direction: 'keluar' })}>
+                  <ArrowUpRight class="h-4 w-4" /> <span class="hidden sm:inline">Ambil</span>
                 </Button>
-                <Button variant="secondary" onClick={() => onMove({ item, direction: 'masuk' })}>
-                  <ArrowDownLeft class="h-4 w-4" /> Kembalikan
+                <Button
+                  variant="secondary"
+                  aria-label="Kembalikan barang"
+                  onClick={() => onMove({ item, direction: 'masuk' })}
+                >
+                  <ArrowDownLeft class="h-4 w-4" /> <span class="hidden sm:inline">Kembalikan</span>
                 </Button>
               </>
             )}
@@ -245,15 +261,20 @@ export function ItemDetail(
                 the thing you had just been looking at to find again. */}
             <Button
               variant="secondary"
+              aria-label="Ubah barang"
               onClick={() => onNavigate({ name: 'opname', edit: item.itemId })}
             >
-              <Pencil class="h-4 w-4" /> Ubah
+              <Pencil class="h-4 w-4" /> <span class="hidden sm:inline">Ubah</span>
             </Button>
             {/* Not gated on `canRecord`: filing a request is not recording a movement, and
                 §93 keeps the FORM open to everybody even though the list is admin-only. */}
             {onRestock && item.trackBy === 'quantity' && (
-              <Button variant="secondary" onClick={() => onRestock(item.itemId)}>
-                <ShoppingCart class="h-4 w-4" /> Ajukan
+              <Button
+                variant="secondary"
+                aria-label="Ajukan pembelian"
+                onClick={() => onRestock(item.itemId)}
+              >
+                <ShoppingCart class="h-4 w-4" /> <span class="hidden sm:inline">Ajukan</span>
               </Button>
             )}
           </div>
