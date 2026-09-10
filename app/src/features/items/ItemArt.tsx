@@ -21,6 +21,7 @@
 // be taken by somebody. See `data/photoStore.ts`.
 
 import type { Item } from '../../../../domain/types';
+import type { PurchaseRequest } from '../../../../domain/requests';
 
 const INK = '#2b2926';
 const INK_SOFT = '#5f5a52';
@@ -461,6 +462,32 @@ export function artFor(
     if (pattern.test(categoryName)) return id;
   }
   return item.kind === 'equipment' ? 'alat' : 'default';
+}
+
+/**
+ * The drawing a REQUEST wears.
+ *
+ * A restock borrows its item's, so the row looks like the thing it will become. Something new
+ * has only the words somebody typed — which is exactly what `artFor` resolves from, unit first
+ * and then name — so "3 roll karpet" gets a roll without anybody choosing one.
+ *
+ * Here rather than inside `RequestBoard` because the finder shows requests too, and a request
+ * that wears one drawing on one screen and another on the next is two things to the reader.
+ */
+export function artForRequest(
+  request: Pick<PurchaseRequest, 'itemId' | 'name' | 'unit' | 'type'>,
+  items: readonly Item[],
+  categories: readonly { categoryId: string; name: string }[],
+): ArtId {
+  const item = request.itemId ? items.find((i) => i.itemId === request.itemId) : undefined;
+  if (item) {
+    return artFor(item, categories.find((c) => c.categoryId === item.categoryId)?.name ?? '');
+  }
+  return artFor({
+    name: request.name,
+    unit: request.unit,
+    kind: request.type === 'perbaikan' ? 'equipment' : 'consumable',
+  });
 }
 
 /**

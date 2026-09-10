@@ -72,6 +72,8 @@ afterEach(cleanup);
    string on screen three times over, and an unscoped match would pass on the wrong one. */
 const barang = () => within(screen.getByRole('region', { name: 'Barang' }));
 const pengajuan = () => within(screen.getByRole('region', { name: 'Pengajuan' }));
+/** The section element itself, for the times a query needs the DOM rather than a matcher. */
+const region = (name: string) => screen.getByRole('region', { name });
 const rak = () => within(screen.getByRole('region', { name: 'Rak' }));
 
 describe('the navbar search, on screens that are not lists', () => {
@@ -164,5 +166,26 @@ describe('pengajuan, for the people allowed to read it', () => {
     render(<Harness query="sapu" requests={[request()]} onOpenRequests={() => { opened = true; }} />);
     fireEvent.click(pengajuan().getByText('Sapu ijuk'));
     expect(opened).toBe(true);
+  });
+});
+
+describe('a pengajuan row looks like the rows above it', () => {
+  /*
+   * It had no drawing, so it started flush left and sat shorter than the Barang and Rak rows —
+   * which read as a different KIND of result rather than a third group of the same shape.
+   */
+  it('carries a drawing', () => {
+    render(<Harness query="sapu" requests={[request()]} />);
+    // Inside the ROW, not the section heading — that carries its own icon.
+    expect(region('Pengajuan').querySelector('li svg')).toBeTruthy();
+  });
+
+  it('borrows the ITEM\'s drawing when the request is a restock', () => {
+    /* Shared with `RequestBoard` rather than re-derived, because a request that wears one
+       drawing on one screen and another on the next is two things to the reader. */
+    render(<Harness query="sabun" requests={[request({ name: 'Sabun cuci tangan', itemId: 'ITM-0001' })]} />);
+    const inList = region('Barang').querySelector('li svg')?.innerHTML;
+    const inRequest = region('Pengajuan').querySelector('li svg')?.innerHTML;
+    expect(inRequest).toBe(inList);
   });
 });

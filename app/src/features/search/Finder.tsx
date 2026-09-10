@@ -14,7 +14,7 @@ import { MapPin, Package, Search, ShoppingCart, X } from '@octanejs/lucide';
 import type { Category, Item, Location } from '../../../../domain/types';
 import type { PurchaseRequest } from '../../../../domain/requests';
 import type { Inventory } from '../../state/useInventory';
-import { ItemArt, artFor } from '../items/ItemArt';
+import { ItemArt, artFor, artForRequest } from '../items/ItemArt';
 import { RackArt, rackArtFor } from '../racks/RackArt';
 import { CARD, CODE } from '../../components/ui';
 import { REQUEST_STATUS_LABEL } from '../../components/format';
@@ -157,6 +157,10 @@ export function Finder(p: FinderProps) {
                     class={`${CARD} flex w-full items-center gap-3 p-3 text-left transition-colors hover:border-slate-400`}
                     onClick={p.onOpenRequests}
                   >
+                    {/* A drawing, like the two lists above. Without one this row started flush
+                        left and sat shorter than its neighbours, which read as a different
+                        KIND of result rather than a third group of the same shape. */}
+                    <ItemArt art={artForRequest(r, p.items, p.categories)} size={36} />
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-semibold text-slate-900">{r.name}</span>
                       {/* The reason, not the price: a request is judged on why, and the number

@@ -31,7 +31,7 @@ import { FilterField } from '../../components/FilterField';
 import { createItem } from '../stocktake/draft';
 import { RequestForm } from './RequestForm';
 import type { RequestInput } from './RequestForm';
-import { artFor, ItemArt } from '../items/ItemArt';
+import { artForRequest, ItemArt } from '../items/ItemArt';
 import { discardPhotos, RequestThumb } from './RequestPhotos';
 
 /** Rupiah, grouped the way the country writes it. */
@@ -172,25 +172,8 @@ export function RequestBoard(
     return `REQ-${String(highest + 1).padStart(4, '0')}`;
   }, [requests]);
 
-  /**
-   * The drawing a request wears when it has no photo.
-   *
-   * A restock borrows its item's, so the row looks like the same thing it will become. A new
-   * thing has only the words somebody typed, which is exactly what `artFor` resolves from —
-   * unit first, then name — so "3 roll karpet" gets a roll without anybody choosing one.
-   */
-  function artOf(r: PurchaseRequest) {
-    const item = r.itemId ? draft.items.find((i) => i.itemId === r.itemId) : undefined;
-    if (item) {
-      const category = draft.categories.find((c) => c.categoryId === item.categoryId)?.name ?? '';
-      return artFor(item, category);
-    }
-    return artFor({
-      name: r.name,
-      unit: r.unit,
-      kind: r.type === 'perbaikan' ? 'equipment' : 'consumable',
-    });
-  }
+  /** Shared with the finder, so one request cannot wear two different drawings. */
+  const artOf = (r: PurchaseRequest) => artForRequest(r, draft.items, draft.categories);
 
   function closeForm() {
     setAdding(false);
