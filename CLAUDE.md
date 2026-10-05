@@ -1,6 +1,6 @@
 # Sistem Inventaris BRT Masjid Al-Qalam — Development Design Doc
 
-**Status:** v1.6 (real problem statement; keterangan inferred; in-use deleted) · **Owner:** Alfin · **Base template:** [spessolve/smart-inventory-system](https://github.com/spessolve/smart-inventory-system)
+**Status:** v1.16 (committee review + the existing Sheet; period close; Go + Postgres replaces Apps Script — Part XXVI) · **Owner:** Alfin · **Base template:** [spessolve/smart-inventory-system](https://github.com/spessolve/smart-inventory-system)
 
 ---
 
@@ -23,7 +23,7 @@ Applying it honestly to what exists and what is planned:
 | Rack labels — one QR per shelf | ✅ Removes searching, which is the invisible daily tax in a messy gudang. |
 | Cycle counts, one rack at a time | ✅ *If* it stays a two-minute job. A monthly full opname would fail this test. |
 | Gateway / Clerk / JWT setup | ✅ One-time cost that removes recurring work. Front-loaded, not ongoing. |
-| **Per-unit QR on every knife** | ⚠️ **Fails as specced.** Labelling 200 blades is an operational project, and re-labelling after they are washed and sharpened is recurring work. This is why "Label satu-satu vs Hitung jumlahnya" is asked out loud rather than defaulted. |
+| **Per-unit QR on every knife** | ⚠️ **Fails as specced.** Labelling 200 blades is an operational project, and re-labelling after they are washed and sharpened is recurring work. This is why "Label satu-satu vs Hitung jumlahnya" is asked out loud rather than defaulted. **Resolved 2026-10-05 (§112): per-unit QR only for the items the committee picks (e.g. the expensive knives); everything else is counted.** |
 | **PIN on every visit** | ⚠️ Borderline. Four taps buys access control that ~5–10 users barely need. Kept because the owner chose it; revisit if the marbot hour shows it being skipped. |
 | Supplier/PO management, sales analytics, costing (DOSS, image 1) | ❌ Pure added burden with no return here. Correctly rejected. |
 
@@ -37,6 +37,12 @@ Applying it honestly to what exists and what is planned:
 requirements PDF is a **proposal written by the owner's boss**, who is not an inventory
 specialist and has said that *"valid enhancement and improvement is open to discuss."* Treat
 the PDF as **input, not specification**: it carries the goal, not the design.
+
+> ⚠️ **PARTLY CORRECTED 2026-10-05 (Part XXVI §104).** "There is no paper process" held for
+> paper, not for spreadsheets: the committee has a working Google Sheet prototype
+> (`Data Inventaris BRT.xlsx`) with a **463-item catalog**, 8 users in 5 roles, a Notifikasi sheet
+> and a Histori sheet. The catalog is real and is the starting point; what is still true is that
+> nothing has been in daily use long enough to have a habit around it.
 
 **What is actually wrong today**, in the boss's own words:
 
@@ -1765,3 +1771,193 @@ there; no write has, because doing so needs a Clerk admin token, which needs the
 Apps Script Script Properties and never in a transcript. What is proven is the shape of the
 refusals and 31 gateway tests against a fake spreadsheet. **The first real admin save is a test
 the owner has to run**, and it is the one remaining unknown in this Part.
+
+
+# Part XXVI — Committee review, and the Sheet that already existed (v1.16)
+
+Recorded 2026-10-05. Input: written feedback from the committee and admins, plus
+`docs/Data Inventaris BRT.xlsx` — their earlier recording system, given afterwards "as a
+reference". The file is **git-ignored**: its `Daftar_User` sheet holds PINs in plain text and
+people's email addresses. Never commit it, never quote those columns. Everything below was
+settled in a grilling pass with the owner; the meeting-facing version is a private Doc,
+*Usulan Perubahan Sistem Inventaris BRT — Bahan Rapat*.
+
+## 104. What the Sheet changed about what we believed
+
+- **A catalog exists.** 463 items in 10 categories (STOK A–J), each with code (`A.1`…),
+  location, unit, minimum. §0's "no asset register at all" is no longer true, and the stock-take
+  (§59) stops being "walk the gudang and add everything" — it is **import, then verify**.
+- **The roster is known.** 8 users, 5 roles in the Sheet: Admin Utama, Admin, Perawatan, Marbot
+  (4), Security. §0's "roster size still unknown" is answered: six or seven operators, not one
+  to three, so attribution is real work (as §0 already argued it would be).
+- **Its Histori logs cell edits** (sheet, cell address, old value, new value, who), not item
+  movements. 17 rows, all 2026-10-04, one user, all on `S1`, toggling the same cell — it reads
+  as testing; that is an observation, not a certainty. Our per-item history stays the better
+  answer to "where did it go".
+- **Its Notifikasi is ours.** Item appears when stock ≤ minimum; 39 of 463 items have a minimum
+  above 0; one uses `-1` as "no minimum" — the same idea as §46's "(-)".
+- **Its status column is in real use:** *Pasang* 53, *Dipakai* 46, *Rusak* 5, *Pinjam* **1**.
+- **STOK A–J are categories, not racks.** Location is its own column, 16 distinct codes, 311 of
+  463 items in `G - 2`. The committee called them "rak 1–10"; the Sheet says otherwise.
+- **Dirty data to fix at import:** the Menu Utama labels say "STOK F" and "STOK H" twice and skip
+  G and I (the codes underneath are correct A–J); locations are free text (`M/G-2`, `Jan/G-2`).
+
+## 105. Dispositions of the nine pieces of feedback
+
+| Feedback | Disposition |
+| --- | --- |
+| Beranda like the Menu Utama sheet | Accepted — 10 categories + Notifikasi + Histori + admin entries. |
+| Opname/Peta Rak/Stok/Aset as one sheet per category (S1–S10) | Accepted **as a view per category**; location stays a column; stock stays per location (§111). |
+| Laporan → Notifikasi + Histori | Accepted; charts and score dropped (§111). |
+| 4-digit PIN, unique per person, recorded in Histori | Accepted — already Model C; see §109 for view vs record. |
+| AMBIL as −/number/+ per row | Accepted. |
+| KET → STATUS dropdown (7 values) | Accepted **pre-filled by inference**, touched only for exceptions (§108). |
+| Apps Script → Go + PostgreSQL | Accepted (§107). |
+| Items and status stay in the Sheet, editable, import/export | Accepted with a boundary: **opening balances**, not history (§106). |
+| Roles/users migrate fully to Clerk and Go | Accepted; PIN map moves to Postgres. |
+
+## 106. Period close ("tutup buku") — how a hand-editable Sheet and an append-only log coexist
+
+The collision: the Sheet is meant to be edited directly, and the whole design is *derive, don't
+mutate*. Resolved by making what the Sheet holds an **opening balance**, not a live number.
+
+- **Stock = opening balance of the period + every transaction after it.** Closing a period
+  replaces the opening balance with the previous closing balance, so the Sheet needs only
+  closing figures, never the history.
+- **Who edits the Sheet:** the admin utama and the project owner only. They edit opening
+  balances; they never edit history.
+- **Closing:** annual is mandatory, monthly optional. The system **proposes** the closing balance
+  per item per location; an admin checks it, fixes the shelves that differ through the existing
+  cycle count (§15.1), and presses Tutup. It must stay a checking job, not a full recount of the
+  gudang — a monthly full opname would fail §0.0.
+- **A wrong balance mid-period** is corrected through **Tambah/Kurang Stok**, recorded as an
+  `adjust` labelled *Koreksi*, admin-only — **not** through Pemakaian. A correction filed as
+  pemakaian inflates PENGAMBILAN, triggers Notifikasi for the wrong reason, and hides the
+  loss pattern. The period's opening balance does not change. An opening-balance edit made
+  outside a close is refused or flagged.
+- **History:** all transactions live in PostgreSQL, **partitioned by period**, kept **at least
+  one year**, and a closed period stays **inspectable** — it just is not folded when the app opens.
+  The Sheet carries the closing figure only. This is §16's "compaction", now with an owner.
+- Supersedes §100's whole-tab `putCatalog` as the Sheet write path; the rule that the log has
+  exactly one writer stands.
+
+## 107. Go + PostgreSQL replace the Apps Script gateway
+
+Owner's reason: the Apps Script gateway is slow, and moving data to Postgres is the point.
+
+- **Postgres:** transactions, history, PINs, enrolled devices. **Sheet:** catalog, opening
+  balances, closing figures. **Clerk:** admin identity and roles.
+- **§65.2 is superseded:** a Go service can read the client IP, so **per-IP rate limiting of PIN
+  attempts is possible**. Device enrolment is kept for now as a second layer; revisit once the
+  Go service is live rather than assuming it is redundant.
+- §65.1 (CORS "simple request" only) and §65.3 (HS256 template because Apps Script cannot
+  verify RSA) describe Apps Script's limits and fall away with it; Clerk JWTs can be verified
+  normally in Go. The lesson of §98 stands: **a login protects writing and the admin surface,
+  not reading** — the tier split is what protects identities.
+- §3's "no server we operate" no longer holds (it already did not, on Fly.io). **New standing cost:
+  somebody maintains the server and its backups, especially before Qurban and Ramadhan.** Unowned
+  — see §113.
+
+## 108. Status vocabulary: Dipakai and Dipasang come back, with a place instead of a person
+
+§58.3 deleted `in_use` because it recorded no holder while the boss's top pain is things going
+missing. The Sheet's data says the pain is elsewhere: *Pinjam* is 1 of 463, *Dipakai* and *Pasang*
+are 99. Those are fixed items **at a place** (floor polisher: *Dipakai*, location *Janitor*; a
+lamp: *Dipasang*), not items someone carried away.
+
+- **Dipakai** and **Dipasang** are statuses of items **at a place, with no holder**. A location
+  is **optional**: the place is often implied by the item itself (a toilet-paper roll that is
+  *Dipasang* is already in the toilet), so "Dipasang di R. Genset" is only worth typing when it
+  adds something. **Pinjam** is for items carried off by a person and is where the holder matters
+  (§110).
+- The STATUS dropdown is **pre-filled** by `planMovement` from the item's kind and the −/+
+  direction; the operator touches it only for exceptions (Rusak, Hilang, Pasang). This keeps
+  Part XVI decision 2 — keterangan inferred, never chosen — intact against a 7-value dropdown.
+- Domain naming (`digunakan` vs `dipakai`, adding `pasang`) is decided at implementation.
+- **Later, not scheduled:** a floor plan of the masjid. Once it can hold points, a point can be
+  linked to a *Dipasang* or *Dipakai* item, so "where is the parang installed or in use" becomes a
+  position rather than a text field. That, and the optional location above, is why locations
+  become a managed list at import rather than free text.
+
+## 109. Identity, revised
+
+- **PIN unique per person** stays (Model C). Old PINs in the Sheet are a simple sequence and are
+  **regenerated at random on migration**.
+- **Viewing needs a PIN once.** Go returns a **device token** (not the PIN), kept in
+  localStorage; it opens the read views and can be revoked server-side. **The PIN itself is never
+  stored on the device.** Recording a movement **always asks for the PIN**, once per visit
+  (§58.5 stands — 20 knives cost one PIN, not twenty).
+- The public, PII-free management dashboard (§39) stays separate and PIN-free.
+- **Anggota carry a *tipe*** (Perawatan — marbot and BRT staff; Security) written into Histori.
+  Roles collapse to `admin_utama · admin · anggota` plus tipe; Perawatan and Security are not
+  roles.
+- **No responsible tipe per category or item — everyone is jointly responsible** (owner,
+  2026-10-05; this drops the earlier idea of a default tipe per category such as STOK F →
+  Security). Tipe therefore carries **no permission and triggers no automatic "out-of-type"
+  flag**. It is recorded so Histori can be filtered and read in context — e.g. a loan recorded by
+  Security. Whether a loan recorded outside Perawatan should be marked as a deviation from the
+  SOP: **decided 2026-10-05 — no marker**; Histori records the recorder's tipe and nothing more
+  (§110).
+
+## 110. Borrowers are often outsiders
+
+Borrowers may be jamaah or neighbourhood officials (RT/RW) — no account, no PIN, never in the
+app. §60 flagged this as Phase 3; it is pulled forward.
+
+- **Pinjam requires a borrower name**, picked from a registry or added inline, **phone optional**.
+  Owner chose this to enforce a stricter SOP. Dipakai/Dipasang need **neither a name nor a
+  mandatory location** (§108).
+- **Any PIN holder may record a loan** — jamaah often report to Security, not Perawatan. The
+  SOP is that a Perawatan member accompanies and records; **the system does not enforce it** and
+  records the recorder's tipe in Histori. **No deviation marker** for a loan recorded outside
+  Perawatan (owner, 2026-10-05): without a responsible tipe per item it would flag most loans
+  Security records, including the legitimate ones.
+
+## 111. Model and screens
+
+- **Stock stays per location** (Part XXI). Evidence for it: 8 items in the Sheet are written with
+  two locations in one cell, with no quantity split.
+- **Per-category pages (S1–S10)** are filtered views of the same data, not a second model; Peta
+  Rak and zones fold into them so the same facts are not listed in two places (§82).
+- **Laporan becomes Notifikasi + Histori.** Notifikasi covers low, out, *rusak* and *hilang* —
+  the working reading of §71.2's undefined "bermasalah". Charts and the trust score are dropped
+  (supersedes the §74 layout; the rusak/hilang repair-and-write-off lists survive inside Notifikasi).
+- **Kept as shortcuts:** QR camera scanning, item photos, Pengajuan Pembelian (§93), Cetak Label
+  (admin only). Owner's reason: scanning beats scrolling and searching row by row.
+
+## 112. Per-unit QR, answered
+
+Pisau is the thing that goes missing after Qurban (§73), and some knives are expensive and some
+cheap. **Per-unit QR is applied only to items the committee chooses**; everything else is counted
+by quantity, as the Sheet already does ("Pisau — Besar 2", "Pisau — Kecil, Biru 20"). Expensive and
+cheap knives may be split into separate catalog items. Whether to label at all is the committee's
+call, not ours.
+
+## 113. Still open — for the meeting, decided on manual validation
+
+If the committee and the boss disagree, **the meeting decides, on manual validation.**
+
+1. Are there items stored separately in two locations? *(Working assumption: yes.)*
+2. **Verifying opening stock.** The numbers were counted and validated by hand, not all of them,
+   and fast movers like soap have already drifted. *Proposed:* a category is marked verified once
+   counted, and the first period starts from verified figures only. Which category first, and
+   who counts?
+3. **Which items get a QR each.**
+4. A second real story of something that went missing, and whether it was lent-and-lost or lost
+   in the mess (§60) — this sizes how much loan tracking is worth.
+5. **Who maintains the Go server and its backups** (§107).
+
+## 114. Order of work
+
+Backend first (owner's call — it retires the slow Apps Script and starts moving data to Postgres):
+
+1. **Go + PostgreSQL** with unique PINs, tipe, the borrower registry and Clerk for admin;
+   transactions and history move to Postgres in stages.
+2. **Go reads and writes the Sheet:** catalog, opening balances, closing figures.
+3. **Import the 463 items**, normalising locations to a fixed list, then verify per category.
+4. **New screens:** Beranda like Menu Utama, per-category pages, the −/+ stepper with a pre-filled
+   STATUS, Notifikasi and Histori.
+5. **First period close** — one trial period before it counts.
+6. *Not scheduled:* the masjid floor plan.
+
+The live app on Fly.io keeps running on the current gateway until step 1 can replace it.

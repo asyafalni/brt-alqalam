@@ -11,3 +11,6 @@ dist/
 # Scratch Playwright helpers — a screenshot or a DOM probe written for one question and
 # thrown away. The audits that earn their keep live under their real names.
 docs/_*.mjs
+
+# Data lama komite: berisi PIN teks biasa dan email pengguna
+docs/Data Inventaris BRT.xlsx
